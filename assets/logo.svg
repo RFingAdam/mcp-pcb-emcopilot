@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">
+  <defs>
+    <linearGradient id="pcbGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- PCB icon -->
+  <g transform="translate(15, 15)">
+    <!-- Board outline -->
+    <rect x="0" y="10" width="60" height="40" rx="3" fill="none" stroke="url(#pcbGrad)" stroke-width="2"/>
+
+    <!-- Traces -->
+    <line x1="8" y1="25" x2="25" y2="25" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="25" y1="25" x2="25" y2="40" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="25" y1="40" x2="52" y2="40" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+
+    <line x1="8" y1="35" x2="18" y2="35" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18" y1="35" x2="18" y2="20" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18" y1="20" x2="52" y2="20" stroke="url(#pcbGrad)" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Vias -->
+    <circle cx="25" cy="25" r="3" fill="url(#pcbGrad)"/>
+    <circle cx="25" cy="40" r="3" fill="url(#pcbGrad)"/>
+    <circle cx="18" cy="35" r="3" fill="url(#pcbGrad)"/>
+    <circle cx="18" cy="20" r="3" fill="url(#pcbGrad)"/>
+
+    <!-- Component pads -->
+    <rect x="45" y="17" width="10" height="6" rx="1" fill="url(#pcbGrad)" opacity="0.7"/>
+    <rect x="45" y="37" width="10" height="6" rx="1" fill="url(#pcbGrad)" opacity="0.7"/>
+
+    <!-- EM waves -->
+    <path d="M 65 30 Q 72 20, 75 30 Q 78 40, 85 30" stroke="#3B82F6" stroke-width="1.5" fill="none" opacity="0.6"/>
+    <path d="M 68 30 Q 77 15, 82 30 Q 87 45, 95 30" stroke="#10B981" stroke-width="1.5" fill="none" opacity="0.4"/>
+  </g>
+
+  <!-- Text -->
+  <text x="100" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#1F2937">
+    MCP PCB EM Copilot
+  </text>
+  <text x="100" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#6B7280">
+    SI, EMC analysis &amp; design review
+  </text>
+</svg>
