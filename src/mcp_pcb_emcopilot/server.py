@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCP server for PCB design review, EMC analysis, and signal integrity.
 
-Provides ~48 tools for PCB engineers covering:
+Provides ~54 tools for PCB engineers covering:
 - File parsing (KiCad, ODB++, Gerber, Altium, IPC-2581)
 - Impedance (microstrip, stripline, differential pairs)
 - Signal integrity (timing, crosstalk, via transitions)
@@ -494,6 +494,33 @@ async def list_tools() -> list[Tool]:
         }, ["cable_spacing_mm", "parallel_length_mm", "frequency_mhz"]),
 
         # =====================================================================
+        # EMI / RETURN PATH (6 tools)
+        # =====================================================================
+        _make_tool("pcb_trace_return_path", "Trace ground return current path for a specific net. Shows return path segments, loop area, split crossings, and via transition quality.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "net_name": {"type": "string", "description": "Net name to trace return path for"},
+        }, ["session_id", "net_name"]),
+        _make_tool("pcb_analyze_return_paths", "Analyze return paths for all high-speed signal nets. Identifies split-plane crossings, inadequate return vias, and calculates effective loop areas.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "max_frequency_mhz": {"type": "number", "description": "Max signal frequency for analysis (0 = analyze all high-speed nets)"},
+        }, ["session_id"]),
+        _make_tool("pcb_find_split_crossings", "Find signals crossing ground plane splits/slots. Each crossing forces return current to detour, increasing loop area and EMI risk.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_emi_risk", "Score EMI risk per net and identify top concerns. Combines return path quality, loop area, frequency content, and current to predict emissions.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "standard": {"type": "string", "description": "EMC standard: FCC_B, FCC_A, CISPR_B, CISPR_A"},
+        }, ["session_id"]),
+        _make_tool("pcb_predict_emissions", "Predict radiated emission spectrum vs regulatory limits. Calculates emission level at each harmonic and compares to FCC/CISPR limits.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "standard": {"type": "string", "description": "EMC standard for limit comparison (default: FCC_B)"},
+            "test_distance_m": {"type": "number", "description": "Measurement distance in meters (default: 3)"},
+        }, ["session_id"]),
+        _make_tool("pcb_get_emi_hotspots", "Identify board regions with highest EMI risk. Clusters high-risk nets by location and returns spatial hot-spots.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+
+        # =====================================================================
         # CLASSIFICATION (3 tools)
         # =====================================================================
         _make_tool("pcb_classify_nets", "Classify all nets by function (power, ground, DDR, USB, PCIe, etc.) with confidence scores. Detects differential pairs automatically.", {
@@ -766,6 +793,90 @@ def _dispatch(name: str, args: dict) -> dict:
         std_val = std_map.get(args.get("standard", "FCC_B"), args.get("standard", "fcc_class_b"))
         res = predictor.predict_compliance(standard=EMCStandard(std_val))
         return _serialize(res)
+
+    # === EMI / RETURN PATH ===
+    if name == "pcb_trace_return_path":
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        net_categories = {nc.net_name: nc.category for nc in classified.classified_nets}
+        category = net_categories.get(args["net_name"], "unknown")
+        analyzer = ReturnPathAnalyzer()
+        result = analyzer.analyze_net(data, args["net_name"], net_category=category, net_categories=net_categories)
+        return _serialize(result)
+
+    if name == "pcb_analyze_return_paths":
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        analyzer = ReturnPathAnalyzer()
+        result = analyzer.analyze(data, classified, max_frequency_mhz=args.get("max_frequency_mhz", 0))
+        return _serialize(result)
+
+    if name == "pcb_find_split_crossings":
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        data = _get_session(args["session_id"])
+        analyzer = ReturnPathAnalyzer()
+        crossings = analyzer.find_split_crossings(data)
+        return {"split_crossings": [_serialize(c) for c in crossings], "count": len(crossings)}
+
+    if name == "pcb_analyze_emi_risk":
+        from .analyzers.emc.emi_risk_scorer import EMIRiskScorer
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        rp_analyzer = ReturnPathAnalyzer()
+        rp_result = rp_analyzer.analyze(data, classified)
+        scorer = EMIRiskScorer()
+        result = scorer.score(data, rp_result, classified, standard=args.get("standard", "FCC_B"))
+        return _serialize(result)
+
+    if name == "pcb_predict_emissions":
+        from .analyzers.emc.emi_risk_scorer import EMIRiskScorer
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        rp_analyzer = ReturnPathAnalyzer()
+        rp_result = rp_analyzer.analyze(data, classified)
+        scorer = EMIRiskScorer()
+        dist = args.get("test_distance_m", 3.0)
+        result = scorer.score(data, rp_result, classified, standard=args.get("standard", "FCC_B"), test_distance_m=dist)
+        # Return focused emission spectrum data
+        compliance = result.standard_compliance
+        return {
+            "frequency_risks": [_serialize(fr) for fr in result.frequency_risks],
+            "predicted_problem_frequencies_mhz": result.predicted_problem_frequencies_mhz,
+            "standard_compliance": compliance,
+            "test_distance_m": dist,
+            "standard": args.get("standard", "FCC_B"),
+            "total_frequencies_analyzed": len(result.frequency_risks),
+        }
+
+    if name == "pcb_get_emi_hotspots":
+        from .analyzers.emc.emi_risk_scorer import EMIRiskScorer
+        from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        rp_analyzer = ReturnPathAnalyzer()
+        rp_result = rp_analyzer.analyze(data, classified)
+        scorer = EMIRiskScorer()
+        result = scorer.score(data, rp_result, classified)
+        return {
+            "hotspots": [_serialize(r) for r in result.board_regions],
+            "count": len(result.board_regions),
+            "overall_risk_level": result.overall_risk_level,
+            "overall_risk_score": result.overall_risk_score,
+        }
 
     # === HIGH-SPEED DIGITAL ===
     if name == "pcb_analyze_ddr":
