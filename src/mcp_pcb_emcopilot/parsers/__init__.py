@@ -246,6 +246,50 @@ def _parse_odb(file_path: str) -> PCBDesignData:
                 area_mm2=cp.area_mm2 or 0,
             ))
 
+    # Populate deep extraction fields
+    # Drill table
+    data.drill_table = parser._build_drill_table(odb)
+
+    # Board outline detail
+    if odb.outline:
+        data.board_outline_detail = {
+            "width_mm": round(odb.outline.width_mm or 0, 3),
+            "height_mm": round(odb.outline.height_mm or 0, 3),
+            "area_mm2": round(odb.outline.area_mm2 or 0, 2),
+            "vertices": odb.outline.outline,
+            "cutouts": odb.outline.cutouts,
+            "origin_x_mm": round(odb.outline.origin_x_mm, 3),
+            "origin_y_mm": round(odb.outline.origin_y_mm, 3),
+        }
+
+    # Design rules
+    data.design_rules = [
+        {
+            "name": r.rule_name,
+            "type": r.rule_type,
+            "value_mm": r.value_mm,
+            "scope": r.layer_scope,
+        }
+        for r in odb.design_rules
+    ]
+
+    # Apply extracted design rules to PCBDesignData min_* fields
+    for rule in odb.design_rules:
+        if rule.layer_scope is not None:
+            continue  # Only apply global rules to top-level fields
+        if rule.rule_type == "width":
+            data.min_trace_width_mm = rule.value_mm
+        elif rule.rule_type == "spacing":
+            data.min_clearance_mm = rule.value_mm
+        elif rule.rule_type == "drill":
+            data.min_via_drill_mm = rule.value_mm
+
+    # Copper pours summary
+    data.copper_pours = parser._build_copper_pour_summary(odb)
+
+    # Manufacturing notes
+    data.manufacturing_notes = list(odb.manufacturing_notes)
+
     return data
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCP server for PCB design review, EMC analysis, and signal integrity.
 
-Provides ~45 tools for PCB engineers covering:
+Provides ~48 tools for PCB engineers covering:
 - File parsing (KiCad, ODB++, Gerber, Altium, IPC-2581)
 - Impedance (microstrip, stripline, differential pairs)
 - Signal integrity (timing, crosstalk, via transitions)
@@ -11,6 +11,7 @@ Provides ~45 tools for PCB engineers covering:
 - DFM (solder paste, placement, assembly, tolerance)
 - Thermal (power dissipation, hotspot, copper spreading, thermal via)
 - Antenna/EMI (trace antenna, slot, common mode, cable coupling)
+- Classification (net classification, interface detection, design type)
 - Design validation (cross-validation, BOM, schematic-layout)
 - Session management
 
@@ -289,6 +290,21 @@ async def list_tools() -> list[Tool]:
             "session_id": {"type": "string", "description": "Session ID"},
             "layer": {"type": "string", "description": "Optional layer filter"},
         }, ["session_id"]),
+        _make_tool("pcb_get_drill_table", "Get drill table: sizes, counts, plating types, aspect ratios.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_get_board_outline", "Get board outline: dimensions, area, vertices, cutouts.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_get_design_rules", "Get extracted DRC constraints: min trace, min space, min drill, min annular ring.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_get_copper_pours", "Get copper pour/zone data: areas, nets, clearances per layer.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_get_manufacturing_notes", "Get fab notes, material specs, and manufacturing info.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
 
         # =====================================================================
         # IMPEDANCE CALCULATORS (4 tools — original)
@@ -478,6 +494,19 @@ async def list_tools() -> list[Tool]:
         }, ["cable_spacing_mm", "parallel_length_mm", "frequency_mhz"]),
 
         # =====================================================================
+        # CLASSIFICATION (3 tools)
+        # =====================================================================
+        _make_tool("pcb_classify_nets", "Classify all nets by function (power, ground, DDR, USB, PCIe, etc.) with confidence scores. Detects differential pairs automatically.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_detect_interfaces", "Detect high-speed interfaces (DDR, PCIe, USB, Ethernet, LVDS, RF) with pin counts and associated nets.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_classify_design", "Classify overall design type (rf, mixed_signal, high_speed_digital, power, simple_digital) with complexity score (1-10).", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+
+        # =====================================================================
         # REFERENCE DATA (2 tools — original)
         # =====================================================================
         _make_tool("pcb_get_stackup_templates", "Get common PCB stackup templates with typical impedances.", {}, None),
@@ -562,6 +591,93 @@ def _dispatch(name: str, args: dict) -> dict:
             widths[w] = widths.get(w, 0) + 1
         layers_used = list({t.layer for t in traces})
         return {"count": len(traces), "total_trace_length_mm": round(data.total_trace_length_mm, 1), "width_distribution": widths, "layers": layers_used}
+
+    if name == "pcb_get_drill_table":
+        data = _get_session(args["session_id"])
+        table = data.drill_table
+        total_holes = sum(d.get("count", 0) for d in table)
+        unique_sizes = len(table)
+        pth_count = sum(d["count"] for d in table if d.get("plating") != "non_plated")
+        npth_count = sum(d["count"] for d in table if d.get("plating") == "non_plated")
+        smallest = min((d["size_mm"] for d in table), default=0)
+        largest = max((d["size_mm"] for d in table), default=0)
+        return {
+            "drill_table": table,
+            "summary": {
+                "total_holes": total_holes,
+                "unique_sizes": unique_sizes,
+                "pth_count": pth_count,
+                "npth_count": npth_count,
+                "smallest_drill_mm": smallest,
+                "largest_drill_mm": largest,
+            },
+        }
+
+    if name == "pcb_get_board_outline":
+        data = _get_session(args["session_id"])
+        outline = data.board_outline_detail
+        if not outline:
+            outline = {
+                "width_mm": data.board_width_mm,
+                "height_mm": data.board_height_mm,
+                "area_mm2": round(data.board_width_mm * data.board_height_mm, 2),
+                "vertices": data.board_outline,
+                "cutouts": [],
+            }
+        cutout_count = len(outline.get("cutouts", []))
+        return {
+            "outline": outline,
+            "board_width_mm": outline.get("width_mm", data.board_width_mm),
+            "board_height_mm": outline.get("height_mm", data.board_height_mm),
+            "board_area_mm2": outline.get("area_mm2", 0),
+            "cutout_count": cutout_count,
+            "vertex_count": len(outline.get("vertices", [])),
+        }
+
+    if name == "pcb_get_design_rules":
+        data = _get_session(args["session_id"])
+        rules = data.design_rules
+        # Also include the top-level min_* fields as fallback
+        summary = {
+            "min_trace_width_mm": data.min_trace_width_mm,
+            "min_clearance_mm": data.min_clearance_mm,
+            "min_via_drill_mm": data.min_via_drill_mm,
+        }
+        # Group rules by type
+        by_type = {}
+        for r in rules:
+            rtype = r.get("type", "other")
+            if rtype not in by_type:
+                by_type[rtype] = []
+            by_type[rtype].append(r)
+        return {
+            "rules": rules,
+            "rule_count": len(rules),
+            "by_type": by_type,
+            "summary": summary,
+        }
+
+    if name == "pcb_get_copper_pours":
+        data = _get_session(args["session_id"])
+        pours = data.copper_pours
+        total_area = sum(p.get("area_mm2", 0) for p in pours)
+        layers_with_pours = list({p["layer"] for p in pours})
+        nets_with_pours = list({p.get("net_name", "unassigned") for p in pours})
+        return {
+            "copper_pours": pours,
+            "pour_count": len(pours),
+            "total_area_mm2": round(total_area, 2),
+            "layers_with_pours": layers_with_pours,
+            "nets_with_pours": nets_with_pours,
+        }
+
+    if name == "pcb_get_manufacturing_notes":
+        data = _get_session(args["session_id"])
+        notes = data.manufacturing_notes
+        return {
+            "notes": notes,
+            "note_count": len(notes),
+        }
 
     # === IMPEDANCE CALCULATORS ===
     if name == "pcb_calc_microstrip_impedance":
@@ -836,6 +952,31 @@ def _dispatch(name: str, args: dict) -> dict:
         }
         res = analyzer.analyze_connector(connector=conn)
         return _serialize(res)
+
+    # === CLASSIFICATION ===
+    if name == "pcb_classify_nets":
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        result = classifier.classify(data)
+        return result.to_dict()
+
+    if name == "pcb_detect_interfaces":
+        from .classifiers.net_classifier import NetClassifier
+        from .classifiers.interface_detector import InterfaceDetector
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        net_cls = classifier.classify(data)
+        detector = InterfaceDetector()
+        result = detector.detect(data, net_cls)
+        return result.to_dict()
+
+    if name == "pcb_classify_design":
+        from .classifiers.design_classifier import DesignClassifier
+        data = _get_session(args["session_id"])
+        classifier = DesignClassifier()
+        result = classifier.classify(data)
+        return result.to_dict()
 
     # === REFERENCE DATA ===
     if name == "pcb_get_stackup_templates":

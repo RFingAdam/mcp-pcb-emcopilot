@@ -143,6 +143,13 @@ class PCBDesignData:
     # Parsing info
     warnings: list[str] = field(default_factory=list)
 
+    # Deep extraction data (populated by ODB++ and other parsers)
+    drill_table: list[dict] = field(default_factory=list)  # [{size_mm, count, plating, aspect_ratio}]
+    board_outline_detail: dict = field(default_factory=dict)  # {width_mm, height_mm, area_mm2, vertices, cutouts}
+    design_rules: list[dict] = field(default_factory=list)  # [{name, type, value_mm, scope}]
+    copper_pours: list[dict] = field(default_factory=list)  # [{layer, net_name, area_mm2, clearance_mm, ...}]
+    manufacturing_notes: list[str] = field(default_factory=list)
+
     # BOM data (optional, from bom_parser)
     bom_items: list[dict] = field(default_factory=list)
 

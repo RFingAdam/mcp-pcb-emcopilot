@@ -272,6 +272,24 @@ class ODBBoardOutline:
 
 
 @dataclass
+class ODBDesignRule:
+    """Design rule constraint extracted from ODB++ attributes"""
+    rule_name: str
+    rule_type: str  # spacing, width, drill, annular_ring, other
+    value_mm: float
+    layer_scope: Optional[str] = None  # None = global, or layer name
+
+
+@dataclass
+class ODBPadStack:
+    """Pad stack definition from ODB++ symbols"""
+    pad_id: str
+    layers: Dict[str, ODBPad] = field(default_factory=dict)  # layer_name -> pad shape
+    drill_size_mm: Optional[float] = None
+    plating: str = "pth"  # pth, npth
+
+
+@dataclass
 class ODBData:
     """Complete ODB++ parsed data"""
     # Source info
@@ -308,6 +326,15 @@ class ODBData:
 
     # Pad definitions
     pad_templates: Dict[str, ODBPad] = field(default_factory=dict)
+
+    # Pad stacks
+    pad_stacks: Dict[str, ODBPadStack] = field(default_factory=dict)
+
+    # Design rules
+    design_rules: List[ODBDesignRule] = field(default_factory=list)
+
+    # Manufacturing notes
+    manufacturing_notes: List[str] = field(default_factory=list)
 
     # Stackup properties
     total_thickness_mm: Optional[float] = None

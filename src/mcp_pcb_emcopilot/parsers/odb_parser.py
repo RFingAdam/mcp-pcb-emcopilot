@@ -21,6 +21,8 @@ from .odb_models import (
     ODBDrill,
     ODBBoardOutline,
     ODBPad,
+    ODBDesignRule,
+    ODBPadStack,
     LayerType,
     Polarity,
     ViaType,
@@ -133,6 +135,15 @@ class ODBParser:
 
                 # Parse drills
                 self._parse_drills(step_path, data)
+
+                # Parse layer-level attributes (design rules per layer)
+                self._parse_layer_attributes(step_path, data)
+
+            # Parse design-level attributes and design rules from misc/attrlist
+            self._parse_misc_attributes(odb_root, data)
+
+            # Parse manufacturing notes from misc/info
+            self._parse_misc_info(odb_root, data)
 
             # Calculate summary statistics
             self._calculate_statistics(data)
@@ -1007,6 +1018,244 @@ class ODBParser:
         min_pad_size = 0.4  # mm
 
         return max(calculated_pad, min_pad_size)
+
+    def _parse_layer_attributes(self, step_path: Path, data: ODBData):
+        """Parse attrlist files from each layer directory for per-layer design rules.
+
+        ODB++ layers can have an attrlist file containing attributes like:
+        .min_line_width, .min_spacing, .min_annular_ring, etc.
+        """
+        layers_dir = step_path / "layers"
+        if not layers_dir.exists():
+            return
+
+        for layer_info in data.layers:
+            if layer_info.layer_type not in (LayerType.SIGNAL, LayerType.PLANE, LayerType.MIXED):
+                continue
+
+            layer_dir = layers_dir / layer_info.name
+            if not layer_dir.exists():
+                # Try case-insensitive match
+                for d in layers_dir.iterdir():
+                    if d.name.lower() == layer_info.name.lower():
+                        layer_dir = d
+                        break
+
+            if not layer_dir.exists():
+                continue
+
+            attrlist_file = layer_dir / "attrlist"
+            if not attrlist_file.exists():
+                continue
+
+            try:
+                content = self._read_file(attrlist_file)
+                self._extract_design_rules_from_attrlist(
+                    content, data, layer_scope=layer_info.name
+                )
+            except Exception as e:
+                data.parse_warnings.append(
+                    f"Error parsing attrlist for layer {layer_info.name}: {e}"
+                )
+
+    def _parse_misc_attributes(self, odb_root: Path, data: ODBData):
+        """Parse design-level attributes from misc/attrlist.
+
+        This file contains global design rules and fabrication parameters:
+        .min_line_width = 0.1
+        .min_spacing = 0.1
+        .min_drill = 0.2
+        .min_annular_ring = 0.075
+        """
+        attrlist_file = odb_root / "misc" / "attrlist"
+        if not attrlist_file.exists():
+            return
+
+        try:
+            content = self._read_file(attrlist_file)
+            self._extract_design_rules_from_attrlist(content, data, layer_scope=None)
+        except Exception as e:
+            data.parse_warnings.append(f"Error parsing misc/attrlist: {e}")
+
+    def _extract_design_rules_from_attrlist(
+        self, content: str, data: ODBData, layer_scope: Optional[str]
+    ):
+        """Extract design rule constraints from an attrlist file.
+
+        ODB++ attrlist format:
+        - Lines starting with . define attributes: .attr_name = value
+        - Lines starting with @ define attribute assignments: @0 .attr_name
+        - Comment lines start with #
+        """
+        # Mapping from ODB++ attribute names to rule types
+        rule_type_map = {
+            "min_line_width": "width",
+            "min_line_wid": "width",
+            "min_trace_width": "width",
+            "min_spacing": "spacing",
+            "min_space": "spacing",
+            "min_clearance": "spacing",
+            "min_drill": "drill",
+            "min_drill_size": "drill",
+            "min_annular_ring": "annular_ring",
+            "min_ann_ring": "annular_ring",
+            "min_smd_to_hole": "spacing",
+            "min_pad_to_pad": "spacing",
+            "min_pad_to_trace": "spacing",
+            "max_copper_sliver": "width",
+            "min_via_hole": "drill",
+            "min_hole_to_hole": "spacing",
+            "min_hole_to_copper": "spacing",
+        }
+
+        for line in content.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            # Parse .attribute = value lines
+            if line.startswith('.') and '=' in line:
+                key, _, value = line.partition('=')
+                attr_name = key.strip().lstrip('.')
+                value_str = value.strip().strip("'\"")
+
+                # Try to parse numeric value
+                try:
+                    # Strip units suffix if present
+                    num_str = re.sub(r'[a-zA-Z]+$', '', value_str).strip()
+                    if not num_str:
+                        continue
+                    num_val = float(num_str)
+
+                    # Convert to mm based on current units
+                    if self._units == 'mil':
+                        val_mm = num_val * self.MIL_TO_MM
+                    elif self._units == 'inch':
+                        val_mm = num_val * self.INCH_TO_MM
+                    else:
+                        val_mm = num_val  # Already mm
+
+                    # Determine rule type
+                    attr_lower = attr_name.lower()
+                    rule_type = rule_type_map.get(attr_lower, "other")
+
+                    # Only add recognized design rule attributes
+                    if attr_lower in rule_type_map:
+                        # Check for duplicate (same rule_name + layer_scope)
+                        is_dup = any(
+                            r.rule_name == attr_name and r.layer_scope == layer_scope
+                            for r in data.design_rules
+                        )
+                        if not is_dup:
+                            data.design_rules.append(ODBDesignRule(
+                                rule_name=attr_name,
+                                rule_type=rule_type,
+                                value_mm=round(val_mm, 4),
+                                layer_scope=layer_scope,
+                            ))
+                except ValueError:
+                    continue
+
+    def _parse_misc_info(self, odb_root: Path, data: ODBData):
+        """Parse manufacturing notes and general info from misc/info.
+
+        The misc/info file contains free-form text with design metadata,
+        fab notes, material specs, revision history, etc.
+        """
+        info_file = odb_root / "misc" / "info"
+        if not info_file.exists():
+            return
+
+        try:
+            content = self._read_file(info_file)
+            for line in content.split('\n'):
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                # Capture non-empty lines as manufacturing notes
+                # Filter out pure formatting/separator lines
+                if len(line) > 2 and not all(c in '-=_*' for c in line):
+                    data.manufacturing_notes.append(line)
+
+            # Also try to extract job_name from info
+            for note in data.manufacturing_notes:
+                note_lower = note.lower()
+                if 'job_name' in note_lower or 'design_name' in note_lower:
+                    parts = note.split('=', 1)
+                    if len(parts) == 2:
+                        data.job_name = parts[1].strip().strip("'\"")
+                        break
+        except Exception as e:
+            data.parse_warnings.append(f"Error parsing misc/info: {e}")
+
+    def _build_drill_table(self, data: ODBData) -> list:
+        """Build a drill table summarizing drill sizes, counts, plating, and aspect ratios.
+
+        Returns a list of dicts: [{size_mm, count, plating, aspect_ratio}]
+        sorted by drill size ascending.
+        """
+        # Group drills by diameter
+        drill_groups: Dict[float, Dict] = {}
+
+        for drill in data.drills:
+            size = round(drill.diameter_mm, 3)
+            if size not in drill_groups:
+                drill_groups[size] = {
+                    "size_mm": size,
+                    "count": 0,
+                    "plating": drill.drill_type,
+                }
+            drill_groups[size]["count"] += 1
+            # If any drill of this size is non-plated, note it
+            if drill.drill_type == "non_plated":
+                drill_groups[size]["plating"] = "non_plated"
+
+        # Also include vias that may not have explicit drill records
+        for via in data.vias:
+            size = round(via.drill_diameter_mm, 3)
+            if size not in drill_groups:
+                drill_groups[size] = {
+                    "size_mm": size,
+                    "count": 0,
+                    "plating": "plated",
+                }
+                drill_groups[size]["count"] += 1
+
+        # Calculate aspect ratios (drill depth / drill diameter)
+        board_thickness = data.total_thickness_mm or 1.6  # Default FR4
+        for group in drill_groups.values():
+            if group["size_mm"] > 0:
+                group["aspect_ratio"] = round(board_thickness / group["size_mm"], 2)
+            else:
+                group["aspect_ratio"] = 0.0
+
+        return sorted(drill_groups.values(), key=lambda d: d["size_mm"])
+
+    def _build_copper_pour_summary(self, data: ODBData) -> list:
+        """Build a summary of copper pours with net assignments and areas.
+
+        Returns a list of dicts: [{layer, net_name, area_mm2, clearance_mm,
+        thermal_relief, pour_type}]
+        """
+        summary = []
+        for layer_name, pours in data.copper_pours.items():
+            for pour in pours:
+                area = pour.area_mm2
+                if area is None and pour.boundary:
+                    area = self._calculate_polygon_area(pour.boundary)
+                    pour.area_mm2 = area
+
+                summary.append({
+                    "layer": layer_name,
+                    "net_name": pour.net_name or "unassigned",
+                    "net_index": pour.net_number,
+                    "area_mm2": round(area, 2) if area else 0.0,
+                    "clearance_mm": pour.clearance_mm,
+                    "thermal_relief": pour.thermal_enabled,
+                    "pour_type": pour.pour_type,
+                })
+        return summary
 
     def _calculate_statistics(self, data: ODBData):
         """Calculate summary statistics for parsed data"""
