@@ -1,6 +1,6 @@
 [project]
 name = "mcp-pcb-emcopilot"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for PCB design review, EMC analysis, and signal integrity"
 readme = "README.md"
 license = "Apache-2.0"
@@ -23,6 +23,18 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+altium = ["olefile>=0.47"]
+excel = ["openpyxl>=3.1.0"]
+sparams = ["numpy>=1.26"]
+ground = ["networkx>=3.2"]
+all = [
+    "olefile>=0.47",
+    "openpyxl>=3.1.0",
+    "numpy>=1.26",
+    "networkx>=3.2",
 ]
 
 [project.scripts]
