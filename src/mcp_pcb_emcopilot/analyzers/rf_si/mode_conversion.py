@@ -226,7 +226,8 @@ def analyze_mode_conversion(
     i_common_ma = v_common / z_common * 1000 if z_common > 0 else 0
 
     # --- Skew ---
-    prop_delay_ps_per_mm = math.sqrt(er_eff) / (C0 / 1e12 / 1e3)  # ps/mm
+    # velocity = C0 / sqrt(er_eff) in m/s; delay_per_mm = 1e9 * sqrt(er_eff) / C0 ps/mm
+    prop_delay_ps_per_mm = math.sqrt(er_eff) * 1e9 / C0  # ps/mm
     skew_ps = length_asymmetry_mm * prop_delay_ps_per_mm
     bit_period_ps = 1e12 / (data_rate_gbps * 1e9)
     skew_percent = (skew_ps / bit_period_ps) * 100 if bit_period_ps > 0 else 0

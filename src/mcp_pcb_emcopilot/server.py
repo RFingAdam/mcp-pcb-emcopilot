@@ -689,7 +689,7 @@ async def list_tools() -> list[Tool]:
         }, ["data_rate_gbps", "trace_length_mm", "dielectric_constant", "loss_tangent", "trace_width_mm", "dielectric_height_mm"]),
 
         # =====================================================================
-        # EMC (6 tools)
+        # EMC (10 tools)
         # =====================================================================
         _make_tool("pcb_analyze_current_loop", "Estimate radiated emissions from a current loop for EMC.", {
             "loop_area_mm2": {"type": "number"}, "current_ma": {"type": "number"}, "frequency_mhz": {"type": "number"},
@@ -738,28 +738,6 @@ async def list_tools() -> list[Tool]:
             "existing_vias": {"type": "array", "items": {"type": "object"}, "description": "Existing via locations [{x_mm, y_mm}, ...]"},
             "plane_gaps": {"type": "array", "items": {"type": "object"}, "description": "Plane gap definitions [{x_start_mm, y_start_mm, x_end_mm, y_end_mm, width_mm}, ...]"},
         }, ["plane_width_mm", "plane_height_mm", "max_frequency_mhz", "dielectric_constant"]),
-
-        _make_tool("pcb_analyze_clock_emi", "Analyze clock/crystal oscillator EMI with trapezoidal harmonic envelope. Computes harmonic spectrum, compares against FCC/CISPR limits, models spread-spectrum reduction.", {
-            "frequency_mhz": {"type": "number", "description": "Clock fundamental frequency (MHz)"},
-            "voltage_v": {"type": "number", "description": "Signal amplitude V pk-pk (default 3.3)"},
-            "rise_time_ps": {"type": "number", "description": "Rise/fall time in ps (default 500)"},
-            "current_ma": {"type": "number", "description": "Signal current mA (default 10)"},
-            "loop_area_mm2": {"type": "number", "description": "Signal loop area mm^2 (default 10)"},
-            "spread_spectrum_percent": {"type": "number", "description": "Spread spectrum modulation % (0=none, 0.5-2 typical)"},
-            "duty_cycle": {"type": "number", "description": "Duty cycle 0-1 (default 0.5)"},
-            "standard": {"type": "string", "description": "EMC standard: fcc_b or cispr_b"},
-        }, ["frequency_mhz"]),
-
-        _make_tool("pcb_analyze_smps_emi", "Analyze SMPS switching power supply EMI. Models input/output loop radiation, harmonic spectrum from duty cycle, and recommends EMI filter parameters.", {
-            "switching_freq_khz": {"type": "number", "description": "Switching frequency (kHz)"},
-            "input_voltage_v": {"type": "number", "description": "Input voltage (V)"},
-            "output_voltage_v": {"type": "number", "description": "Output voltage (V)"},
-            "output_current_a": {"type": "number", "description": "Output load current (A)"},
-            "input_loop_area_mm2": {"type": "number", "description": "Input loop area mm^2 (default 20)"},
-            "output_loop_area_mm2": {"type": "number", "description": "Output loop area mm^2 (default 20)"},
-            "topology": {"type": "string", "description": "Converter topology: buck, boost, buck_boost"},
-            "standard": {"type": "string", "description": "EMC standard: fcc_b or cispr_b"},
-        }, ["switching_freq_khz", "input_voltage_v", "output_voltage_v", "output_current_a"]),
 
         # =====================================================================
         # HIGH-SPEED DIGITAL (6 tools)
@@ -1419,32 +1397,6 @@ def _dispatch(name: str, args: dict) -> dict:
             existing_vias=args.get("existing_vias"), plane_gaps=args.get("plane_gaps"),
         ))
 
-    if name == "pcb_analyze_clock_emi":
-        from .analyzers.emc.clock_emi_analyzer import analyze_clock_emi
-        return _result(analyze_clock_emi(
-            frequency_mhz=args["frequency_mhz"],
-            voltage_v=args.get("voltage_v", 3.3),
-            rise_time_ps=args.get("rise_time_ps", 500.0),
-            current_ma=args.get("current_ma", 10.0),
-            loop_area_mm2=args.get("loop_area_mm2", 10.0),
-            spread_spectrum_percent=args.get("spread_spectrum_percent", 0.0),
-            duty_cycle=args.get("duty_cycle", 0.5),
-            standard=args.get("standard", "fcc_b"),
-        ))
-
-    if name == "pcb_analyze_smps_emi":
-        from .analyzers.emc.clock_emi_analyzer import analyze_smps_emi
-        return _result(analyze_smps_emi(
-            switching_freq_khz=args["switching_freq_khz"],
-            input_voltage_v=args["input_voltage_v"],
-            output_voltage_v=args["output_voltage_v"],
-            output_current_a=args["output_current_a"],
-            input_loop_area_mm2=args.get("input_loop_area_mm2", 20.0),
-            output_loop_area_mm2=args.get("output_loop_area_mm2", 20.0),
-            topology=args.get("topology", "buck"),
-            standard=args.get("standard", "fcc_b"),
-        ))
-
     # === EMI / RETURN PATH ===
     if name == "pcb_trace_return_path":
         from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
@@ -1840,7 +1792,6 @@ def _dispatch(name: str, args: dict) -> dict:
             sid = existing_sid
         else:
             # Create new session from STEP data
-            from .parsers import parse_pcb_file
             data = parse_pcb_file(args["file_path"], format_hint="step")
             sid = sessions.create_session(data)
         return {
