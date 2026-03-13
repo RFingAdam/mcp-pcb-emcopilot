@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="420" viewBox="0 0 700 420">
+<style>
+  text { font-family: Arial, Helvetica, sans-serif; }
+  .title { font-size: 18px; font-weight: bold; fill: #1a1a1a; }
+  .subtitle { font-size: 11px; fill: #666; }
+  .label { font-size: 11px; font-weight: bold; fill: #fff; }
+  .label-dark { font-size: 11px; font-weight: bold; fill: #333; }
+  .label-sm { font-size: 9px; fill: #fff; }
+  .label-sm-dark { font-size: 9px; fill: #555; }
+  .dim { font-size: 9px; fill: #888; }
+  .arrow { stroke: #444; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-dash { stroke: #999; stroke-width: 1.5; stroke-dasharray: 6,3; fill: none; marker-end: url(#arrowhead-gray); }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#444" />
+  </marker>
+  <marker id="arrowhead-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 8 3, 0 6" fill="#999" />
+  </marker>
+</defs>
+<text x="350" y="28" class="title" text-anchor="middle">6-Layer PCB Stackup Cross-Section</text>
+<rect x="150" y="55" width="350" height="6" fill="#009900" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="62" class="label-sm-dark" text-anchor="end">Soldermask</text>
+<text x="510" y="62" class="dim" text-anchor="start">0.025 mm</text>
+<rect x="150" y="61" width="350" height="10" fill="#cc3333" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="70" class="label-sm-dark" text-anchor="end">L1 Signal (1oz Cu)</text>
+<text x="510" y="70" class="dim" text-anchor="start">0.035 mm</text>
+<rect x="150" y="71" width="350" height="25" fill="#ffffcc" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="87" class="label-sm-dark" text-anchor="end">Prepreg (FR-4)</text>
+<text x="510" y="87" class="dim" text-anchor="start">0.150 mm, Dk=4.2</text>
+<rect x="150" y="96" width="350" height="10" fill="#3333cc" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="105" class="label-sm-dark" text-anchor="end">L2 GND (1oz Cu)</text>
+<text x="510" y="105" class="dim" text-anchor="start">0.035 mm</text>
+<rect x="150" y="106" width="350" height="45" fill="#e0e0e0" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="132" class="label-sm-dark" text-anchor="end">Core (FR-4)</text>
+<text x="510" y="132" class="dim" text-anchor="start">0.300 mm, Dk=4.2</text>
+<rect x="150" y="151" width="350" height="8" fill="#cc3333" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="159" class="label-sm-dark" text-anchor="end">L3 Signal (0.5oz Cu)</text>
+<text x="510" y="159" class="dim" text-anchor="start">0.018 mm</text>
+<rect x="150" y="159" width="350" height="45" fill="#ffffcc" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="185" class="label-sm-dark" text-anchor="end">Prepreg (FR-4)</text>
+<text x="510" y="185" class="dim" text-anchor="start">0.300 mm, Dk=4.2</text>
+<rect x="150" y="204" width="350" height="8" fill="#cc3333" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="212" class="label-sm-dark" text-anchor="end">L4 Signal (0.5oz Cu)</text>
+<text x="510" y="212" class="dim" text-anchor="start">0.018 mm</text>
+<rect x="150" y="212" width="350" height="45" fill="#e0e0e0" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="238" class="label-sm-dark" text-anchor="end">Core (FR-4)</text>
+<text x="510" y="238" class="dim" text-anchor="start">0.300 mm, Dk=4.2</text>
+<rect x="150" y="257" width="350" height="10" fill="#cc6600" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="266" class="label-sm-dark" text-anchor="end">L5 PWR (1oz Cu)</text>
+<text x="510" y="266" class="dim" text-anchor="start">0.035 mm</text>
+<rect x="150" y="267" width="350" height="25" fill="#ffffcc" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="283" class="label-sm-dark" text-anchor="end">Prepreg (FR-4)</text>
+<text x="510" y="283" class="dim" text-anchor="start">0.150 mm, Dk=4.2</text>
+<rect x="150" y="292" width="350" height="10" fill="#cc3333" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="301" class="label-sm-dark" text-anchor="end">L6 Signal (1oz Cu)</text>
+<text x="510" y="301" class="dim" text-anchor="start">0.035 mm</text>
+<rect x="150" y="302" width="350" height="6" fill="#009900" stroke="#888" stroke-width="0.5"/>
+<text x="140" y="309" class="label-sm-dark" text-anchor="end">Soldermask</text>
+<text x="510" y="309" class="dim" text-anchor="start">0.025 mm</text>
+<line x1="630" y1="55" x2="630" y2="308" stroke="#cc0000" stroke-width="2"/>
+<line x1="625" y1="55" x2="635" y2="55" stroke="#cc0000" stroke-width="2"/>
+<line x1="625" y1="308" x2="635" y2="308" stroke="#cc0000" stroke-width="2"/>
+<text x="640" y="186" font-size="12" font-weight="bold" fill="#cc0000" font-family="Arial">Total: ~1.43 mm</text>
+</svg>

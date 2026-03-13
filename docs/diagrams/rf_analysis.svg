@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="350" viewBox="0 0 800 350">
+<style>
+  text { font-family: Arial, Helvetica, sans-serif; }
+  .title { font-size: 18px; font-weight: bold; fill: #1a1a1a; }
+  .subtitle { font-size: 11px; fill: #666; }
+  .label { font-size: 11px; font-weight: bold; fill: #fff; }
+  .label-dark { font-size: 11px; font-weight: bold; fill: #333; }
+  .label-sm { font-size: 9px; fill: #fff; }
+  .label-sm-dark { font-size: 9px; fill: #555; }
+  .dim { font-size: 9px; fill: #888; }
+  .arrow { stroke: #444; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-dash { stroke: #999; stroke-width: 1.5; stroke-dasharray: 6,3; fill: none; marker-end: url(#arrowhead-gray); }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#444" />
+  </marker>
+  <marker id="arrowhead-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 8 3, 0 6" fill="#999" />
+  </marker>
+</defs>
+<text x="400" y="28" class="title" text-anchor="middle">EMI Analysis Signal Flow</text>
+<rect x="50" y="120" width="110" height="55" rx="6" fill="#7c3aed" stroke="#6d28d9" stroke-width="1.5"/>
+<text x="105" y="142" class="label" text-anchor="middle">Clock/Signal</text>
+<text x="105" y="156" class="label" text-anchor="middle">Source</text>
+<rect x="200" y="120" width="120" height="55" rx="6" fill="#2563eb" stroke="#1d4ed8" stroke-width="1.5"/>
+<text x="260" y="142" class="label" text-anchor="middle">PCB Trace</text>
+<text x="260" y="156" class="label" text-anchor="middle">(Transmission Line)</text>
+<rect x="360" y="120" width="110" height="55" rx="6" fill="#dc2626" stroke="#b91c1c" stroke-width="1.5"/>
+<text x="415" y="142" class="label" text-anchor="middle">Unintentional</text>
+<text x="415" y="156" class="label" text-anchor="middle">Antenna</text>
+<rect x="510" y="120" width="110" height="55" rx="6" fill="#ea580c" stroke="#c2410c" stroke-width="1.5"/>
+<text x="565" y="142" class="label" text-anchor="middle">Radiated</text>
+<text x="565" y="156" class="label" text-anchor="middle">Emission</text>
+<rect x="660" y="120" width="110" height="55" rx="6" fill="#16a34a" stroke="#15803d" stroke-width="1.5"/>
+<text x="715" y="142" class="label" text-anchor="middle">Regulatory</text>
+<text x="715" y="156" class="label" text-anchor="middle">Limit Check</text>
+<line x1="160" y1="147" x2="200" y2="147" class="arrow"/>
+<line x1="320" y1="147" x2="360" y2="147" class="arrow"/>
+<line x1="470" y1="147" x2="510" y2="147" class="arrow"/>
+<line x1="620" y1="147" x2="660" y2="147" class="arrow"/>
+<rect x="65" y="220" width="90" height="40" rx="4" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="110" y="236" class="label-sm-dark" text-anchor="middle">Harmonic</text>
+<text x="110" y="249" class="label-sm-dark" text-anchor="middle">Content</text>
+<rect x="210" y="220" width="100" height="40" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="260" y="236" class="label-sm-dark" text-anchor="middle">Impedance &amp;</text>
+<text x="260" y="249" class="label-sm-dark" text-anchor="middle">Loss Model</text>
+<rect x="370" y="220" width="95" height="40" rx="4" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+<text x="417" y="236" class="label-sm-dark" text-anchor="middle">Loop Area &amp;</text>
+<text x="417" y="249" class="label-sm-dark" text-anchor="middle">Trace Length</text>
+<rect x="520" y="220" width="90" height="40" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+<text x="565" y="236" class="label-sm-dark" text-anchor="middle">E-field</text>
+<text x="565" y="249" class="label-sm-dark" text-anchor="middle">(dBuV/m)</text>
+<rect x="670" y="220" width="95" height="40" rx="4" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="717" y="236" class="label-sm-dark" text-anchor="middle">FCC/CISPR</text>
+<text x="717" y="249" class="label-sm-dark" text-anchor="middle">Margin (dB)</text>
+<line x1="110" y1="220" x2="105" y2="175" class="arrow-dash"/>
+<line x1="260" y1="220" x2="260" y2="175" class="arrow-dash"/>
+<line x1="417" y1="220" x2="415" y2="175" class="arrow-dash"/>
+<line x1="565" y1="220" x2="565" y2="175" class="arrow-dash"/>
+<line x1="717" y1="220" x2="715" y2="175" class="arrow-dash"/>
+<text x="400" y="310" class="dim" text-anchor="middle">Based on: Trapezoidal waveform Fourier analysis, IPC-2141 impedance, magnetic dipole radiation model</text>
+</svg>
