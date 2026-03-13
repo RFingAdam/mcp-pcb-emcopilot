@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, asdict
-
+from dataclasses import asdict, dataclass, field
 
 VALID_SEVERITIES = {"CRITICAL", "HIGH", "WARNING", "INFO", "PASS"}
 _FINDING_ID_RE = re.compile(r"^[A-Z]+-\d{3}$")

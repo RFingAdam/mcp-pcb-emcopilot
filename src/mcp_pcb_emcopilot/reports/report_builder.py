@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import Any, Optional
 
 from ..models.pcb_data import PCBDesignData
-from .tracked_finding import TrackedFinding
 from .section_registry import REPORT_SECTIONS, SectionDef
+from .tracked_finding import TrackedFinding
 
 # ---------------------------------------------------------------------------
 # Domain key → finding-ID prefix mapping
@@ -352,7 +352,7 @@ class ReportBuilder:
         verdict: str,
     ) -> tuple[str, int, int]:
         """Assemble DOCX report. Returns (path, sections_generated, sections_skipped)."""
-        from .docx_report import _check_docx, add_styled_table, add_finding_box, add_image_with_caption
+        from .docx_report import _check_docx, add_finding_box, add_image_with_caption, add_styled_table
         _check_docx()
         from docx import Document
         from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -610,8 +610,9 @@ class ReportBuilder:
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
     ) -> None:
-        from .docx_report import add_styled_table, add_finding_box
         from docx.shared import Pt, RGBColor
+
+        from .docx_report import add_finding_box, add_styled_table
 
         doc.add_heading(f"{sect.number}. {sect.title}", level=1)
 
@@ -870,8 +871,9 @@ class ReportBuilder:
         all_findings: list[TrackedFinding],
     ) -> None:
         """Build a domain-specific section with data tables and findings."""
-        from .docx_report import add_styled_table, add_finding_box
         from docx.shared import Pt
+
+        from .docx_report import add_finding_box, add_styled_table
 
         doc.add_heading(f"{sect.number}. {sect.title}", level=1)
 
