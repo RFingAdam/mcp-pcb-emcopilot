@@ -167,6 +167,9 @@ class PCBDesignData:
     # Review results (populated by orchestrator)
     review_results: dict = field(default_factory=dict)
 
+    # Per-tool analysis cache (populated by individual MCP tool calls)
+    analysis_cache: dict[str, Any] = field(default_factory=dict)
+
     # 3D / STEP data (optional, from step_parser)
     step_components: list[dict] = field(default_factory=list)  # [{reference, x, y, z, width, depth, height}]
     board_3d: dict = field(default_factory=dict)  # {width, depth, thickness, bounding_box}
