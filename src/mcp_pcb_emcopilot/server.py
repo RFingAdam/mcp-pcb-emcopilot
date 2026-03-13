@@ -617,6 +617,36 @@ async def list_tools() -> list[Tool]:
         }, ["max_frequency_mhz", "dielectric_constant"]),
 
         # =====================================================================
+        # S-PARAMETER / MODE CONVERSION (3 tools — Issues #8 & #12)
+        # =====================================================================
+        _make_tool("pcb_calc_insertion_loss", "Calculate frequency-swept insertion loss (S21) and return loss (S11) for a PCB trace. Models conductor loss (skin effect + Hammerstad roughness), dielectric loss, and mismatch loss.", {
+            "trace_length_mm": {"type": "number", "description": "Trace length in mm"},
+            "trace_width_mm": {"type": "number", "description": "Trace width in mm"},
+            "dielectric_height_mm": {"type": "number", "description": "Height above reference plane in mm"},
+            "dielectric_constant": {"type": "number", "description": "Substrate Er (FR4 ~ 4.3)"},
+            "loss_tangent": {"type": "number", "description": "Material Df (FR4: 0.02, Rogers 4350B: 0.0037)"},
+            "copper_thickness_oz": {"type": "number", "description": "Copper weight in oz (default 1.0)"},
+            "surface_roughness_um": {"type": "number", "description": "RMS roughness in um (standard: 0.5, HVLP: 0.3, RTF: 1.5)"},
+            "freq_start_mhz": {"type": "number", "description": "Sweep start frequency in MHz (default 10)"},
+            "freq_stop_mhz": {"type": "number", "description": "Sweep stop frequency in MHz (default 10000)"},
+            "num_points": {"type": "integer", "description": "Number of sweep points (default 50)"},
+        }, ["trace_length_mm", "trace_width_mm", "dielectric_height_mm", "dielectric_constant", "loss_tangent"]),
+        _make_tool("pcb_calc_return_loss", "Calculate return loss (S11), mismatch loss, and VSWR from impedance mismatch.", {
+            "impedance_ohm": {"type": "number", "description": "Actual trace/load impedance in ohms"},
+            "target_impedance_ohm": {"type": "number", "description": "Target (reference) impedance in ohms"},
+            "frequency_mhz": {"type": "number", "description": "Frequency of interest in MHz"},
+        }, ["impedance_ohm", "target_impedance_ohm", "frequency_mhz"]),
+        _make_tool("pcb_analyze_mode_conversion", "Analyze differential pair mode conversion: even/odd mode impedances, SCD21 from length asymmetry, common-mode current estimate, and EMI impact.", {
+            "trace_width_mm": {"type": "number", "description": "Width of each trace in mm"},
+            "trace_spacing_mm": {"type": "number", "description": "Edge-to-edge spacing in mm"},
+            "dielectric_height_mm": {"type": "number", "description": "Height above reference plane in mm"},
+            "dielectric_constant": {"type": "number", "description": "Substrate Er"},
+            "length_asymmetry_mm": {"type": "number", "description": "Length mismatch between P and N traces in mm"},
+            "data_rate_gbps": {"type": "number", "description": "Signaling rate in Gb/s"},
+            "trace_type": {"type": "string", "enum": ["microstrip", "stripline"], "description": "Trace type (default microstrip)"},
+        }, ["trace_width_mm", "trace_spacing_mm", "dielectric_height_mm", "dielectric_constant", "length_asymmetry_mm", "data_rate_gbps"]),
+
+        # =====================================================================
         # SIGNAL INTEGRITY (5 tools)
         # =====================================================================
         _make_tool("pcb_analyze_timing", "Analyze timing margins for high-speed signals.", {
@@ -645,6 +675,18 @@ async def list_tools() -> list[Tool]:
             "max_skew_ps": {"type": "number", "description": "Maximum allowed skew in ps"},
             "effective_er": {"type": "number", "description": "Effective dielectric constant"},
         }, ["trace_lengths_mm", "max_skew_ps", "effective_er"]),
+        _make_tool("pcb_calc_eye_diagram", "Calculate statistical eye diagram for a high-speed serial channel. Models lossy transmission line (conductor + dielectric loss) and estimates eye opening, jitter, and pass/fail vs standard thresholds.", {
+            "data_rate_gbps": {"type": "number", "description": "Data rate in Gb/s (NRZ)"},
+            "trace_length_mm": {"type": "number", "description": "Trace length in mm"},
+            "dielectric_constant": {"type": "number", "description": "Substrate Er (FR4 ~ 4.3)"},
+            "loss_tangent": {"type": "number", "description": "Dielectric Df (FR4 ~ 0.02, Megtron6 ~ 0.002)"},
+            "trace_width_mm": {"type": "number", "description": "Trace width in mm"},
+            "dielectric_height_mm": {"type": "number", "description": "Height to reference plane in mm"},
+            "copper_thickness_oz": {"type": "number", "description": "Copper weight in oz (default 1.0)"},
+            "rise_time_ps": {"type": "number", "description": "Signal rise time 20-80% in ps (default 50)"},
+            "v_swing_mv": {"type": "number", "description": "Voltage swing in mV (default 800)"},
+            "standard": {"type": "string", "description": "Protocol for thresholds: pcie3, pcie4, pcie5, usb3, sata3, generic_low, generic_high"},
+        }, ["data_rate_gbps", "trace_length_mm", "dielectric_constant", "loss_tangent", "trace_width_mm", "dielectric_height_mm"]),
 
         # =====================================================================
         # EMC (6 tools)
@@ -677,8 +719,50 @@ async def list_tools() -> list[Tool]:
             "standard": {"type": "string", "description": "FCC_B, CISPR32_B, CE"},
         }, ["clock_frequency_mhz", "rise_time_ps"]),
 
+        _make_tool("pcb_analyze_return_current_density", "Estimate return current density distribution on a reference plane beneath a signal trace. Shows how current concentrates under the trace at high frequencies and spreads at low frequencies. Identifies crowding near plane gaps/edges.", {
+            "trace_x_start": {"type": "number", "description": "Trace start X (mm)"},
+            "trace_y_start": {"type": "number", "description": "Trace start Y (mm)"},
+            "trace_x_end": {"type": "number", "description": "Trace end X (mm)"},
+            "trace_y_end": {"type": "number", "description": "Trace end Y (mm)"},
+            "plane_width_mm": {"type": "number", "description": "Reference plane width (mm)"},
+            "plane_height_mm": {"type": "number", "description": "Reference plane height (mm)"},
+            "frequency_mhz": {"type": "number", "description": "Signal frequency (MHz)"},
+            "plane_gaps": {"type": "array", "items": {"type": "object"}, "description": "Optional gap objects with x_start_mm, y_start_mm, x_end_mm, y_end_mm, width_mm"},
+        }, ["trace_x_start", "trace_y_start", "trace_x_end", "trace_y_end", "plane_width_mm", "plane_height_mm", "frequency_mhz"]),
+
+        _make_tool("pcb_optimize_ground_stitching", "Optimize ground via stitching pattern for a reference plane. Calculates spacing from lambda/20 rule and suggests via locations accounting for existing vias and plane gaps.", {
+            "plane_width_mm": {"type": "number", "description": "Reference plane width (mm)"},
+            "plane_height_mm": {"type": "number", "description": "Reference plane height (mm)"},
+            "max_frequency_mhz": {"type": "number", "description": "Maximum operating frequency (MHz)"},
+            "dielectric_constant": {"type": "number", "description": "Substrate dielectric constant (er)"},
+            "existing_vias": {"type": "array", "items": {"type": "object"}, "description": "Existing via locations [{x_mm, y_mm}, ...]"},
+            "plane_gaps": {"type": "array", "items": {"type": "object"}, "description": "Plane gap definitions [{x_start_mm, y_start_mm, x_end_mm, y_end_mm, width_mm}, ...]"},
+        }, ["plane_width_mm", "plane_height_mm", "max_frequency_mhz", "dielectric_constant"]),
+
+        _make_tool("pcb_analyze_clock_emi", "Analyze clock/crystal oscillator EMI with trapezoidal harmonic envelope. Computes harmonic spectrum, compares against FCC/CISPR limits, models spread-spectrum reduction.", {
+            "frequency_mhz": {"type": "number", "description": "Clock fundamental frequency (MHz)"},
+            "voltage_v": {"type": "number", "description": "Signal amplitude V pk-pk (default 3.3)"},
+            "rise_time_ps": {"type": "number", "description": "Rise/fall time in ps (default 500)"},
+            "current_ma": {"type": "number", "description": "Signal current mA (default 10)"},
+            "loop_area_mm2": {"type": "number", "description": "Signal loop area mm^2 (default 10)"},
+            "spread_spectrum_percent": {"type": "number", "description": "Spread spectrum modulation % (0=none, 0.5-2 typical)"},
+            "duty_cycle": {"type": "number", "description": "Duty cycle 0-1 (default 0.5)"},
+            "standard": {"type": "string", "description": "EMC standard: fcc_b or cispr_b"},
+        }, ["frequency_mhz"]),
+
+        _make_tool("pcb_analyze_smps_emi", "Analyze SMPS switching power supply EMI. Models input/output loop radiation, harmonic spectrum from duty cycle, and recommends EMI filter parameters.", {
+            "switching_freq_khz": {"type": "number", "description": "Switching frequency (kHz)"},
+            "input_voltage_v": {"type": "number", "description": "Input voltage (V)"},
+            "output_voltage_v": {"type": "number", "description": "Output voltage (V)"},
+            "output_current_a": {"type": "number", "description": "Output load current (A)"},
+            "input_loop_area_mm2": {"type": "number", "description": "Input loop area mm^2 (default 20)"},
+            "output_loop_area_mm2": {"type": "number", "description": "Output loop area mm^2 (default 20)"},
+            "topology": {"type": "string", "description": "Converter topology: buck, boost, buck_boost"},
+            "standard": {"type": "string", "description": "EMC standard: fcc_b or cispr_b"},
+        }, ["switching_freq_khz", "input_voltage_v", "output_voltage_v", "output_current_a"]),
+
         # =====================================================================
-        # HIGH-SPEED DIGITAL (4 tools)
+        # HIGH-SPEED DIGITAL (6 tools)
         # =====================================================================
         _make_tool("pcb_analyze_ddr", "Analyze DDR memory interface routing.", {
             "ddr_standard": {"type": "string", "enum": ["DDR3", "DDR4", "DDR5", "LPDDR4", "LPDDR5"]},
@@ -692,6 +776,21 @@ async def list_tools() -> list[Tool]:
             "differential_impedance_ohm": {"type": "number"},
             "insertion_loss_db": {"type": "number"},
         }, ["pcie_gen"]),
+        _make_tool("pcb_calc_pcie_link_budget", "Calculate PCIe link insertion loss budget and equalizer margin. Sums trace, connector, via, and package losses then compares against the PCIe generation spec limit.", {
+            "pcie_gen": {"type": "integer", "description": "PCIe generation (1-6)"},
+            "trace_length_mm": {"type": "number", "description": "Total PCB trace length (mm)"},
+            "dielectric_constant": {"type": "number", "description": "Laminate dielectric constant (default 4.0)"},
+            "loss_tangent": {"type": "number", "description": "Dielectric loss tangent (default 0.02)"},
+            "copper_thickness_oz": {"type": "number", "description": "Copper weight in oz (default 0.5)"},
+            "connector_loss_db": {"type": "number", "description": "Total connector insertion loss (dB)"},
+            "via_loss_db": {"type": "number", "description": "Total via transition insertion loss (dB)"},
+            "package_loss_db": {"type": "number", "description": "IC package trace/ball insertion loss (dB)"},
+        }, ["pcie_gen", "trace_length_mm"]),
+        _make_tool("pcb_validate_pcie_lanes", "Validate PCIe lane-to-lane skew against generation-specific spec limits. Calculates per-lane propagation delay and max skew.", {
+            "lane_lengths_mm": {"type": "object", "description": "Dict of lane_name: length_mm (e.g. {\"TX0\": 80.5, \"TX1\": 81.2})"},
+            "dielectric_constant": {"type": "number", "description": "Dielectric constant for delay calculation (default 4.0)"},
+            "pcie_gen": {"type": "integer", "description": "PCIe generation (1-6, default 4)"},
+        }, ["lane_lengths_mm"]),
         _make_tool("pcb_analyze_usb", "Analyze USB routing.", {
             "usb_version": {"type": "string", "enum": ["2.0", "3.0", "3.1", "3.2", "4.0"]},
             "trace_length_mm": {"type": "number"}, "differential_impedance_ohm": {"type": "number"},
@@ -700,15 +799,45 @@ async def list_tools() -> list[Tool]:
             "speed": {"type": "string", "enum": ["100M", "1G", "2.5G", "5G", "10G"]},
             "trace_length_mm": {"type": "number"}, "pair_skew_ps": {"type": "number"},
         }, ["speed"]),
+        _make_tool("pcb_validate_ddr_topology", "Auto-detect and validate DDR memory interface topology from classified nets. Checks byte-lane grouping, DQ-DQS skew, inter-byte-lane skew, addr/cmd-to-clock skew, and fly-by topology against JEDEC limits.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "ddr_standard": {"type": "string", "enum": ["DDR3", "DDR4", "DDR5", "LPDDR4", "LPDDR5"], "description": "DDR standard (default DDR4)"},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_ddr_timing_budget", "Detailed per-lane DDR timing margin analysis against JEDEC budget. Calculates setup/hold margins for each DQ bit relative to DQS.", {
+            "ddr_standard": {"type": "string", "enum": ["DDR3", "DDR4", "DDR5", "LPDDR4", "LPDDR5"]},
+            "data_rate_mtps": {"type": "number", "description": "Data rate in MT/s (e.g. 3200)"},
+            "byte_lanes": {"type": "array", "items": {"type": "object", "properties": {
+                "lane": {"type": "integer", "description": "Byte lane number"},
+                "dqs_length_mm": {"type": "number", "description": "DQS strobe trace length in mm"},
+                "dq_lengths_mm": {"type": "array", "items": {"type": "number"}, "description": "DQ bit trace lengths in mm"},
+                "dqs_n_length_mm": {"type": "number", "description": "DQS_N trace length in mm (optional)"},
+                "dm_length_mm": {"type": "number", "description": "DM/DBI trace length in mm (optional)"},
+            }, "required": ["lane", "dqs_length_mm", "dq_lengths_mm"]}, "description": "List of byte lane data"},
+            "dielectric_constant": {"type": "number", "description": "Substrate Er (default 4.3)"},
+        }, ["ddr_standard", "data_rate_mtps", "byte_lanes"]),
 
         # =====================================================================
-        # POWER INTEGRITY (3 tools)
+        # POWER INTEGRITY (4 tools)
         # =====================================================================
         _make_tool("pcb_analyze_pdn", "Analyze power distribution network impedance.", {
             "target_impedance_mohm": {"type": "number", "description": "Target PDN impedance in milliohms"},
             "supply_voltage_v": {"type": "number"}, "max_current_a": {"type": "number"},
             "ripple_percent": {"type": "number", "description": "Allowed voltage ripple %"},
         }, ["supply_voltage_v", "max_current_a"]),
+        _make_tool("pcb_calc_pdn_impedance", "Frequency-swept PDN impedance profiling. Models VRM, bulk caps, MLCC decaps, and plane capacitance as parallel RLC networks. Sweeps from freq_start to freq_stop and flags anti-resonance peaks exceeding the target impedance Z_target = V * ripple% / I_max.", {
+            "supply_voltage_v": {"type": "number", "description": "Supply rail voltage (V)"},
+            "max_current_a": {"type": "number", "description": "Maximum transient load current (A)"},
+            "ripple_percent": {"type": "number", "description": "Allowed voltage ripple (%)"},
+            "capacitors": {"type": "array", "items": {"type": "object", "properties": {"capacitance_uf": {"type": "number"}, "esr_mohm": {"type": "number"}, "esl_nh": {"type": "number"}, "quantity": {"type": "integer"}}}, "description": "List of capacitor specs: [{capacitance_uf, esr_mohm, esl_nh, quantity}]"},
+            "vrm_bandwidth_khz": {"type": "number", "description": "VRM control-loop bandwidth (kHz, default 50)"},
+            "vrm_r_out_mohm": {"type": "number", "description": "VRM closed-loop output resistance (mohm, default 1)"},
+            "plane_area_mm2": {"type": "number", "description": "Power-ground plane pair area (mm^2)"},
+            "dielectric_height_mm": {"type": "number", "description": "Spacing between power and ground planes (mm)"},
+            "dielectric_constant": {"type": "number", "description": "Relative permittivity of inter-plane dielectric"},
+            "frequency_start_hz": {"type": "number", "description": "Sweep start frequency (Hz, default 1)"},
+            "frequency_stop_hz": {"type": "number", "description": "Sweep stop frequency (Hz, default 1e9)"},
+            "num_points": {"type": "integer", "description": "Number of logarithmic sweep points (default 500)"},
+        }, ["supply_voltage_v", "max_current_a", "ripple_percent", "capacitors"]),
         _make_tool("pcb_analyze_decoupling", "Analyze decoupling capacitor placement.", {
             "ic_power_pins": {"type": "integer", "description": "Number of power pins on IC"},
             "max_frequency_mhz": {"type": "number"}, "target_impedance_mohm": {"type": "number"},
@@ -914,6 +1043,50 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
 
         # =====================================================================
+        # RETURN CURRENT / GROUND STITCHING (2 tools)
+        # =====================================================================
+        _make_tool("pcb_analyze_return_current", "Calculate return current density profile on reference plane beneath a signal trace. Shows how current spreads laterally and what fraction is contained within N*h of the trace center.", {
+            "trace_height_mm": {"type": "number", "description": "Height from signal trace to reference plane (mm)"},
+            "signal_current_ma": {"type": "number", "description": "Signal current magnitude (mA). Default 100"},
+            "analysis_width_mm": {"type": "number", "description": "Total width to analyze centered on trace (mm). Default 20"},
+            "num_points": {"type": "integer", "description": "Number of sample points. Default 100"},
+        }, ["trace_height_mm"]),
+        _make_tool("pcb_analyze_ground_stitch", "Calculate optimal ground via stitching spacing from wavelength (lambda/N) and return current containment constraints.", {
+            "max_frequency_hz": {"type": "number", "description": "Maximum signal frequency or harmonic to contain (Hz)"},
+            "dielectric_constant": {"type": "number", "description": "Substrate Er. Default 4.3"},
+            "trace_height_mm": {"type": "number", "description": "Height to reference plane (mm). Default 0.1"},
+            "target_containment_percent": {"type": "number", "description": "Desired return current containment %. Default 90"},
+            "lambda_fraction": {"type": "number", "description": "Wavelength fraction for spacing rule (e.g. 20 for lambda/20). Default 20"},
+        }, ["max_frequency_hz"]),
+
+        # =====================================================================
+        # CLOCK / SMPS EMI ANALYSIS (2 tools)
+        # =====================================================================
+        _make_tool("pcb_analyze_clock_emi", "Calculate clock signal harmonic EMI envelope using trapezoidal waveform Fourier analysis. Predicts emission levels vs FCC/CISPR limits. Includes spread-spectrum clocking reduction.", {
+            "clock_frequency_mhz": {"type": "number", "description": "Fundamental clock frequency (MHz)"},
+            "rise_time_ns": {"type": "number", "description": "Signal rise time 10-90% (ns). Default 1.0"},
+            "voltage_swing_v": {"type": "number", "description": "Peak voltage swing (V). Default 3.3"},
+            "duty_cycle": {"type": "number", "description": "Duty cycle 0-1. Default 0.5"},
+            "num_harmonics": {"type": "integer", "description": "Number of harmonics to compute. Default 20"},
+            "ssc_enabled": {"type": "boolean", "description": "Spread-spectrum clocking active. Default false"},
+            "ssc_deviation_percent": {"type": "number", "description": "SSC frequency deviation %. Default 0.5"},
+            "trace_length_mm": {"type": "number", "description": "Clock trace length (mm). Default 50"},
+            "limit_standard": {"type": "string", "enum": ["fcc_classb", "fcc_classa", "cispr32_classb", "cispr32_classa"], "description": "Emission limit standard. Default fcc_classb"},
+        }, ["clock_frequency_mhz"]),
+        _make_tool("pcb_analyze_smps_emi", "Calculate SMPS switching harmonic EMI from hot loop radiation. Models trapezoidal current waveform harmonics through magnetic dipole antenna model. Compares to emission limits.", {
+            "switching_frequency_khz": {"type": "number", "description": "SMPS switching frequency (kHz)"},
+            "duty_cycle": {"type": "number", "description": "Switch duty cycle 0-1 (0 = auto from Vin/Vout). Default 0.5"},
+            "input_voltage_v": {"type": "number", "description": "Input supply voltage (V). Default 12"},
+            "output_voltage_v": {"type": "number", "description": "Output voltage (V). Default 3.3"},
+            "output_current_a": {"type": "number", "description": "Output load current (A). Default 2.0"},
+            "rise_time_ns": {"type": "number", "description": "Switch transition rise time (ns). Default 10"},
+            "inductor_value_uh": {"type": "number", "description": "Output inductor (uH). Default 4.7"},
+            "num_harmonics": {"type": "integer", "description": "Number of harmonics. Default 30"},
+            "pcb_loop_area_cm2": {"type": "number", "description": "Hot loop area (cm^2). Default 1.0"},
+            "limit_standard": {"type": "string", "enum": ["fcc_classb", "fcc_classa", "cispr32_classb", "cispr32_classa"], "description": "Emission limit standard. Default cispr32_classb"},
+        }, ["switching_frequency_khz"]),
+
+        # =====================================================================
         # SESSION MANAGEMENT (2 tools)
         # =====================================================================
         _make_tool("pcb_list_sessions", "List all active design sessions.", {}, None),
@@ -1102,6 +1275,40 @@ def _dispatch(name: str, args: dict) -> dict:
     if name == "pcb_calc_via_stitching":
         return _result(calc_via_stitching_requirements(args["max_frequency_mhz"], args["dielectric_constant"]))
 
+    # === S-PARAMETER / MODE CONVERSION ===
+    if name == "pcb_calc_insertion_loss":
+        from .analyzers.rf_si.sparam_extractor import calculate_insertion_loss
+        return _result(calculate_insertion_loss(
+            trace_length_mm=args["trace_length_mm"],
+            trace_width_mm=args["trace_width_mm"],
+            dielectric_height_mm=args["dielectric_height_mm"],
+            dielectric_constant=args["dielectric_constant"],
+            loss_tangent=args["loss_tangent"],
+            copper_thickness_oz=args.get("copper_thickness_oz", 1.0),
+            surface_roughness_um=args.get("surface_roughness_um", 0.5),
+            freq_start_mhz=args.get("freq_start_mhz", 10.0),
+            freq_stop_mhz=args.get("freq_stop_mhz", 10000.0),
+            num_points=args.get("num_points", 50),
+        ))
+    if name == "pcb_calc_return_loss":
+        from .analyzers.rf_si.sparam_extractor import calculate_return_loss
+        return _result(calculate_return_loss(
+            impedance_ohm=args["impedance_ohm"],
+            target_impedance_ohm=args["target_impedance_ohm"],
+            frequency_mhz=args["frequency_mhz"],
+        ))
+    if name == "pcb_analyze_mode_conversion":
+        from .analyzers.rf_si.mode_conversion import analyze_mode_conversion
+        return _result(analyze_mode_conversion(
+            trace_width_mm=args["trace_width_mm"],
+            trace_spacing_mm=args["trace_spacing_mm"],
+            dielectric_height_mm=args["dielectric_height_mm"],
+            dielectric_constant=args["dielectric_constant"],
+            length_asymmetry_mm=args["length_asymmetry_mm"],
+            data_rate_gbps=args["data_rate_gbps"],
+            trace_type=args.get("trace_type", "microstrip"),
+        ))
+
     # === SIGNAL INTEGRITY ===
     if name == "pcb_analyze_timing":
         return _result(analyze_trace_timing(args["trace_length_mm"], args["effective_er"], args["data_rate_gbps"], args["rise_time_ps"], args["setup_time_ps"], args["hold_time_ps"]))
@@ -1133,6 +1340,21 @@ def _dispatch(name: str, args: dict) -> dict:
         ref_name = min(delays, key=delays.get)
         mismatches = {n: {"length_mm": round(lengths[n], 2), "delay_ps": round(d, 1), "delta_ps": round(d - delays[ref_name], 1)} for n, d in delays.items()}
         return {"max_skew_ps": round(skew_ps, 1), "allowed_skew_ps": max_skew_ps, "compliant": skew_ps <= max_skew_ps, "reference_net": ref_name, "signals": mismatches}
+
+    if name == "pcb_calc_eye_diagram":
+        from .analyzers.rf_si.eye_diagram import calculate_eye_opening
+        return _result(calculate_eye_opening(
+            data_rate_gbps=args["data_rate_gbps"],
+            trace_length_mm=args["trace_length_mm"],
+            dielectric_constant=args["dielectric_constant"],
+            loss_tangent=args["loss_tangent"],
+            trace_width_mm=args["trace_width_mm"],
+            dielectric_height_mm=args["dielectric_height_mm"],
+            copper_thickness_oz=args.get("copper_thickness_oz", 1.0),
+            rise_time_ps=args.get("rise_time_ps", 50.0),
+            v_swing_mv=args.get("v_swing_mv", 800.0),
+            standard=args.get("standard"),
+        ))
 
     # === EMC ===
     if name == "pcb_analyze_current_loop":
@@ -1179,6 +1401,49 @@ def _dispatch(name: str, args: dict) -> dict:
         std_val = std_map.get(args.get("standard", "FCC_B"), args.get("standard", "fcc_class_b"))
         res = predictor.predict_compliance(standard=EMCStandard(std_val))
         return _serialize(res)
+
+    if name == "pcb_analyze_return_current_density":
+        from .analyzers.emc.current_density import analyze_return_current_density
+        return _result(analyze_return_current_density(
+            trace_x_start=args["trace_x_start"], trace_y_start=args["trace_y_start"],
+            trace_x_end=args["trace_x_end"], trace_y_end=args["trace_y_end"],
+            plane_width_mm=args["plane_width_mm"], plane_height_mm=args["plane_height_mm"],
+            frequency_mhz=args["frequency_mhz"], plane_gaps=args.get("plane_gaps"),
+        ))
+
+    if name == "pcb_optimize_ground_stitching":
+        from .analyzers.emc.current_density import optimize_ground_stitching
+        return _result(optimize_ground_stitching(
+            plane_width_mm=args["plane_width_mm"], plane_height_mm=args["plane_height_mm"],
+            max_frequency_mhz=args["max_frequency_mhz"], dielectric_constant=args["dielectric_constant"],
+            existing_vias=args.get("existing_vias"), plane_gaps=args.get("plane_gaps"),
+        ))
+
+    if name == "pcb_analyze_clock_emi":
+        from .analyzers.emc.clock_emi_analyzer import analyze_clock_emi
+        return _result(analyze_clock_emi(
+            frequency_mhz=args["frequency_mhz"],
+            voltage_v=args.get("voltage_v", 3.3),
+            rise_time_ps=args.get("rise_time_ps", 500.0),
+            current_ma=args.get("current_ma", 10.0),
+            loop_area_mm2=args.get("loop_area_mm2", 10.0),
+            spread_spectrum_percent=args.get("spread_spectrum_percent", 0.0),
+            duty_cycle=args.get("duty_cycle", 0.5),
+            standard=args.get("standard", "fcc_b"),
+        ))
+
+    if name == "pcb_analyze_smps_emi":
+        from .analyzers.emc.clock_emi_analyzer import analyze_smps_emi
+        return _result(analyze_smps_emi(
+            switching_freq_khz=args["switching_freq_khz"],
+            input_voltage_v=args["input_voltage_v"],
+            output_voltage_v=args["output_voltage_v"],
+            output_current_a=args["output_current_a"],
+            input_loop_area_mm2=args.get("input_loop_area_mm2", 20.0),
+            output_loop_area_mm2=args.get("output_loop_area_mm2", 20.0),
+            topology=args.get("topology", "buck"),
+            standard=args.get("standard", "fcc_b"),
+        ))
 
     # === EMI / RETURN PATH ===
     if name == "pcb_trace_return_path":
@@ -1282,6 +1547,27 @@ def _dispatch(name: str, args: dict) -> dict:
         res = analyzer.analyze(generation=PCIeGeneration(args["pcie_gen"]), lanes=lanes, differential_impedance_ohm=args.get("differential_impedance_ohm"))
         return _serialize(res)
 
+    if name == "pcb_calc_pcie_link_budget":
+        from .analyzers.high_speed.pcie_link_budget import calculate_pcie_link_budget
+        return calculate_pcie_link_budget(
+            pcie_gen=args["pcie_gen"],
+            trace_length_mm=args["trace_length_mm"],
+            dielectric_constant=args.get("dielectric_constant", 4.0),
+            loss_tangent=args.get("loss_tangent", 0.02),
+            copper_thickness_oz=args.get("copper_thickness_oz", 0.5),
+            connector_loss_db=args.get("connector_loss_db", 0.0),
+            via_loss_db=args.get("via_loss_db", 0.0),
+            package_loss_db=args.get("package_loss_db", 0.0),
+        )
+
+    if name == "pcb_validate_pcie_lanes":
+        from .analyzers.high_speed.pcie_link_budget import validate_pcie_lanes
+        return validate_pcie_lanes(
+            lane_lengths_mm=args["lane_lengths_mm"],
+            dielectric_constant=args.get("dielectric_constant", 4.0),
+            pcie_gen=args.get("pcie_gen", 4),
+        )
+
     if name == "pcb_analyze_usb":
         from .analyzers.high_speed.usb_analyzer import USBAnalyzer, USBVersion
         analyzer = USBAnalyzer()
@@ -1299,6 +1585,40 @@ def _dispatch(name: str, args: dict) -> dict:
         res = analyzer.analyze(speed=EthernetSpeed(args["speed"]), mdi_pairs=mdi_pairs)
         return _serialize(res)
 
+    if name == "pcb_validate_ddr_topology":
+        from .analyzers.high_speed.ddr_topology import validate_ddr_topology
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        classified = classifier.classify(data)
+        # Build trace_lengths from net routed_length data
+        trace_lengths = {}
+        for net in data.nets:
+            if net.routed_length_mm > 0:
+                trace_lengths[net.name] = net.routed_length_mm
+        ddr_std = args.get("ddr_standard", "DDR4")
+        er = 4.3
+        if data.layers:
+            for layer in data.layers:
+                if layer.dielectric_constant and layer.dielectric_constant > 1:
+                    er = layer.dielectric_constant
+                    break
+        return validate_ddr_topology(
+            classified_nets=classified,
+            trace_lengths=trace_lengths if trace_lengths else None,
+            ddr_standard=ddr_std,
+            dielectric_constant=er,
+        )
+
+    if name == "pcb_analyze_ddr_timing_budget":
+        from .analyzers.high_speed.ddr_topology import analyze_ddr_timing_budget
+        return analyze_ddr_timing_budget(
+            ddr_standard=args["ddr_standard"],
+            data_rate_mtps=args["data_rate_mtps"],
+            byte_lanes=args["byte_lanes"],
+            dielectric_constant=args.get("dielectric_constant", 4.3),
+        )
+
     # === POWER INTEGRITY ===
     if name == "pcb_analyze_pdn":
         from .analyzers.power_integrity.pdn_analyzer import PDNAnalyzer
@@ -1308,6 +1628,23 @@ def _dispatch(name: str, args: dict) -> dict:
             ripple_percent=args.get("ripple_percent", 5),
         )
         return _serialize(res)
+
+    if name == "pcb_calc_pdn_impedance":
+        from .analyzers.power_integrity.pdn_impedance import calculate_pdn_impedance
+        return calculate_pdn_impedance(
+            supply_voltage_v=args["supply_voltage_v"],
+            max_current_a=args["max_current_a"],
+            ripple_percent=args["ripple_percent"],
+            capacitors=args["capacitors"],
+            vrm_bandwidth_khz=args.get("vrm_bandwidth_khz", 50.0),
+            vrm_r_out_mohm=args.get("vrm_r_out_mohm", 1.0),
+            plane_area_mm2=args.get("plane_area_mm2", 0.0),
+            dielectric_height_mm=args.get("dielectric_height_mm", 0.1),
+            dielectric_constant=args.get("dielectric_constant", 4.3),
+            freq_start_hz=args.get("frequency_start_hz", 1.0),
+            freq_stop_hz=args.get("frequency_stop_hz", 1e9),
+            num_points=args.get("num_points", 500),
+        )
 
     if name == "pcb_analyze_decoupling":
         from .analyzers.power_integrity.decap_placement import DecapAnalyzer
@@ -1710,6 +2047,56 @@ def _dispatch(name: str, args: dict) -> dict:
         data = _get_session(args["session_id"])
         report = generate_report(data, args["session_id"], args.get("format", "detailed"))
         return report
+
+    # === RETURN CURRENT / GROUND STITCHING ===
+    if name == "pcb_analyze_return_current":
+        from .analyzers.emc.current_density import calculate_return_current_density
+        return calculate_return_current_density(
+            trace_height_mm=args["trace_height_mm"],
+            signal_current_ma=args.get("signal_current_ma", 100.0),
+            analysis_width_mm=args.get("analysis_width_mm", 20.0),
+            num_points=args.get("num_points", 100),
+        )
+
+    if name == "pcb_analyze_ground_stitch":
+        from .analyzers.emc.current_density import calculate_ground_stitch_spacing
+        return calculate_ground_stitch_spacing(
+            max_frequency_hz=args["max_frequency_hz"],
+            dielectric_constant=args.get("dielectric_constant", 4.3),
+            trace_height_mm=args.get("trace_height_mm", 0.1),
+            target_containment_percent=args.get("target_containment_percent", 90.0),
+            lambda_fraction=args.get("lambda_fraction", 20.0),
+        )
+
+    # === CLOCK / SMPS EMI ===
+    if name == "pcb_analyze_clock_emi":
+        from .analyzers.emc.clock_emi_analyzer import calculate_clock_emi
+        return calculate_clock_emi(
+            clock_frequency_mhz=args["clock_frequency_mhz"],
+            rise_time_ns=args.get("rise_time_ns", 1.0),
+            voltage_swing_v=args.get("voltage_swing_v", 3.3),
+            duty_cycle=args.get("duty_cycle", 0.5),
+            num_harmonics=args.get("num_harmonics", 20),
+            ssc_enabled=args.get("ssc_enabled", False),
+            ssc_deviation_percent=args.get("ssc_deviation_percent", 0.5),
+            trace_length_mm=args.get("trace_length_mm", 50.0),
+            limit_standard=args.get("limit_standard", "fcc_classb"),
+        )
+
+    if name == "pcb_analyze_smps_emi":
+        from .analyzers.emc.clock_emi_analyzer import calculate_smps_emi
+        return calculate_smps_emi(
+            switching_frequency_khz=args["switching_frequency_khz"],
+            duty_cycle=args.get("duty_cycle", 0.5),
+            input_voltage_v=args.get("input_voltage_v", 12.0),
+            output_voltage_v=args.get("output_voltage_v", 3.3),
+            output_current_a=args.get("output_current_a", 2.0),
+            rise_time_ns=args.get("rise_time_ns", 10.0),
+            inductor_value_uh=args.get("inductor_value_uh", 4.7),
+            num_harmonics=args.get("num_harmonics", 30),
+            pcb_loop_area_cm2=args.get("pcb_loop_area_cm2", 1.0),
+            limit_standard=args.get("limit_standard", "cispr32_classb"),
+        )
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":
