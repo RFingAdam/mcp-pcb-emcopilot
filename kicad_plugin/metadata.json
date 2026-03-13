@@ -1,0 +1,25 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "MCP PCB EMCopilot",
+    "description": "AI-powered EMC/SI/PI design review integrated with KiCad",
+    "description_full": "Integrates KiCad with MCP PCB EMCopilot for automated design review covering EMC compliance, signal integrity, power integrity, thermal, and DFM analysis.",
+    "identifier": "com.github.rfingadam.emcopilot",
+    "type": "plugin",
+    "author": {
+        "name": "Adam Engelbrecht",
+        "contact": {
+            "github": "https://github.com/RFingAdam"
+        }
+    },
+    "license": "Apache-2.0",
+    "resources": {
+        "homepage": "https://github.com/RFingAdam/mcp-pcb-emcopilot"
+    },
+    "versions": [
+        {
+            "version": "1.0.0",
+            "status": "development",
+            "kicad_version": "7.0"
+        }
+    ]
+}
