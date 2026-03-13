@@ -5,16 +5,23 @@ Altium (.PcbDoc), IPC-2581 (.xml/.cvg), BOM (.csv/.xlsx), Schematic (.kicad_sch)
 STEP (.step/.stp), Schematic PDF (.pdf)
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
 from typing import Optional
 
+from .pdf_schematic_parser import PDFSchematicResult
+from ..errors import ParseError
 from ..models.pcb_data import (
     PCBDesignData, PCBComponent, PCBNet, PCBTrace, PCBVia, PCBLayer, PCBZone,
 )
 
 logger = logging.getLogger(__name__)
+
+# Maximum file size: 500 MB
+_MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
 def detect_format(file_path: str) -> str:
@@ -53,6 +60,27 @@ def detect_format(file_path: str) -> str:
         return "unknown"
 
 
+def _validate_file(file_path: str) -> Path:
+    """Validate file exists, is non-empty, and is within size limits.
+
+    Returns the resolved Path on success, raises ParseError on failure.
+    """
+    path = Path(file_path)
+    if not path.exists():
+        raise ParseError("FILE_NOT_FOUND", f"File not found: {file_path}", {"file": file_path})
+
+    file_size = path.stat().st_size
+    if file_size == 0:
+        raise ParseError("EMPTY_FILE", f"File is empty: {file_path}", {"file": file_path})
+    if file_size > _MAX_FILE_SIZE:
+        raise ParseError(
+            "FILE_TOO_LARGE",
+            f"File exceeds 500MB limit: {file_size / 1024 / 1024:.0f}MB",
+            {"file": file_path, "size_bytes": file_size},
+        )
+    return path
+
+
 def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesignData:
     """Parse any supported PCB file into unified PCBDesignData.
 
@@ -62,24 +90,47 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
 
     Returns:
         PCBDesignData with all extracted design data
+
+    Raises:
+        ParseError: If the file cannot be found, is empty, too large, or fails to parse.
     """
+    _validate_file(file_path)
+
     file_format = format_hint or detect_format(file_path)
     logger.info(f"Parsing {file_path} as {file_format}")
 
     if file_format == "kicad":
-        return _parse_kicad(file_path)
+        return _parse_format("kicad", file_path, _parse_kicad)
     elif file_format == "odb":
-        return _parse_odb(file_path)
+        return _parse_format("odb", file_path, _parse_odb)
     elif file_format == "gerber":
-        return _parse_gerber(file_path)
+        return _parse_format("gerber", file_path, _parse_gerber)
     elif file_format == "altium":
-        return _parse_altium(file_path)
+        return _parse_format("altium", file_path, _parse_altium)
     elif file_format == "ipc2581":
-        return _parse_ipc2581(file_path)
+        return _parse_format("ipc2581", file_path, _parse_ipc2581)
     elif file_format == "step":
-        return _parse_step(file_path)
+        return _parse_format("step", file_path, _parse_step)
     else:
-        raise ValueError(f"Unsupported format: {file_format} for {file_path}")
+        raise ParseError(
+            "UNSUPPORTED_FORMAT",
+            f"Unsupported format: {file_format} for {file_path}",
+            {"file": file_path, "format": file_format},
+        )
+
+
+def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
+    """Wrap a format-specific parser with error handling."""
+    try:
+        return parser_fn(file_path)
+    except ParseError:
+        raise  # Re-raise our own errors as-is
+    except Exception as e:
+        raise ParseError(
+            "PARSE_FAILED",
+            f"Failed to parse {fmt} file: {e}",
+            {"file": file_path, "format": fmt},
+        ) from e
 
 
 def _parse_kicad(file_path: str) -> PCBDesignData:
@@ -468,7 +519,7 @@ def _parse_step(file_path: str) -> PCBDesignData:
     return data
 
 
-def parse_schematic_pdf(file_path: str):
+def parse_schematic_pdf(file_path: str) -> PDFSchematicResult:
     """Parse a PDF schematic file and return extraction results.
 
     Args:
