@@ -233,7 +233,7 @@ class PowerPlaneAnalyzer:
         length_m = length_mm / 1000
         width_m = width_mm / 1000
         diagonal = math.sqrt(length_m ** 2 + width_m ** 2)
-        
+
         f_res = self.C0 / (2 * math.sqrt(dielectric_constant) * diagonal)
         return f_res
 

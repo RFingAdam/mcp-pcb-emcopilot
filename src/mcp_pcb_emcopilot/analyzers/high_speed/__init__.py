@@ -11,13 +11,13 @@ Provides analysis for high-speed digital interfaces:
 
 from __future__ import annotations
 
-from .ddr_analyzer import DDRAnalyzer, DDRResult, DDRIssue, DDRStandard
-from .ddr_topology import validate_ddr_topology, analyze_ddr_timing_budget
-from .pcie_analyzer import PCIeAnalyzer, PCIeResult, PCIeIssue, PCIeGeneration
-from .pcie_link_budget import calculate_pcie_link_budget, validate_pcie_lanes
-from .usb_analyzer import USBAnalyzer, USBResult, USBIssue, USBVersion
-from .ethernet_analyzer import EthernetAnalyzer, EthernetResult, EthernetIssue
+from .ddr_analyzer import DDRAnalyzer, DDRIssue, DDRResult, DDRStandard
+from .ddr_topology import analyze_ddr_timing_budget, validate_ddr_topology
+from .ethernet_analyzer import EthernetAnalyzer, EthernetIssue, EthernetResult
 from .length_matching import LengthMatcher, LengthMatchResult, MatchingGroup
+from .pcie_analyzer import PCIeAnalyzer, PCIeGeneration, PCIeIssue, PCIeResult
+from .pcie_link_budget import calculate_pcie_link_budget, validate_pcie_lanes
+from .usb_analyzer import USBAnalyzer, USBIssue, USBResult, USBVersion
 
 __all__ = [
     # DDR

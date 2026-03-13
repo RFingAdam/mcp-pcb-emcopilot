@@ -5,33 +5,32 @@ and that invalid session IDs produce SessionError.
 """
 import json
 import math
+
 import pytest
 
-from mcp_pcb_emcopilot.errors import ValidationError, SessionError
-
+from mcp_pcb_emcopilot.errors import SessionError, ValidationError
 
 # ─── Direct function-level tests ────────────────────────────────────────────
 # We test the calc functions after validation would occur by calling _dispatch directly.
 # Since _dispatch is not easily importable without starting the server, we test
 # the validation functions and the calc functions independently.
-
 from mcp_pcb_emcopilot.server import (
-    calc_microstrip_impedance,
-    calc_stripline_impedance,
-    calc_differential_impedance,
-    calc_trace_width_for_current,
-    calc_cpw_impedance,
-    calc_skin_effect,
-    calc_dielectric_loss,
-    calc_plane_resonance,
-    calc_via_stitching_requirements,
-    analyze_trace_timing,
-    analyze_crosstalk,
-    analyze_via,
-    analyze_current_loop,
-    estimate_rise_time_bandwidth,
     _dispatch,
     _get_session,
+    analyze_crosstalk,
+    analyze_current_loop,
+    analyze_trace_timing,
+    analyze_via,
+    calc_cpw_impedance,
+    calc_dielectric_loss,
+    calc_differential_impedance,
+    calc_microstrip_impedance,
+    calc_plane_resonance,
+    calc_skin_effect,
+    calc_stripline_impedance,
+    calc_trace_width_for_current,
+    calc_via_stitching_requirements,
+    estimate_rise_time_bandwidth,
 )
 
 

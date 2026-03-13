@@ -13,13 +13,12 @@ import tempfile
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
 from mcp_pcb_emcopilot.parsers.step_parser import (
     STEPParser,
-    compute_3d_clearances,
     check_enclosure_fit,
+    compute_3d_clearances,
 )
-from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
-
 
 # =============================================================================
 # Mock STEP content — minimal but realistic EDA export structure
@@ -615,8 +614,8 @@ def test_server_dispatch_parse_step():
 
 def test_server_dispatch_get_3d_clearances():
     """Test pcb_get_3d_clearances through server._dispatch."""
-    from mcp_pcb_emcopilot.server import _dispatch, sessions
     from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
+    from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     # Create a session with 3D data
     data = PCBDesignData(
@@ -654,8 +653,8 @@ def test_server_dispatch_get_3d_clearances():
 
 def test_server_dispatch_check_enclosure_fit():
     """Test pcb_check_enclosure_fit through server._dispatch."""
-    from mcp_pcb_emcopilot.server import _dispatch, sessions
     from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
+    from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     data = PCBDesignData(
         source_file="test.step",
@@ -707,8 +706,8 @@ def test_server_dispatch_check_enclosure_fit():
 
 def test_server_dispatch_no_3d_data_error():
     """Test that 3D tools fail gracefully when no STEP data is present."""
-    from mcp_pcb_emcopilot.server import _dispatch, sessions
     from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
+    from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     # Session without 3D data
     data = PCBDesignData(source_file="test.kicad_pcb", source_format="kicad")
@@ -739,8 +738,8 @@ def test_server_dispatch_no_3d_data_error():
 
 def test_server_merge_step_into_existing_session():
     """Test merging STEP data into an existing session."""
-    from mcp_pcb_emcopilot.server import _dispatch, sessions
     from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
+    from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     # Create a KiCad-like session first
     data = PCBDesignData(
@@ -905,7 +904,7 @@ if __name__ == "__main__":
             print(f"\n{test.__name__}:")
             test()
             passed += 1
-            print(f"  PASSED")
+            print("  PASSED")
         except Exception as e:
             failed += 1
             print(f"  FAILED: {e}")

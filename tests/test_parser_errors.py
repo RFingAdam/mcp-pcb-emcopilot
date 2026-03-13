@@ -8,10 +8,11 @@ Validates that the parsers raise structured ParseError for:
 """
 import os
 import tempfile
+
 import pytest
 
 from mcp_pcb_emcopilot.errors import ParseError
-from mcp_pcb_emcopilot.parsers import parse_pcb_file, _validate_file, _MAX_FILE_SIZE
+from mcp_pcb_emcopilot.parsers import _MAX_FILE_SIZE, _validate_file, parse_pcb_file
 
 
 class TestFileNotFound:

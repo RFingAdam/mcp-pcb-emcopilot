@@ -11,8 +11,8 @@ Exercises:
 
 import json
 import math
-import sys
 import os
+import sys
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -384,6 +384,7 @@ def test_dispatch_pcie_lanes():
 def test_tool_registration():
     """Verify all 3 new tools appear in the tool list."""
     import asyncio
+
     from mcp_pcb_emcopilot.server import list_tools
 
     tools = asyncio.run(list_tools())

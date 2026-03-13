@@ -64,7 +64,7 @@ class STEPParser:
         if not path.exists():
             raise FileNotFoundError(f"STEP file not found: {file_path}")
 
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             content = f.read()
 
         return self.parse_content(content)

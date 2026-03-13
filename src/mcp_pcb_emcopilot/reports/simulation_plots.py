@@ -24,11 +24,11 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import matplotlib
+
 matplotlib.use("Agg")  # non-interactive backend
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Theme configuration
@@ -468,7 +468,8 @@ class SimulationPlotter:
         _apply_theme(ax, t)
 
         from ..analyzers.emc.automotive_emc import (
-            AutomotiveEMCAnalyzer, CISPR25_RADIATED_LIMITS,
+            CISPR25_RADIATED_LIMITS,
+            AutomotiveEMCAnalyzer,
         )
         analyzer = AutomotiveEMCAnalyzer()
 
@@ -861,11 +862,11 @@ class SimulationPlotter:
         Plots predicted harmonics and overlays CISPR 25 conducted limits
         (peak + average) and FCC Class B/A limit as dashed lines.
         """
-        from ..analyzers.emc.conducted_emissions import (
-            ConductedEmissionAnalyzer,
-            FCC_PART15_CONDUCTED_LIMITS,
-        )
         from ..analyzers.emc.automotive_emc import CISPR25_CONDUCTED_LIMITS
+        from ..analyzers.emc.conducted_emissions import (
+            FCC_PART15_CONDUCTED_LIMITS,
+            ConductedEmissionAnalyzer,
+        )
 
         t = self.theme
         fig, ax = plt.subplots(figsize=self.figsize)
@@ -1011,12 +1012,12 @@ class SimulationPlotter:
 
         from ..analyzers.emc.near_field import (
             NearFieldAnalyzer,
-            h_field_magnetic_dipole,
-            e_field_electric_dipole,
-            to_db_h,
-            to_db_e,
-            transition_distance,
             classify_source,
+            e_field_electric_dipole,
+            h_field_magnetic_dipole,
+            to_db_e,
+            to_db_h,
+            transition_distance,
         )
 
         fig, (ax_h, ax_e) = plt.subplots(

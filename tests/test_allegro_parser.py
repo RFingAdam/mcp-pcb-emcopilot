@@ -6,14 +6,13 @@ from pathlib import Path
 
 import pytest
 
+from mcp_pcb_emcopilot.errors import ParseError
+from mcp_pcb_emcopilot.parsers import detect_format, parse_pcb_file
 from mcp_pcb_emcopilot.parsers.allegro_parser import (
-    AllegroParser,
     AllegroBoardData,
+    AllegroParser,
     _map_layer_name,
 )
-from mcp_pcb_emcopilot.parsers import detect_format, parse_pcb_file
-from mcp_pcb_emcopilot.errors import ParseError
-
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SAMPLE_ALLEGRO = str(FIXTURES_DIR / "sample_allegro.txt")

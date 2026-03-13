@@ -6,12 +6,13 @@ S-parameters from trace geometry without FDTD simulation.
 """
 from __future__ import annotations
 
-import math
 import cmath
-import numpy as np
-from dataclasses import dataclass, field
-from typing import Optional, List
+import math
 import re
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+import numpy as np
 
 try:
     import skrf as rf

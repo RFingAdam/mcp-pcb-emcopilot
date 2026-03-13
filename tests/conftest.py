@@ -1,6 +1,7 @@
 """Shared test fixtures for PCB EMCopilot."""
-import pytest
 from pathlib import Path
+
+import pytest
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -39,7 +40,12 @@ def sample_allegro():
 def sample_design_data():
     """Create a minimal PCBDesignData for testing analyzers."""
     from mcp_pcb_emcopilot.models.pcb_data import (
-        PCBDesignData, PCBComponent, PCBNet, PCBTrace, PCBVia, PCBLayer,
+        PCBComponent,
+        PCBDesignData,
+        PCBLayer,
+        PCBNet,
+        PCBTrace,
+        PCBVia,
     )
 
     d = PCBDesignData(source_file="/tmp/test_board.kicad_pcb", source_format="kicad")

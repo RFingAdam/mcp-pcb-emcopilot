@@ -7,7 +7,7 @@ import uuid
 from typing import Optional
 
 try:
-    from flask import Flask, request, redirect, url_for, jsonify, Response
+    from flask import Flask, Response, jsonify, redirect, request, url_for
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -18,7 +18,7 @@ from ..parsers import parse_pcb_file
 _sessions: dict[str, dict] = {}
 
 
-def create_app() -> "Flask":
+def create_app() -> Flask:
     """Create and configure the Flask application."""
     if not FLASK_AVAILABLE:
         raise ImportError("Flask is required for the web UI. Install with: pip install flask")
@@ -99,7 +99,7 @@ def create_app() -> "Flask":
             title=f"Design Review: {session['filename']}",
         )
 
-        with open(path, "r") as f:
+        with open(path) as f:
             html_content = f.read()
         os.unlink(path)
 

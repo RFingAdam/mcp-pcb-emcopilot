@@ -12,11 +12,17 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from .pdf_schematic_parser import PDFSchematicResult
 from ..errors import ParseError
 from ..models.pcb_data import (
-    PCBDesignData, PCBComponent, PCBNet, PCBTrace, PCBVia, PCBLayer, PCBZone,
+    PCBComponent,
+    PCBDesignData,
+    PCBLayer,
+    PCBNet,
+    PCBTrace,
+    PCBVia,
+    PCBZone,
 )
+from .pdf_schematic_parser import PDFSchematicResult
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +49,7 @@ def detect_format(file_path: str) -> str:
     elif ext in (".exp",):
         # Allegro extraction file — verify content if possible
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 header = f.read(2000)
                 if "$HEADER" in header or "$NETS" in header or "$COMPONENTS" in header:
                     return "allegro"
@@ -55,7 +61,7 @@ def detect_format(file_path: str) -> str:
     elif ext in (".xml", ".cvg"):
         # Could be IPC-2581 or other XML — check content
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 header = f.read(1000)
                 if "IPC-2581" in header or "Stackup" in header:
                     return "ipc2581"
@@ -73,7 +79,7 @@ def detect_format(file_path: str) -> str:
     elif ext == ".txt":
         # Content-based detection for Allegro ASCII exports
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 header = f.read(2000)
                 if "$HEADER" in header or "$NETS" in header or "$COMPONENTS" in header:
                     return "allegro"

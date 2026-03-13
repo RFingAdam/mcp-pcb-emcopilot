@@ -1,7 +1,8 @@
 """Tests for KiCad plugin (without KiCad dependency)."""
-import pytest
 import json
 import os
+
+import pytest
 
 
 class TestPluginMetadata:
