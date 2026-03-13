@@ -55,7 +55,7 @@ class NetClassificationResult:
             "total_nets": len(self.classified_nets),
             "classified_count": sum(1 for n in self.classified_nets if n.category != "unknown"),
             "unknown_count": sum(1 for n in self.classified_nets if n.category == "unknown"),
-            "differential_pairs": len(self.differential_pairs),
+            "differential_pair_count": len(self.differential_pairs),
             "categories": {cat: len(nets) for cat, nets in sorted(cats.items())},
             "nets": [
                 {
