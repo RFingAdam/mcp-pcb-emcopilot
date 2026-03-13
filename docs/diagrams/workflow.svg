@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="280" viewBox="0 0 900 280">
+<style>
+  text { font-family: Arial, Helvetica, sans-serif; }
+  .title { font-size: 18px; font-weight: bold; fill: #1a1a1a; }
+  .subtitle { font-size: 11px; fill: #666; }
+  .label { font-size: 11px; font-weight: bold; fill: #fff; }
+  .label-dark { font-size: 11px; font-weight: bold; fill: #333; }
+  .label-sm { font-size: 9px; fill: #fff; }
+  .label-sm-dark { font-size: 9px; fill: #555; }
+  .dim { font-size: 9px; fill: #888; }
+  .arrow { stroke: #444; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-dash { stroke: #999; stroke-width: 1.5; stroke-dasharray: 6,3; fill: none; marker-end: url(#arrowhead-gray); }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#444" />
+  </marker>
+  <marker id="arrowhead-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 8 3, 0 6" fill="#999" />
+  </marker>
+</defs>
+<text x="450" y="28" class="title" text-anchor="middle">Automated Design Review Workflow</text>
+<rect x="30" y="70" width="105" height="55" rx="6" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="82" y="92" class="label" text-anchor="middle">1. Parse</text>
+<text x="82" y="106" class="label" text-anchor="middle">Layout</text>
+<line x1="135" y1="97" x2="155" y2="97" class="arrow"/>
+<rect x="155" y="70" width="105" height="55" rx="6" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="207" y="92" class="label" text-anchor="middle">2. Classify</text>
+<text x="207" y="106" class="label" text-anchor="middle">Design</text>
+<line x1="260" y1="97" x2="280" y2="97" class="arrow"/>
+<rect x="280" y="70" width="105" height="55" rx="6" fill="#8b5cf6" stroke="#8b5cf6" stroke-width="1.5"/>
+<text x="332" y="92" class="label" text-anchor="middle">3. Detect</text>
+<text x="332" y="106" class="label" text-anchor="middle">Interfaces</text>
+<line x1="385" y1="97" x2="405" y2="97" class="arrow"/>
+<rect x="405" y="70" width="105" height="55" rx="6" fill="#dc2626" stroke="#dc2626" stroke-width="1.5"/>
+<text x="457" y="92" class="label" text-anchor="middle">4. Run</text>
+<text x="457" y="106" class="label" text-anchor="middle">Analyzers</text>
+<line x1="510" y1="97" x2="530" y2="97" class="arrow"/>
+<rect x="530" y="70" width="105" height="55" rx="6" fill="#ea580c" stroke="#ea580c" stroke-width="1.5"/>
+<text x="582" y="92" class="label" text-anchor="middle">5. Cross-</text>
+<text x="582" y="106" class="label" text-anchor="middle">Correlate</text>
+<line x1="635" y1="97" x2="655" y2="97" class="arrow"/>
+<rect x="655" y="70" width="105" height="55" rx="6" fill="#0d9488" stroke="#0d9488" stroke-width="1.5"/>
+<text x="707" y="92" class="label" text-anchor="middle">6. Generate</text>
+<text x="707" y="106" class="label" text-anchor="middle">Visualizations</text>
+<line x1="760" y1="97" x2="780" y2="97" class="arrow"/>
+<rect x="780" y="70" width="105" height="55" rx="6" fill="#16a34a" stroke="#16a34a" stroke-width="1.5"/>
+<text x="832" y="92" class="label" text-anchor="middle">7. Export</text>
+<text x="832" y="106" class="label" text-anchor="middle">Report</text>
+<text x="82" y="155" class="dim" text-anchor="middle">KiCad / ODB++</text>
+<text x="82" y="169" class="dim" text-anchor="middle">Gerber / Altium</text>
+<text x="207" y="155" class="dim" text-anchor="middle">RF / Mixed-Sig</text>
+<text x="207" y="169" class="dim" text-anchor="middle">High-Speed / Power</text>
+<text x="332" y="155" class="dim" text-anchor="middle">DDR / PCIe / USB</text>
+<text x="332" y="169" class="dim" text-anchor="middle">Ethernet / LVDS</text>
+<text x="457" y="155" class="dim" text-anchor="middle">EMC / SI / PI</text>
+<text x="457" y="169" class="dim" text-anchor="middle">DFM / Thermal</text>
+<text x="582" y="155" class="dim" text-anchor="middle">Related findings</text>
+<text x="582" y="169" class="dim" text-anchor="middle">Severity ranking</text>
+<text x="707" y="155" class="dim" text-anchor="middle">Board renders</text>
+<text x="707" y="169" class="dim" text-anchor="middle">Net highlights</text>
+<text x="832" y="155" class="dim" text-anchor="middle">DOCX with</text>
+<text x="832" y="169" class="dim" text-anchor="middle">embedded images</text>
+</svg>

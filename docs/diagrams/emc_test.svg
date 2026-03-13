@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+<style>
+  text { font-family: Arial, Helvetica, sans-serif; }
+  .title { font-size: 18px; font-weight: bold; fill: #1a1a1a; }
+  .subtitle { font-size: 11px; fill: #666; }
+  .label { font-size: 11px; font-weight: bold; fill: #fff; }
+  .label-dark { font-size: 11px; font-weight: bold; fill: #333; }
+  .label-sm { font-size: 9px; fill: #fff; }
+  .label-sm-dark { font-size: 9px; fill: #555; }
+  .dim { font-size: 9px; fill: #888; }
+  .arrow { stroke: #444; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-dash { stroke: #999; stroke-width: 1.5; stroke-dasharray: 6,3; fill: none; marker-end: url(#arrowhead-gray); }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#444" />
+  </marker>
+  <marker id="arrowhead-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 8 3, 0 6" fill="#999" />
+  </marker>
+</defs>
+<text x="400" y="28" class="title" text-anchor="middle">CISPR 25 Radiated Emissions Test Setup</text>
+<text x="400" y="48" class="dim" text-anchor="middle">Semi-anechoic chamber | Antenna 1m from EUT | 150 kHz - 2.5 GHz</text>
+<rect x="50" y="400" width="700" height="15" fill="#ccc" stroke="#999" stroke-width="1"/>
+<text x="400" y="412" class="label-sm-dark" text-anchor="middle">Ground Plane</text>
+<rect x="120" y="250" width="160" height="150" fill="none" stroke="#666" stroke-width="2" rx="2"/>
+<text x="200" y="395" class="dim" text-anchor="middle">Test Table (0.8m)</text>
+<rect x="145" y="200" width="110" height="55" rx="4" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="200" y="232" class="label-dark" text-anchor="middle">EUT (PCB)</text>
+<rect x="415" y="180" width="6" height="220" fill="#888" stroke="#666"/>
+<polygon points="418,180 400,220 436,220" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+<text x="418" y="175" class="label-dark" text-anchor="middle">ANT</text>
+<rect x="60" y="310" width="90" height="40" rx="6" fill="#fed7aa" stroke="#ea580c" stroke-width="1.5"/>
+<text x="105" y="335" class="label-dark" text-anchor="middle">LISN</text>
+<rect x="560" y="100" width="120" height="50" rx="6" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="620" y="122" class="label-dark" text-anchor="middle">Spectrum</text>
+<text x="620" y="136" class="label-dark" text-anchor="middle">Analyzer</text>
+<line x1="150" y1="330" x2="145" y2="255" stroke="#333" stroke-width="1.5"/>
+<line x1="560" y1="125" x2="436" y2="200" stroke="#333" stroke-width="1.5"/>
+<line x1="150" y1="330" x2="560" y2="125" stroke="#999" stroke-width="1" stroke-dasharray="5,3"/>
+<line x1="200" y1="440" x2="418" y2="440" stroke="#cc0000" stroke-width="1" stroke-dasharray="4,3"/>
+<polygon points="200,437 200,443 208,440" fill="#cc0000"/>
+<polygon points="418,437 418,443 410,440" fill="#cc0000"/>
+<rect x="280" y="432" width="50" height="16" fill="white"/>
+<text x="305" y="445" class="label-sm-dark" text-anchor="middle">1 m</text>
+<polygon points="30,70 45,85 30,100" fill="#555" opacity="0.3"/>
+<polygon points="770,70 755,85 770,100" fill="#555" opacity="0.3"/>
+<polygon points="30,110 45,125 30,140" fill="#555" opacity="0.3"/>
+<polygon points="770,110 755,125 770,140" fill="#555" opacity="0.3"/>
+<polygon points="30,150 45,165 30,180" fill="#555" opacity="0.3"/>
+<polygon points="770,150 755,165 770,180" fill="#555" opacity="0.3"/>
+<polygon points="30,190 45,205 30,220" fill="#555" opacity="0.3"/>
+<polygon points="770,190 755,205 770,220" fill="#555" opacity="0.3"/>
+<polygon points="30,230 45,245 30,260" fill="#555" opacity="0.3"/>
+<polygon points="770,230 755,245 770,260" fill="#555" opacity="0.3"/>
+<polygon points="30,270 45,285 30,300" fill="#555" opacity="0.3"/>
+<polygon points="770,270 755,285 770,300" fill="#555" opacity="0.3"/>
+<polygon points="30,310 45,325 30,340" fill="#555" opacity="0.3"/>
+<polygon points="770,310 755,325 770,340" fill="#555" opacity="0.3"/>
+<polygon points="30,350 45,365 30,380" fill="#555" opacity="0.3"/>
+<polygon points="770,350 755,365 770,380" fill="#555" opacity="0.3"/>
+<polygon points="30,390 45,405 30,420" fill="#555" opacity="0.3"/>
+<polygon points="770,390 755,405 770,420" fill="#555" opacity="0.3"/>
+</svg>

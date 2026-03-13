@@ -54,3 +54,25 @@ htmlcov/
 *.gbr
 *.drl
 *.ger
+
+# Design review outputs (customer-specific, do not commit)
+/*.docx
+DESIGN_REVIEW_REPORT.md
+generate_docx_report.py
+# Allow framework documentation DOCX in docs/
+!docs/*.docx
+
+# ODB++ and layout files
+*.tgz
+Test_ODB*
+Test_Schematic*
+
+# Lock files
+.~lock.*
+
+# Report images
+/tmp/
+report_images/
+
+# Schematic extracts
+pcb_schematic_*/
