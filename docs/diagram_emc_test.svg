@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     version="1.1" width="800" height="600" viewBox="0 0 800 600">
+  <defs/>
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <!-- draw.io diagram embedded as XML data -->
+      <pre style="display:none">&lt;mxGraphModel&gt;
+  &lt;root&gt;
+      &lt;mxCell id="0" /&gt;
+      &lt;mxCell id="1" parent="0" /&gt;
+      &lt;mxCell id="2" value="CISPR 25 Radiated Emissions Test Setup" style="text;html=1;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="0" y="20" width="760" height="30" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="3" value="Semi-anechoic chamber. Antenna 1m from EUT. 150 kHz - 2.5 GHz." style="text;html=1;fontSize=10;fontColor=#666666;fontStyle=2;align=center;verticalAlign=top;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="0" y="52" width="760" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="4" value="Ground Plane" style="fillColor=#CCCCCC;strokeColor=#999999;fontSize=10;fontStyle=0;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="30" y="480" width="700" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="5" value="Test Table 0.8m" style="fillColor=none;strokeColor=#666666;strokeWidth=2;fontSize=9;fontColor=#666666;verticalAlign=bottom;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="140" y="320" width="140" height="140" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="6" value="EUT" style="fillColor=#DAE8FC;strokeColor=#6C8EBF;fontStyle=1;fontSize=11;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="160" y="280" width="100" height="50" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="7" value="" style="fillColor=#999999;strokeColor=#666666;fontSize=0;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="377" y="320" width="6" height="160" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="8" value="1m - 4m" style="text;html=1;fontSize=9;fontColor=#CC0000;fontStyle=2;align=left;verticalAlign=middle;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="405" y="390" width="70" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="9" value="ANT" style="shape=mxgraph.electrical.signal_sources.signal_transducer;fillColor=#F5F5F5;strokeColor=#666666;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="360" y="270" width="40" height="50" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="10" value="LISN" style="fillColor=#FFE6CC;strokeColor=#D79B00;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;rounded=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="60" y="410" width="90" height="45" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="11" style="endArrow=none;strokeWidth=1.5;strokeColor=#333333;rounded=1;" parent="1" edge="1" source="10" target="6" /&gt;
+      &lt;mxCell id="12" value="Spectrum Analyzer" style="fillColor=#E1D5E7;strokeColor=#9673A6;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;rounded=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="560" y="120" width="90" height="45" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="13" style="endArrow=none;strokeWidth=1.5;strokeColor=#333333;rounded=1;" parent="1" edge="1" source="12" target="9" /&gt;
+      &lt;mxCell id="14" style="endArrow=none;strokeWidth=1;strokeColor=#999999;dashed=1;dashPattern=4 4;rounded=1;" parent="1" edge="1" source="10" target="12" /&gt;
+      &lt;mxCell id="15" value="" style="shape=point;size=0;fillColor=none;strokeColor=none;" parent="1" vertex="1" connectable="0"&gt;
+        &lt;mxGeometry x="210" y="530" width="1" height="1" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="16" value="" style="shape=point;size=0;fillColor=none;strokeColor=none;" parent="1" vertex="1" connectable="0"&gt;
+        &lt;mxGeometry x="380" y="530" width="1" height="1" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="17" style="endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=1;strokeColor=#CC0000;dashed=1;dashPattern=4 4;" parent="1" edge="1" source="15" target="16" /&gt;
+      &lt;mxCell id="18" value="1 m" style="text;html=1;fontSize=9;fontColor=#CC0000;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;fillColor=#FFFFFF;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="265" y="518" width="60" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+  &lt;/root&gt;
+&lt;/mxGraphModel&gt;</pre>
+      <p style="font-family:sans-serif;color:#666;text-align:center;padding-top:280px;">
+        draw.io diagram (open in draw.io for full rendering)
+      </p>
+    </div>
+  </foreignObject>
+  <!-- Raw XML stored for re-import -->
+  <desc>&lt;mxGraphModel&gt;
+  &lt;root&gt;
+      &lt;mxCell id="0" /&gt;
+      &lt;mxCell id="1" parent="0" /&gt;
+      &lt;mxCell id="2" value="CISPR 25 Radiated Emissions Test Setup" style="text;html=1;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="0" y="20" width="760" height="30" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="3" value="Semi-anechoic chamber. Antenna 1m from EUT. 150 kHz - 2.5 GHz." style="text;html=1;fontSize=10;fontColor=#666666;fontStyle=2;align=center;verticalAlign=top;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="0" y="52" width="760" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="4" value="Ground Plane" style="fillColor=#CCCCCC;strokeColor=#999999;fontSize=10;fontStyle=0;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="30" y="480" width="700" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="5" value="Test Table 0.8m" style="fillColor=none;strokeColor=#666666;strokeWidth=2;fontSize=9;fontColor=#666666;verticalAlign=bottom;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="140" y="320" width="140" height="140" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="6" value="EUT" style="fillColor=#DAE8FC;strokeColor=#6C8EBF;fontStyle=1;fontSize=11;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="160" y="280" width="100" height="50" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="7" value="" style="fillColor=#999999;strokeColor=#666666;fontSize=0;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="377" y="320" width="6" height="160" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="8" value="1m - 4m" style="text;html=1;fontSize=9;fontColor=#CC0000;fontStyle=2;align=left;verticalAlign=middle;whiteSpace=wrap;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="405" y="390" width="70" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="9" value="ANT" style="shape=mxgraph.electrical.signal_sources.signal_transducer;fillColor=#F5F5F5;strokeColor=#666666;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="360" y="270" width="40" height="50" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="10" value="LISN" style="fillColor=#FFE6CC;strokeColor=#D79B00;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;rounded=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="60" y="410" width="90" height="45" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="11" style="endArrow=none;strokeWidth=1.5;strokeColor=#333333;rounded=1;" parent="1" edge="1" source="10" target="6" /&gt;
+      &lt;mxCell id="12" value="Spectrum Analyzer" style="fillColor=#E1D5E7;strokeColor=#9673A6;fontStyle=1;fontSize=10;whiteSpace=wrap;html=1;rounded=1;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="560" y="120" width="90" height="45" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="13" style="endArrow=none;strokeWidth=1.5;strokeColor=#333333;rounded=1;" parent="1" edge="1" source="12" target="9" /&gt;
+      &lt;mxCell id="14" style="endArrow=none;strokeWidth=1;strokeColor=#999999;dashed=1;dashPattern=4 4;rounded=1;" parent="1" edge="1" source="10" target="12" /&gt;
+      &lt;mxCell id="15" value="" style="shape=point;size=0;fillColor=none;strokeColor=none;" parent="1" vertex="1" connectable="0"&gt;
+        &lt;mxGeometry x="210" y="530" width="1" height="1" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="16" value="" style="shape=point;size=0;fillColor=none;strokeColor=none;" parent="1" vertex="1" connectable="0"&gt;
+        &lt;mxGeometry x="380" y="530" width="1" height="1" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+      &lt;mxCell id="17" style="endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=1;strokeColor=#CC0000;dashed=1;dashPattern=4 4;" parent="1" edge="1" source="15" target="16" /&gt;
+      &lt;mxCell id="18" value="1 m" style="text;html=1;fontSize=9;fontColor=#CC0000;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;fillColor=#FFFFFF;" parent="1" vertex="1"&gt;
+        &lt;mxGeometry x="265" y="518" width="60" height="20" as="geometry" /&gt;
+      &lt;/mxCell&gt;
+  &lt;/root&gt;
+&lt;/mxGraphModel&gt;</desc>
+</svg>
