@@ -31,6 +31,11 @@ def sample_ipc2581():
 
 
 @pytest.fixture
+def sample_allegro():
+    return str(FIXTURES_DIR / "sample_allegro.txt")
+
+
+@pytest.fixture
 def sample_design_data():
     """Create a minimal PCBDesignData for testing analyzers."""
     from mcp_pcb_emcopilot.models.pcb_data import (
