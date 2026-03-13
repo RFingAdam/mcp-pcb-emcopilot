@@ -19,6 +19,8 @@ Provides ~57 tools for PCB engineers covering:
 Claude Code acts as the AI orchestrator — this server provides the computational tools.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import math
@@ -32,6 +34,11 @@ from mcp.types import TextContent, Tool
 
 from .session import DesignSessionManager
 from .parsers import parse_pcb_file, detect_format
+from .errors import (
+    PCBError, ValidationError, ParseError, SessionError,
+    error_response, validate_positive, validate_non_negative,
+    validate_range, validate_string,
+)
 
 # Physical constants
 C0 = 299792458.0
@@ -46,7 +53,7 @@ sessions = DesignSessionManager()
 # Original calculation functions (preserved for regression compatibility)
 # =============================================================================
 
-def calc_microstrip_impedance(trace_width_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant):
+def calc_microstrip_impedance(trace_width_mm: float, dielectric_height_mm: float, trace_thickness_mm: float, dielectric_constant: float) -> dict[str, Any]:
     w = trace_width_mm
     h = dielectric_height_mm
     t = trace_thickness_mm
@@ -68,7 +75,7 @@ def calc_microstrip_impedance(trace_width_mm, dielectric_height_mm, trace_thickn
     }
 
 
-def calc_stripline_impedance(trace_width_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant):
+def calc_stripline_impedance(trace_width_mm: float, dielectric_height_mm: float, trace_thickness_mm: float, dielectric_constant: float) -> dict[str, Any]:
     w = trace_width_mm
     b = dielectric_height_mm * 2
     t = trace_thickness_mm
@@ -88,7 +95,7 @@ def calc_stripline_impedance(trace_width_mm, dielectric_height_mm, trace_thickne
     }
 
 
-def calc_differential_impedance(trace_width_mm, trace_spacing_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant, trace_type="microstrip"):
+def calc_differential_impedance(trace_width_mm: float, trace_spacing_mm: float, dielectric_height_mm: float, trace_thickness_mm: float, dielectric_constant: float, trace_type: str = "microstrip") -> dict[str, Any]:
     if trace_type == "microstrip":
         single = calc_microstrip_impedance(trace_width_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant)
     else:
@@ -110,7 +117,7 @@ def calc_differential_impedance(trace_width_mm, trace_spacing_mm, dielectric_hei
     }
 
 
-def calc_trace_width_for_current(current_amps, temp_rise_c, copper_thickness_oz, layer_type="external"):
+def calc_trace_width_for_current(current_amps: float, temp_rise_c: float, copper_thickness_oz: float, layer_type: str = "external") -> dict[str, Any]:
     thickness_mils = copper_thickness_oz * 1.37
     k = 0.048 if layer_type == "external" else 0.024
     b, c = 0.44, 0.725
@@ -120,7 +127,7 @@ def calc_trace_width_for_current(current_amps, temp_rise_c, copper_thickness_oz,
     return {"trace_width_mm": round(width_mm, 3), "trace_width_mils": round(width_mils, 1), "cross_section_mils2": round(area, 1), "current_amps": current_amps, "temp_rise_c": temp_rise_c, "copper_oz": copper_thickness_oz, "layer_type": layer_type, "standard": "IPC-2221"}
 
 
-def analyze_trace_timing(trace_length_mm, effective_er, data_rate_gbps, rise_time_ps, setup_time_ps, hold_time_ps):
+def analyze_trace_timing(trace_length_mm: float, effective_er: float, data_rate_gbps: float, rise_time_ps: float, setup_time_ps: float, hold_time_ps: float) -> dict[str, Any]:
     prop_delay_ps_per_mm = (1000 / C0) * math.sqrt(effective_er) * 1e12
     total_delay_ps = trace_length_mm * prop_delay_ps_per_mm
     ui_ps = 1e12 / (data_rate_gbps * 1e9)
@@ -136,7 +143,7 @@ def analyze_trace_timing(trace_length_mm, effective_er, data_rate_gbps, rise_tim
     return {"propagation_delay_ps": round(total_delay_ps, 1), "setup_margin_ps": round(setup_margin, 1), "hold_margin_ps": round(hold_margin, 1), "timing_valid": len(issues) == 0, "issues": issues}
 
 
-def analyze_crosstalk(trace_spacing_mm, trace_width_mm, dielectric_height_mm, coupling_length_mm, rise_time_ps):
+def analyze_crosstalk(trace_spacing_mm: float, trace_width_mm: float, dielectric_height_mm: float, coupling_length_mm: float, rise_time_ps: float) -> dict[str, Any]:
     s, h, l = trace_spacing_mm, dielectric_height_mm, coupling_length_mm
     coupling_factor = math.exp(-2 * s / h)
     next_percent = 25 * coupling_factor * min(l / 25.4, 1.0)
@@ -157,7 +164,7 @@ def analyze_crosstalk(trace_spacing_mm, trace_width_mm, dielectric_height_mm, co
     return {"near_end_crosstalk_percent": round(next_percent, 2), "far_end_crosstalk_percent": round(fext_percent, 2), "severity": severity, "recommendations": recs}
 
 
-def analyze_via(via_diameter_mm, via_length_mm, pad_diameter_mm, antipad_diameter_mm, dielectric_constant, frequency_ghz):
+def analyze_via(via_diameter_mm: float, via_length_mm: float, pad_diameter_mm: float, antipad_diameter_mm: float, dielectric_constant: float, frequency_ghz: float) -> dict[str, Any]:
     d, h = via_diameter_mm, via_length_mm
     inductance_nh = 5.08 * h * (math.log(4 * h / d) + 1)
     capacitance_pf = 1.41 * dielectric_constant * h * pad_diameter_mm / (antipad_diameter_mm - pad_diameter_mm)
@@ -177,7 +184,7 @@ def analyze_via(via_diameter_mm, via_length_mm, pad_diameter_mm, antipad_diamete
     return {"inductance_nh": round(inductance_nh, 3), "capacitance_pf": round(capacitance_pf, 3), "characteristic_impedance_ohms": round(z_via, 1), "resonant_frequency_ghz": round(f_res_ghz, 2), "insertion_loss_db": round(s21_db, 2), "issues": issues, "parameters": {"via_diameter_mm": d, "via_length_mm": h, "pad_diameter_mm": pad_diameter_mm, "antipad_diameter_mm": antipad_diameter_mm, "dielectric_constant": dielectric_constant, "frequency_ghz": frequency_ghz}}
 
 
-def analyze_current_loop(loop_area_mm2, current_ma, frequency_mhz):
+def analyze_current_loop(loop_area_mm2: float, current_ma: float, frequency_mhz: float) -> dict[str, Any]:
     area_m2 = loop_area_mm2 * 1e-6
     current_a = current_ma * 1e-3
     freq_hz = frequency_mhz * 1e6
@@ -196,7 +203,7 @@ def analyze_current_loop(loop_area_mm2, current_ma, frequency_mhz):
     return {"e_field_dbuv_m": round(e_field_dbuv, 1), "fcc_class_b_limit_dbuv_m": limit_dbuv, "margin_db": round(margin_db, 1), "compliant": margin_db > 0, "margin_acceptable": margin_db > 6, "recommendations": recs, "parameters": {"loop_area_mm2": loop_area_mm2, "current_ma": current_ma, "frequency_mhz": frequency_mhz, "distance_m": distance}}
 
 
-def estimate_rise_time_bandwidth(rise_time_ps):
+def estimate_rise_time_bandwidth(rise_time_ps: float) -> dict[str, Any]:
     rise_time_s = rise_time_ps * 1e-12
     bw_3db_ghz = 0.35 / rise_time_s / 1e9
     f_5th_ghz = 5 * bw_3db_ghz / math.pi
@@ -206,7 +213,7 @@ def estimate_rise_time_bandwidth(rise_time_ps):
 
 # --- New RF engineering calculators (added from review) ---
 
-def calc_cpw_impedance(trace_width_mm, gap_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant, has_ground_plane=True):
+def calc_cpw_impedance(trace_width_mm: float, gap_mm: float, dielectric_height_mm: float, trace_thickness_mm: float, dielectric_constant: float, has_ground_plane: bool = True) -> dict[str, Any]:
     """Coplanar waveguide impedance (grounded CPW by default, ungrounded if has_ground_plane=False).
 
     Uses Wen's conformal mapping method with Hilberg's approximation for K(k)/K'(k).
@@ -274,7 +281,7 @@ def calc_cpw_impedance(trace_width_mm, gap_mm, dielectric_height_mm, trace_thick
     }
 
 
-def calc_skin_effect(frequency_mhz, copper_thickness_oz=1.0, surface_roughness_um=0.5):
+def calc_skin_effect(frequency_mhz: float, copper_thickness_oz: float = 1.0, surface_roughness_um: float = 0.5) -> dict[str, Any]:
     """Calculate skin depth, AC resistance factor, and conductor loss.
 
     Includes Hammerstad-Bekkadal surface roughness correction.
@@ -335,7 +342,7 @@ def calc_skin_effect(frequency_mhz, copper_thickness_oz=1.0, surface_roughness_u
     }
 
 
-def calc_dielectric_loss(frequency_mhz, dielectric_constant, loss_tangent, trace_length_mm):
+def calc_dielectric_loss(frequency_mhz: float, dielectric_constant: float, loss_tangent: float, trace_length_mm: float) -> dict[str, Any]:
     """Calculate dielectric loss for a given trace at frequency.
 
     Uses: alpha_d = (pi * f * sqrt(er_eff) * tan_delta) / c
@@ -374,7 +381,7 @@ def calc_dielectric_loss(frequency_mhz, dielectric_constant, loss_tangent, trace
     }
 
 
-def calc_plane_resonance(plane_width_mm, plane_length_mm, dielectric_constant, dielectric_height_mm):
+def calc_plane_resonance(plane_width_mm: float, plane_length_mm: float, dielectric_constant: float, dielectric_height_mm: float) -> dict[str, Any]:
     """Calculate PCB power/ground plane cavity resonance frequencies.
 
     Cavity model: f_mn = c / (2 * sqrt(er)) * sqrt((m/L)^2 + (n/W)^2)
@@ -420,7 +427,7 @@ def calc_plane_resonance(plane_width_mm, plane_length_mm, dielectric_constant, d
     }
 
 
-def calc_via_stitching_requirements(max_frequency_mhz, dielectric_constant):
+def calc_via_stitching_requirements(max_frequency_mhz: float, dielectric_constant: float) -> dict[str, Any]:
     """Calculate required via stitching density and spacing for EMI containment.
 
     Rule: via spacing < lambda/20 at max frequency to prevent cavity resonance leakage.
@@ -478,7 +485,7 @@ MATERIAL_PROPERTIES = [
 # Helper to safely serialize results
 # =============================================================================
 
-def _serialize(obj):
+def _serialize(obj: Any) -> Any:
     """Convert dataclass/object to JSON-safe dict."""
     if hasattr(obj, '__dataclass_fields__'):
         return asdict(obj)
@@ -493,7 +500,7 @@ def _serialize(obj):
     return str(obj)
 
 
-def _result(data, success=True):
+def _result(data: Any, success: bool = True) -> Any:
     """Wrap result in standard format."""
     if success:
         if isinstance(data, dict):
@@ -506,7 +513,7 @@ def _result(data, success=True):
 # Tool definitions
 # =============================================================================
 
-def _make_tool(name, desc, props, required=None):
+def _make_tool(name: str, desc: str, props: dict[str, Any], required: list[str] | None = None) -> Tool:
     """Helper to create Tool with schema."""
     schema = {"type": "object", "properties": props}
     if required:
@@ -1114,11 +1121,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif "success" not in result:
             result["success"] = True
         return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+    except PCBError as e:
+        return [TextContent(type="text", text=json.dumps(e.to_dict(), indent=2, default=str))]
     except Exception as e:
         return [TextContent(type="text", text=json.dumps({"success": False, "error": str(e)}))]
 
 
-def _dispatch(name: str, args: dict) -> dict:
+def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     """Route tool call to handler."""
 
     # === FILE PARSING ===
@@ -1259,28 +1268,67 @@ def _dispatch(name: str, args: dict) -> dict:
 
     # === IMPEDANCE CALCULATORS ===
     if name == "pcb_calc_microstrip_impedance":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_positive(args.get("trace_thickness_mm", 0), "trace_thickness_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_microstrip_impedance(args["trace_width_mm"], args["dielectric_height_mm"], args["trace_thickness_mm"], args["dielectric_constant"]))
     if name == "pcb_calc_stripline_impedance":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_positive(args.get("trace_thickness_mm", 0), "trace_thickness_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_stripline_impedance(args["trace_width_mm"], args["dielectric_height_mm"], args["trace_thickness_mm"], args["dielectric_constant"]))
     if name == "pcb_calc_differential_impedance":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("trace_spacing_mm", 0), "trace_spacing_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_positive(args.get("trace_thickness_mm", 0), "trace_thickness_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_differential_impedance(args["trace_width_mm"], args["trace_spacing_mm"], args["dielectric_height_mm"], args["trace_thickness_mm"], args["dielectric_constant"], args.get("trace_type", "microstrip")))
     if name == "pcb_calc_trace_width":
+        validate_positive(args.get("current_amps", 0), "current_amps")
+        validate_positive(args.get("temp_rise_c", 0), "temp_rise_c")
+        validate_positive(args.get("copper_thickness_oz", 0), "copper_thickness_oz")
         return _result(calc_trace_width_for_current(args["current_amps"], args["temp_rise_c"], args["copper_thickness_oz"], args.get("layer_type", "external")))
 
     # === ADVANCED RF CALCULATORS ===
     if name == "pcb_calc_cpw_impedance":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("gap_mm", 0), "gap_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_non_negative(args.get("trace_thickness_mm", 0), "trace_thickness_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_cpw_impedance(args["trace_width_mm"], args["gap_mm"], args["dielectric_height_mm"], args["trace_thickness_mm"], args["dielectric_constant"], args.get("has_ground_plane", True)))
     if name == "pcb_calc_skin_effect":
+        validate_positive(args.get("frequency_mhz", 0), "frequency_mhz")
+        validate_positive(args.get("copper_thickness_oz", 1.0), "copper_thickness_oz")
+        validate_non_negative(args.get("surface_roughness_um", 0.5), "surface_roughness_um")
         return _result(calc_skin_effect(args["frequency_mhz"], args.get("copper_thickness_oz", 1.0), args.get("surface_roughness_um", 0.5)))
     if name == "pcb_calc_dielectric_loss":
+        validate_positive(args.get("frequency_mhz", 0), "frequency_mhz")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_non_negative(args.get("loss_tangent", 0), "loss_tangent")
+        validate_positive(args.get("trace_length_mm", 0), "trace_length_mm")
         return _result(calc_dielectric_loss(args["frequency_mhz"], args["dielectric_constant"], args["loss_tangent"], args["trace_length_mm"]))
     if name == "pcb_calc_plane_resonance":
+        validate_positive(args.get("plane_width_mm", 0), "plane_width_mm")
+        validate_positive(args.get("plane_length_mm", 0), "plane_length_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
         return _result(calc_plane_resonance(args["plane_width_mm"], args["plane_length_mm"], args["dielectric_constant"], args["dielectric_height_mm"]))
     if name == "pcb_calc_via_stitching":
+        validate_positive(args.get("max_frequency_mhz", 0), "max_frequency_mhz")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_via_stitching_requirements(args["max_frequency_mhz"], args["dielectric_constant"]))
 
     # === S-PARAMETER / MODE CONVERSION ===
     if name == "pcb_calc_insertion_loss":
+        validate_positive(args.get("trace_length_mm", 0), "trace_length_mm")
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_non_negative(args.get("loss_tangent", 0), "loss_tangent")
         from .analyzers.rf_si.sparam_extractor import calculate_insertion_loss
         return _result(calculate_insertion_loss(
             trace_length_mm=args["trace_length_mm"],
@@ -1295,6 +1343,9 @@ def _dispatch(name: str, args: dict) -> dict:
             num_points=args.get("num_points", 50),
         ))
     if name == "pcb_calc_return_loss":
+        validate_positive(args.get("impedance_ohm", 0), "impedance_ohm")
+        validate_positive(args.get("target_impedance_ohm", 0), "target_impedance_ohm")
+        validate_positive(args.get("frequency_mhz", 0), "frequency_mhz")
         from .analyzers.rf_si.sparam_extractor import calculate_return_loss
         return _result(calculate_return_loss(
             impedance_ohm=args["impedance_ohm"],
@@ -1302,6 +1353,12 @@ def _dispatch(name: str, args: dict) -> dict:
             frequency_mhz=args["frequency_mhz"],
         ))
     if name == "pcb_analyze_mode_conversion":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("trace_spacing_mm", 0), "trace_spacing_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_non_negative(args.get("length_asymmetry_mm", 0), "length_asymmetry_mm")
+        validate_positive(args.get("data_rate_gbps", 0), "data_rate_gbps")
         from .analyzers.rf_si.mode_conversion import analyze_mode_conversion
         return _result(analyze_mode_conversion(
             trace_width_mm=args["trace_width_mm"],
@@ -1315,13 +1372,36 @@ def _dispatch(name: str, args: dict) -> dict:
 
     # === SIGNAL INTEGRITY ===
     if name == "pcb_analyze_timing":
+        validate_positive(args.get("trace_length_mm", 0), "trace_length_mm")
+        validate_range(args.get("effective_er", 0), 1.0, 100.0, "effective_er")
+        validate_positive(args.get("data_rate_gbps", 0), "data_rate_gbps")
+        validate_positive(args.get("rise_time_ps", 0), "rise_time_ps")
+        validate_non_negative(args.get("setup_time_ps", 0), "setup_time_ps")
+        validate_non_negative(args.get("hold_time_ps", 0), "hold_time_ps")
         return _result(analyze_trace_timing(args["trace_length_mm"], args["effective_er"], args["data_rate_gbps"], args["rise_time_ps"], args["setup_time_ps"], args["hold_time_ps"]))
     if name == "pcb_analyze_crosstalk":
+        validate_positive(args.get("trace_spacing_mm", 0), "trace_spacing_mm")
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_positive(args.get("coupling_length_mm", 0), "coupling_length_mm")
+        validate_positive(args.get("rise_time_ps", 0), "rise_time_ps")
         return _result(analyze_crosstalk(args["trace_spacing_mm"], args["trace_width_mm"], args["dielectric_height_mm"], args["coupling_length_mm"], args["rise_time_ps"]))
     if name == "pcb_analyze_via":
+        validate_positive(args.get("via_diameter_mm", 0), "via_diameter_mm")
+        validate_positive(args.get("via_length_mm", 0), "via_length_mm")
+        validate_positive(args.get("pad_diameter_mm", 0), "pad_diameter_mm")
+        validate_positive(args.get("antipad_diameter_mm", 0), "antipad_diameter_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_positive(args.get("frequency_ghz", 0), "frequency_ghz")
         return _result(analyze_via(args["via_diameter_mm"], args["via_length_mm"], args["pad_diameter_mm"], args["antipad_diameter_mm"], args["dielectric_constant"], args["frequency_ghz"]))
 
     if name == "pcb_analyze_differential_pair":
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("trace_spacing_mm", 0), "trace_spacing_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_positive(args.get("target_impedance_ohm", 0), "target_impedance_ohm")
+        validate_positive(args.get("data_rate_gbps", 0), "data_rate_gbps")
         res = calc_differential_impedance(args["trace_width_mm"], args["trace_spacing_mm"], args["dielectric_height_mm"], args.get("trace_thickness_mm", 0.035), args["dielectric_constant"])
         z_diff = res["differential_impedance_ohms"]
         target = args["target_impedance_ohm"]
@@ -1334,6 +1414,8 @@ def _dispatch(name: str, args: dict) -> dict:
         return {"differential_impedance_ohm": z_diff, "target_impedance_ohm": target, "deviation_percent": round(deviation, 1), "compliant": deviation <= 10, "data_rate_gbps": args["data_rate_gbps"], "issues": issues}
 
     if name == "pcb_analyze_length_matching":
+        validate_positive(args.get("max_skew_ps", 0), "max_skew_ps")
+        validate_range(args.get("effective_er", 0), 1.0, 100.0, "effective_er")
         lengths = args["trace_lengths_mm"]
         max_skew_ps = args["max_skew_ps"]
         er = args["effective_er"]
@@ -1346,6 +1428,12 @@ def _dispatch(name: str, args: dict) -> dict:
         return {"max_skew_ps": round(skew_ps, 1), "allowed_skew_ps": max_skew_ps, "compliant": skew_ps <= max_skew_ps, "reference_net": ref_name, "signals": mismatches}
 
     if name == "pcb_calc_eye_diagram":
+        validate_positive(args.get("data_rate_gbps", 0), "data_rate_gbps")
+        validate_positive(args.get("trace_length_mm", 0), "trace_length_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        validate_non_negative(args.get("loss_tangent", 0), "loss_tangent")
+        validate_positive(args.get("trace_width_mm", 0), "trace_width_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
         from .analyzers.rf_si.eye_diagram import calculate_eye_opening
         return _result(calculate_eye_opening(
             data_rate_gbps=args["data_rate_gbps"],
@@ -1362,8 +1450,12 @@ def _dispatch(name: str, args: dict) -> dict:
 
     # === EMC ===
     if name == "pcb_analyze_current_loop":
+        validate_positive(args.get("loop_area_mm2", 0), "loop_area_mm2")
+        validate_positive(args.get("current_ma", 0), "current_ma")
+        validate_positive(args.get("frequency_mhz", 0), "frequency_mhz")
         return _result(analyze_current_loop(args["loop_area_mm2"], args["current_ma"], args["frequency_mhz"]))
     if name == "pcb_estimate_bandwidth":
+        validate_positive(args.get("rise_time_ps", 0), "rise_time_ps")
         return _result(estimate_rise_time_bandwidth(args["rise_time_ps"]))
 
     if name == "pcb_analyze_shielding":
@@ -2172,16 +2264,20 @@ def _dispatch(name: str, args: dict) -> dict:
 
 
 def _get_session(session_id: str):
-    """Get session or raise error."""
+    """Get session or raise SessionError."""
     data = sessions.get_session(session_id)
     if data is None:
-        raise ValueError(f"No session found: {session_id}. Use pcb_parse_layout first.")
+        raise SessionError(
+            "INVALID_SESSION",
+            f"No active session with ID '{session_id}'. Use pcb_parse_layout to create one first.",
+            {"session_id": session_id},
+        )
     return data
 
 
-def main():
+def main() -> None:
     """Run the MCP server."""
-    async def run():
+    async def run() -> None:
         async with stdio_server() as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())
     asyncio.run(run())
