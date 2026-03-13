@@ -1,4 +1,6 @@
 """Stackup parser for extracting and computing layer stackup properties"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from enum import Enum
@@ -144,7 +146,7 @@ class StackupLayer:
     reference_layer_number: Optional[int] = None  # For signal layers
     distance_to_reference_mm: Optional[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.thickness_um = self.thickness_mm * 1000
 
     @property
@@ -183,15 +185,15 @@ class Stackup:
     default_material: str = "fr4"
     default_copper_weight_oz: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self._recalculate()
 
-    def _recalculate(self):
+    def _recalculate(self) -> None:
         """Recalculate derived properties"""
         self.total_thickness_mm = sum(l.thickness_mm for l in self.layers)
         self.copper_layer_count = len([l for l in self.layers if l.layer_type in ("signal", "plane")])
 
-    def add_layer(self, layer: StackupLayer):
+    def add_layer(self, layer: StackupLayer) -> None:
         """Add a layer to the stackup"""
         self.layers.append(layer)
         self._recalculate()
@@ -456,8 +458,8 @@ class StackupParser:
         er: float,
         loss_tangent: float,
         material_type: MaterialType = MaterialType.CUSTOM,
-        **kwargs
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
         Add a custom material to the library.
 

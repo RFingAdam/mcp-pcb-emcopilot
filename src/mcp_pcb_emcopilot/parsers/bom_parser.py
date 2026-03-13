@@ -6,6 +6,8 @@ Supports:
 - Automatic component type inference from reference designators
 """
 
+from __future__ import annotations
+
 import csv
 import logging
 import re
@@ -111,7 +113,7 @@ class BOMParser:
             reader = csv.DictReader(f, delimiter=delimiter)
 
             # Map column names to standardized keys
-            column_map = self._map_columns(reader.fieldnames or [])
+            column_map = self._map_columns(reader.fieldnames or [])  # type: ignore[arg-type]
 
             for line_num, row in enumerate(reader, start=2):  # Start at 2 (after header)
                 try:

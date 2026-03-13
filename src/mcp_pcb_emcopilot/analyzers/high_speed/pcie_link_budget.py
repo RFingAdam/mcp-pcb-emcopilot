@@ -9,6 +9,8 @@ Lane-to-lane skew is validated against generation-specific requirements.
 All arithmetic uses pure Python math -- no numpy required.
 """
 
+from __future__ import annotations
+
 import math
 from typing import Optional
 

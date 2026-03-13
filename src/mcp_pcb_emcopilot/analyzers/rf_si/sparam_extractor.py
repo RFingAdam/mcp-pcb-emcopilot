@@ -10,6 +10,8 @@ for the MCP tool interface.  For full ABCD-matrix cascading with via models
 use the SParameterCalculator in sparam_calculator.py instead.
 """
 
+from __future__ import annotations
+
 import math
 from typing import Optional
 

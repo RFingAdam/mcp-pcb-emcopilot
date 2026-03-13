@@ -10,6 +10,8 @@ current.  Anti-resonance peaks that exceed the target are flagged.
 All arithmetic uses the stdlib ``cmath`` module -- no numpy required.
 """
 
+from __future__ import annotations
+
 import cmath
 import math
 from typing import Optional

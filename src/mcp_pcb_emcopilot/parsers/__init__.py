@@ -122,7 +122,7 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
 def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
     """Wrap a format-specific parser with error handling."""
     try:
-        return parser_fn(file_path)
+        return parser_fn(file_path)  # type: ignore[no-any-return]
     except ParseError:
         raise  # Re-raise our own errors as-is
     except Exception as e:
@@ -138,7 +138,7 @@ def _parse_kicad(file_path: str) -> PCBDesignData:
     from .kicad_pcb_parser import KiCadPcbParser
 
     parser = KiCadPcbParser()
-    board = parser.parse_file(file_path)
+    board = parser.parse_file(file_path)  # type: ignore[attr-defined]
 
     data = PCBDesignData(
         source_file=file_path,
@@ -388,8 +388,8 @@ def _parse_altium(file_path: str) -> PCBDesignData:
     except ImportError:
         raise ImportError("Altium parser requires 'olefile' package: pip install olefile")
 
-    parser = AltiumPcbParser()
-    board = parser.parse_file(file_path)
+    parser = AltiumPcbParser()  # type: ignore[attr-defined]
+    board = parser.parse_file(file_path)  # type: ignore[attr-defined]
 
     data = PCBDesignData(
         source_file=file_path,
@@ -441,8 +441,8 @@ def _parse_ipc2581(file_path: str) -> PCBDesignData:
     """Parse IPC-2581 XML into PCBDesignData."""
     from .ipc2581_parser import IPC2581Parser
 
-    parser = IPC2581Parser()
-    ipc = parser.parse_file(file_path)
+    parser = IPC2581Parser()  # type: ignore[attr-defined]
+    ipc = parser.parse_file(file_path)  # type: ignore[attr-defined]
 
     data = PCBDesignData(
         source_file=file_path,
@@ -491,7 +491,7 @@ def _parse_step(file_path: str) -> PCBDesignData:
     from .step_parser import STEPParser
 
     parser = STEPParser()
-    result = parser.parse_file(file_path)
+    result = parser.parse_file(file_path)  # type: ignore[attr-defined]
 
     board_3d = result.get("board_3d", {})
     step_components = result.get("step_components", [])
@@ -531,4 +531,4 @@ def parse_schematic_pdf(file_path: str) -> PDFSchematicResult:
     from .pdf_schematic_parser import PDFSchematicParser
 
     parser = PDFSchematicParser()
-    return parser.parse(file_path)
+    return parser.parse(file_path)  # type: ignore[no-any-return]

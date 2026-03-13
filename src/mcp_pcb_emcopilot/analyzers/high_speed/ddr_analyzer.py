@@ -8,6 +8,8 @@ Analyzes DDR3/DDR4/DDR5/LPDDR routing for compliance:
 - Via transitions
 - Reference plane continuity
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -135,7 +137,7 @@ class DDRResult:
 
 
 # DDR timing specifications by standard (in picoseconds)
-DDR_SPECS = {
+DDR_SPECS: dict[DDRStandard, dict[str, Any]] = {
     DDRStandard.DDR3: {
         "dq_dqs_skew_ps": 50,      # Max DQ-DQS skew per byte lane
         "addr_cmd_skew_ps": 100,   # Max address/command skew
@@ -315,7 +317,7 @@ class DDRAnalyzer:
 
         return prop_delay
 
-    def _calculate_all_layer_delays(self, layers: List[Dict[str, Any]]):
+    def _calculate_all_layer_delays(self, layers: List[Dict[str, Any]]) -> None:
         """Pre-calculate propagation delays for all signal layers."""
         for idx, layer in enumerate(layers):
             layer_type = str(layer.get('type', '')).lower()
@@ -527,7 +529,7 @@ class DDRAnalyzer:
             max_via = max(via_transitions.values()) if via_transitions else 0
             if max_via > spec["max_via_transitions"]:
                 via_ok = False
-                worst_signal = max(via_transitions, key=via_transitions.get)
+                worst_signal = max(via_transitions, key=lambda k: via_transitions[k])
                 issues.append(DDRIssue(
                     issue_type=DDRIssueType.VIA_COUNT_EXCEEDED,
                     severity="medium",
@@ -615,7 +617,7 @@ class DDRAnalyzer:
         Returns:
             Dictionary with topology classification and issues
         """
-        topology_result = {
+        topology_result: dict[str, Any] = {
             "topology_type": "unknown",
             "is_optimal": True,
             "issues": [],
@@ -680,7 +682,7 @@ class DDRAnalyzer:
         Returns:
             Dictionary with validation results and issues
         """
-        result = {
+        result: dict[str, Any] = {
             "zq_present": zq_resistor_position is not None,
             "value_correct": False,
             "placement_ok": False,
@@ -762,7 +764,7 @@ class DDRAnalyzer:
         Returns:
             Dictionary with stub measurements and violations
         """
-        result = {
+        result: dict[str, Any] = {
             "stub_count": len(dram_tap_points),
             "max_stub_length_mm": 0.0,
             "stubs_compliant": True,

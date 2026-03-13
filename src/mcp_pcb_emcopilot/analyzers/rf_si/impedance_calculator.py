@@ -8,6 +8,8 @@ Implements IPC-2141 and industry-standard formulas for:
 - Coplanar waveguide (with/without ground)
 - Differential pairs
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Optional, Literal
@@ -389,7 +391,7 @@ class ImpedanceCalculator:
         k0_prime = math.sqrt(1 - k0**2)
 
         # Elliptic integral ratio approximation
-        def elliptic_ratio(k):
+        def elliptic_ratio(k: float) -> float:
             if k < 0.707:
                 k_prime = math.sqrt(1 - k**2)
                 return math.pi / math.log(2 * (1 + math.sqrt(k_prime)) / (1 - math.sqrt(k_prime)))

@@ -8,8 +8,10 @@ FCC/CISPR limits.  Includes spread-spectrum clocking (SSC) dithering reduction.
 All calculations are pure Python — no external dependencies.
 """
 
+from __future__ import annotations
+
 import math
-from typing import Optional
+from typing import Any, Optional
 
 
 def _trapezoidal_harmonic_amplitude(
@@ -30,7 +32,7 @@ def _trapezoidal_harmonic_amplitude(
         return 0.0
 
     # sinc(x) = sin(pi*x) / (pi*x), using x directly
-    def sinc(x):
+    def sinc(x: float) -> float:
         if abs(x) < 1e-12:
             return 1.0
         return abs(math.sin(math.pi * x) / (math.pi * x))
@@ -163,7 +165,7 @@ def calculate_clock_emi(
             else:
                 return limits.get("above_960_mhz", 54)
 
-    harmonics = []
+    harmonics: list[dict[str, Any]] = []
     worst_margin_db = 100.0
     worst_harmonic = 1
 
@@ -333,7 +335,7 @@ def calculate_smps_emi(
     # E = Z0 * H = 377 * H
     loop_area_m2 = pcb_loop_area_cm2 * 1e-4
 
-    harmonics = []
+    harmonics: list[dict[str, Any]] = []
     worst_margin_db = 100.0
     worst_harmonic = 1
 
@@ -360,7 +362,7 @@ def calculate_smps_emi(
             # Reuse limit function pattern
             if "cispr" in limit_standard:
                 if f_mhz < 230:
-                    limit = 40 if "classb" in limit_standard else 50
+                    limit: float = 40 if "classb" in limit_standard else 50
                 elif f_mhz < 1000:
                     limit = 47 if "classb" in limit_standard else 57
                 else:
@@ -380,7 +382,7 @@ def calculate_smps_emi(
                 worst_margin_db = margin
                 worst_harmonic = n
         else:
-            limit = None
+            limit = None  # type: ignore[assignment]
             margin = None
 
         harmonics.append({
@@ -542,7 +544,7 @@ def analyze_clock_emi(
         if spreading_bw_hz > rbw_hz:
             ss_reduction_db = min(10.0 * math.log10(spreading_bw_hz / rbw_hz), 20.0)
 
-    harmonics = []
+    harmonics: list[dict[str, Any]] = []
     worst_margin_db = 999.0
     worst_freq_mhz = frequency_mhz
     worst_emission = -100.0
@@ -737,7 +739,7 @@ def analyze_smps_emi(
     input_area_m2 = input_loop_area_mm2 * 1e-6
     output_area_m2 = output_loop_area_mm2 * 1e-6
 
-    harmonics = []
+    harmonics: list[dict[str, Any]] = []
     worst_margin = 999.0
     worst_freq = freq_mhz
     worst_emission = -100.0

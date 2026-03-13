@@ -4,6 +4,8 @@ Common Mode Analyzer.
 Analyzes differential pairs for common mode conversion
 issues that lead to EMI.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
