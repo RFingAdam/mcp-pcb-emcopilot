@@ -32,14 +32,20 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from .session import DesignSessionManager
-from .models.pcb_data import PCBDesignData
-from .parsers import parse_pcb_file, detect_format
 from .errors import (
-    PCBError, ValidationError, ParseError, SessionError,
-    error_response, validate_positive, validate_non_negative,
-    validate_range, validate_string,
+    ParseError,
+    PCBError,
+    SessionError,
+    ValidationError,
+    error_response,
+    validate_non_negative,
+    validate_positive,
+    validate_range,
+    validate_string,
 )
+from .models.pcb_data import PCBDesignData
+from .parsers import detect_format, parse_pcb_file
+from .session import DesignSessionManager
 
 # Physical constants
 C0 = 299792458.0
@@ -1589,7 +1595,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return _result(estimate_rise_time_bandwidth(args["rise_time_ps"]))
 
     if name == "pcb_analyze_shielding":
-        from .analyzers.emc.shielding import ShieldingAnalyzer, ShieldConfig
+        from .analyzers.emc.shielding import ShieldConfig, ShieldingAnalyzer
         analyzer = ShieldingAnalyzer()
         apertures = []
         if args.get("aperture_mm"):
@@ -1618,7 +1624,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return _serialize(res)
 
     if name == "pcb_predict_compliance":
-        from .analyzers.emc.compliance_predictor import EMCCompliancePredictor, EMCStandard, ClockSource
+        from .analyzers.emc.compliance_predictor import ClockSource, EMCCompliancePredictor, EMCStandard
         predictor = EMCCompliancePredictor()
         predictor.add_clock(ClockSource(name="CLK", frequency_mhz=args["clock_frequency_mhz"], rise_time_ns=args["rise_time_ps"] / 1000.0))
         if args.get("has_shielding"):
@@ -1869,7 +1875,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
 
     # === DFM ===
     if name == "pcb_analyze_solder_paste":
-        from .analyzers.dfm.solder_paste import SolderPasteAnalyzer, PadDefinition, ComponentPads
+        from .analyzers.dfm.solder_paste import ComponentPads, PadDefinition, SolderPasteAnalyzer
         analyzer = SolderPasteAnalyzer()  # type: ignore[assignment]
         pad = PadDefinition(pad_id="1", width_mm=args["pad_width_mm"], length_mm=args["pad_length_mm"], pitch_mm=args["pitch_mm"])
         comp = ComponentPads(reference="U1", package="custom", pads=[pad])
@@ -1877,7 +1883,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return _serialize(res)
 
     if name == "pcb_analyze_placement":
-        from .analyzers.dfm.component_placement import PlacementAnalyzer, Component
+        from .analyzers.dfm.component_placement import Component, PlacementAnalyzer
         analyzer = PlacementAnalyzer()  # type: ignore[assignment]
         pitch = args["component_pitch_mm"]
         comps = [
@@ -1996,8 +2002,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return result.to_dict()
 
     if name == "pcb_detect_interfaces":
-        from .classifiers.net_classifier import NetClassifier
         from .classifiers.interface_detector import InterfaceDetector
+        from .classifiers.net_classifier import NetClassifier
         data = _get_session(args["session_id"])
         classifier = NetClassifier()
         net_cls = classifier.classify(data)
@@ -2170,7 +2176,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
 
     if name == "pcb_generate_docx_report":
-        from .reports.docx_report import generate_docx_report, generate_all_renders
+        from .reports.docx_report import generate_all_renders, generate_docx_report
         data = _get_session(args["session_id"])
         image_dir = args.get("image_dir")
         output_path = args.get("output_path")
@@ -2263,8 +2269,9 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
 
         if args.get("render_image") and data.schematic_pdf_path:
-            from .parsers.pdf_schematic_parser import PDFSchematicParser
             import tempfile
+
+            from .parsers.pdf_schematic_parser import PDFSchematicParser
             parser = PDFSchematicParser()  # type: ignore[assignment]
             output_dir = tempfile.mkdtemp(prefix="pcb_schematic_")
             image_path = parser.render_page_image(  # type: ignore[attr-defined]
@@ -2480,8 +2487,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     # === CONDUCTED EMISSIONS ===
     if name == "pcb_analyze_conducted_emissions":
         from .analyzers.emc.conducted_emissions import ConductedEmissionAnalyzer
-        analyzer = ConductedEmissionAnalyzer()
-        analysis = analyzer.predict_conducted_compliance(
+        ce_analyzer = ConductedEmissionAnalyzer()
+        ce_result = ce_analyzer.predict_conducted_compliance(
             switching_freq_khz=args["switching_freq_khz"],
             input_voltage=args["input_voltage"],
             duty_cycle=args["duty_cycle"],
@@ -2491,69 +2498,69 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             num_harmonics=args.get("num_harmonics", 50),
             input_filter_db=args.get("input_filter_db", 0.0),
         )
-        return analyzer.to_dict(analysis)
+        return ce_analyzer.to_dict(ce_result)
 
     # === EMI FILTER DESIGN ===
     if name == "pcb_design_emi_filter":
         from .analyzers.emc.filter_design import FilterDesigner
         source_z = args.get("source_impedance_ohm", 50.0)
         designer = FilterDesigner(source_impedance_ohm=source_z, load_impedance_ohm=source_z)
-        result = designer.auto_design_filter(
+        filt_result = designer.auto_design_filter(
             failure_frequencies_mhz=args["failure_frequencies_mhz"],
             required_attenuation_db=args["required_attenuation_db"],
             filter_type=args.get("filter_type", "auto"),
         )
-        return designer.to_dict(result)
+        return designer.to_dict(filt_result)
 
     # === AUTOMOTIVE EMC ===
     if name == "pcb_analyze_automotive_emc":
         from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
-        analyzer = AutomotiveEMCAnalyzer()
-        analysis = analyzer.analyze_automotive_design(
+        auto_analyzer = AutomotiveEMCAnalyzer()
+        auto_result = auto_analyzer.analyze_automotive_design(
             clock_frequencies_mhz=args["clock_frequencies_mhz"],
             cispr_class=args.get("cispr_class", 3),
             iso_level=args.get("iso_level", 3),
             has_shielding=args.get("has_shielding", False),
             has_input_filter=args.get("has_input_filter", False),
         )
-        return analyzer.to_dict(analysis)
+        return auto_analyzer.to_dict(auto_result)
 
     if name == "pcb_get_cispr25_limit":
         from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
-        analyzer = AutomotiveEMCAnalyzer()
-        result = analyzer.get_cispr25_limit(
+        cispr_analyzer = AutomotiveEMCAnalyzer()
+        cispr_result = cispr_analyzer.get_cispr25_limit(
             frequency_mhz=args["frequency_mhz"],
             cispr_class=args.get("cispr_class", 3),
             category=args.get("category", "radiated"),
         )
-        if result is None:
+        if cispr_result is None:
             return {"success": False, "error": "No CISPR 25 limit found for the given frequency/class/category"}
-        return result
+        return cispr_result
 
     if name == "pcb_get_iso11452_level":
         from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
-        analyzer = AutomotiveEMCAnalyzer()
-        result = analyzer.get_iso11452_level(level=args.get("level", 3))
-        if result is None:
+        iso_analyzer = AutomotiveEMCAnalyzer()
+        iso_result = iso_analyzer.get_iso11452_level(level=args.get("level", 3))
+        if iso_result is None:
             return {"success": False, "error": "Invalid ISO 11452 level (must be 1-5)"}
-        return result
+        return iso_result
 
     if name == "pcb_analyze_immunity_margin":
         from .analyzers.emc.immunity import ImmunityAnalyzer
-        analyzer = ImmunityAnalyzer()
-        analysis = analyzer.analyze_immunity(
+        imm_analyzer = ImmunityAnalyzer()
+        imm_result = imm_analyzer.analyze_immunity(
             interfaces=args["interfaces"],
             field_strength_vm=args.get("field_strength_vm", 10.0),
             iso_level=args.get("iso_level", 3),
         )
-        return analyzer.to_dict(analysis)
+        return imm_analyzer.to_dict(imm_result)
 
     # === NEAR-FIELD EMI ===
     if name == "pcb_analyze_near_field":
         from .analyzers.emc.near_field import NearFieldAnalyzer
-        analyzer = NearFieldAnalyzer()
-        analysis = analyzer.analyze_sources(args["sources"])
-        return analyzer.to_dict(analysis)
+        nf_analyzer = NearFieldAnalyzer()
+        nf_result = nf_analyzer.analyze_sources(args["sources"])
+        return nf_analyzer.to_dict(nf_result)
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":
