@@ -54,6 +54,10 @@ htmlcov/
 *.gbr
 *.drl
 *.ger
+# Allow test fixtures
+!tests/fixtures/*.gbr
+!tests/fixtures/*.drl
+!tests/fixtures/*.ger
 
 # Design review outputs (customer-specific, do not commit)
 /*.docx
