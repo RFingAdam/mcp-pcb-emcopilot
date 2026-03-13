@@ -157,6 +157,20 @@ class PCBDesignData:
     schematic_components: list[dict] = field(default_factory=list)
     schematic_nets: list[dict] = field(default_factory=list)
 
+    # Schematic PDF data (optional, from pdf_schematic_parser)
+    schematic_pages: list[dict] = field(default_factory=list)
+    schematic_pdf_path: Optional[str] = None
+
+    # Review context (set by orchestrator)
+    review_context: dict = field(default_factory=dict)
+
+    # Review results (populated by orchestrator)
+    review_results: dict = field(default_factory=dict)
+
+    # 3D / STEP data (optional, from step_parser)
+    step_components: list[dict] = field(default_factory=list)  # [{reference, x, y, z, width, depth, height}]
+    board_3d: dict = field(default_factory=dict)  # {width, depth, thickness, bounding_box}
+
     @property
     def component_count(self) -> int:
         return len(self.components)

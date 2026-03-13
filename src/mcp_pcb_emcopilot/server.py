@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """MCP server for PCB design review, EMC analysis, and signal integrity.
 
-Provides ~54 tools for PCB engineers covering:
-- File parsing (KiCad, ODB++, Gerber, Altium, IPC-2581)
+Provides ~57 tools for PCB engineers covering:
+- File parsing (KiCad, ODB++, Gerber, Altium, IPC-2581, STEP)
 - Impedance (microstrip, stripline, differential pairs)
 - Signal integrity (timing, crosstalk, via transitions)
 - EMC compliance (current loops, emissions, shielding, grounding, ESD)
@@ -13,6 +13,7 @@ Provides ~54 tools for PCB engineers covering:
 - Antenna/EMI (trace antenna, slot, common mode, cable coupling)
 - Classification (net classification, interface detection, design type)
 - Design validation (cross-validation, BOM, schematic-layout)
+- 3D / mechanical (STEP parsing, clearances, enclosure fit)
 - Session management
 
 Claude Code acts as the AI orchestrator — this server provides the computational tools.
@@ -538,6 +539,93 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         _make_tool("pcb_get_stackup_templates", "Get common PCB stackup templates with typical impedances.", {}, None),
         _make_tool("pcb_get_material_properties", "Get dielectric properties for common PCB materials.", {}, None),
+
+        # =====================================================================
+        # 3D / STEP FILE (3 tools)
+        # =====================================================================
+        _make_tool("pcb_parse_step", "Parse a STEP (.step/.stp) file for 3D mechanical review. Extracts board outline, component bounding boxes, heights. Returns session_id.", {
+            "file_path": {"type": "string", "description": "Path to STEP file (.step or .stp)"},
+            "session_id": {"type": "string", "description": "Optional existing session to merge 3D data into"},
+        }, ["file_path"]),
+        _make_tool("pcb_get_3d_clearances", "Get component-to-component and component-to-board-edge 3D clearances from STEP data.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_step"},
+        }, ["session_id"]),
+        _make_tool("pcb_check_enclosure_fit", "Check if PCB assembly fits within an enclosure with required clearances.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_step"},
+            "enclosure_width_mm": {"type": "number", "description": "Internal enclosure width in mm"},
+            "enclosure_depth_mm": {"type": "number", "description": "Internal enclosure depth in mm"},
+            "enclosure_height_mm": {"type": "number", "description": "Internal enclosure height in mm"},
+            "clearance_mm": {"type": "number", "description": "Required clearance on all sides in mm (default 1.0)"},
+        }, ["session_id", "enclosure_width_mm", "enclosure_depth_mm", "enclosure_height_mm"]),
+
+        # =====================================================================
+        # VISUALIZATION (4 tools)
+        # =====================================================================
+        _make_tool("pcb_render_board", "Render SVG board view with component placement, traces, vias. Supports layer filtering, net/component highlighting.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "layers": {"type": "array", "items": {"type": "string"}, "description": "Optional layer filter (e.g. ['F.Cu'])"},
+            "highlight_nets": {"type": "array", "items": {"type": "string"}, "description": "Net names to highlight in red"},
+            "highlight_components": {"type": "array", "items": {"type": "string"}, "description": "Component references to highlight"},
+            "width_px": {"type": "integer", "description": "SVG width in pixels (default 800)", "default": 800},
+        }, ["session_id"]),
+        _make_tool("pcb_render_stackup", "Render SVG cross-section of the PCB layer stackup showing copper, dielectric, solder mask layers with thicknesses.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_render_net", "Render SVG highlighting a specific net's traces and vias on the board.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "net_name": {"type": "string", "description": "Name of the net to highlight"},
+        }, ["session_id", "net_name"]),
+        _make_tool("pcb_annotate_board", "Render SVG board view with annotation overlays (arrows, text callouts, highlight regions, warning markers).", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "annotations": {"type": "array", "items": {"type": "object", "properties": {
+                "type": {"type": "string", "enum": ["arrow", "text", "highlight", "warning"], "description": "Annotation type"},
+                "x": {"type": "number", "description": "X position in mm (board coordinates)"},
+                "y": {"type": "number", "description": "Y position in mm (board coordinates)"},
+                "text": {"type": "string", "description": "Label text (for arrow, text, warning)"},
+                "color": {"type": "string", "description": "CSS colour (default red)"},
+                "shape": {"type": "string", "enum": ["rect", "circle"], "description": "Highlight shape (default rect)"},
+                "width": {"type": "number", "description": "Highlight rect width in mm"},
+                "height": {"type": "number", "description": "Highlight rect height in mm"},
+                "radius": {"type": "number", "description": "Highlight circle radius in mm"},
+                "severity": {"type": "string", "enum": ["warning", "error"], "description": "Warning marker severity"},
+            }, "required": ["type", "x", "y"]}, "description": "List of annotation objects"},
+        }, ["session_id", "annotations"]),
+
+        # =====================================================================
+        # SCHEMATIC PDF (3 tools)
+        # =====================================================================
+        _make_tool("pcb_parse_schematic_pdf", "Parse a PDF schematic to extract component references, net labels, and page data. Uses text-layer extraction (requires pymupdf for full support). If session_id provided, attaches schematic data to existing layout session for cross-reference.", {
+            "file_path": {"type": "string", "description": "Path to the schematic PDF file"},
+            "session_id": {"type": "string", "description": "Optional session ID to attach schematic data to an existing layout session"},
+        }, ["file_path"]),
+        _make_tool("pcb_get_schematic_page", "Get extracted text and annotations for a specific schematic PDF page. Returns page text, detected components, and net labels. If pymupdf is installed, can also render the page as an image.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_schematic_pdf"},
+            "page_number": {"type": "integer", "description": "1-based page number"},
+            "render_image": {"type": "boolean", "description": "Render page to PNG image (requires pymupdf)"},
+        }, ["session_id", "page_number"]),
+        _make_tool("pcb_cross_reference_schematic", "Cross-reference schematic components/nets against layout. Finds missing components, extra components, value mismatches, and unrouted nets. Requires both schematic and layout data in the session.", {
+            "session_id": {"type": "string", "description": "Session ID with both schematic and layout data loaded"},
+        }, ["session_id"]),
+
+        # =====================================================================
+        # DESIGN REVIEW ORCHESTRATION (3 tools)
+        # =====================================================================
+        _make_tool("pcb_set_review_context", "Set design review context: requirements, standards, known issues, operating conditions. Call before pcb_run_design_review.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "design_intent": {"type": "string", "description": "Free-text description of the design purpose"},
+            "target_standards": {"type": "array", "items": {"type": "string"}, "description": "Target EMC standards (e.g. FCC_B, CISPR_32, CE, automotive)"},
+            "known_issues": {"type": "array", "items": {"type": "string"}, "description": "Known issues to investigate"},
+            "impedance_targets": {"type": "object", "description": "Dict of net_pattern: impedance_ohm targets"},
+            "thermal_limits": {"type": "object", "description": "Thermal constraints (e.g. {max_ambient_c: 40, max_junction_c: 125})"},
+            "operating_conditions": {"type": "object", "description": "Operating conditions (e.g. {temp_min_c: -40, temp_max_c: 85, altitude_m: 3000})"},
+        }, ["session_id"]),
+        _make_tool("pcb_run_design_review", "Run full automated multi-domain design review. Classifies design, selects relevant analyzers, runs analysis, cross-correlates findings, and generates structured results.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_generate_report", "Generate structured report from design review results. Must run pcb_run_design_review first.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "format": {"type": "string", "enum": ["summary", "detailed", "json"], "description": "Report format: summary (pass/fail + top risks), detailed (all findings), json (raw structured data)"},
+        }, ["session_id"]),
 
         # =====================================================================
         # SESSION MANAGEMENT (2 tools)
@@ -1094,6 +1182,236 @@ def _dispatch(name: str, args: dict) -> dict:
         return {"stackup_templates": STACKUP_TEMPLATES}
     if name == "pcb_get_material_properties":
         return {"materials": MATERIAL_PROPERTIES}
+
+    # === 3D / STEP FILE ===
+    if name == "pcb_parse_step":
+        from .parsers.step_parser import STEPParser
+        parser = STEPParser()
+        result = parser.parse_file(args["file_path"])
+        board_3d = result.get("board_3d", {})
+        step_components = result.get("step_components", [])
+        existing_sid = args.get("session_id")
+        if existing_sid:
+            # Merge 3D data into existing session
+            data = _get_session(existing_sid)
+            data.step_components = step_components
+            data.board_3d = board_3d
+            if board_3d.get("width"):
+                data.board_width_mm = board_3d["width"]
+            if board_3d.get("depth"):
+                data.board_height_mm = board_3d["depth"]
+            if board_3d.get("thickness"):
+                data.board_thickness_mm = board_3d["thickness"]
+            sid = existing_sid
+        else:
+            # Create new session from STEP data
+            from .parsers import parse_pcb_file
+            data = parse_pcb_file(args["file_path"], format_hint="step")
+            sid = sessions.create_session(data)
+        return {
+            "success": True,
+            "session_id": sid,
+            "board_3d": board_3d,
+            "component_count": len(step_components),
+            "components": [
+                {"reference": c["reference"], "height": c.get("height", 0)}
+                for c in step_components[:50]
+            ],
+            "warnings": result.get("warnings", []),
+        }
+
+    if name == "pcb_get_3d_clearances":
+        from .parsers.step_parser import compute_3d_clearances
+        data = _get_session(args["session_id"])
+        if not data.step_components and not data.board_3d:
+            raise ValueError("No STEP/3D data in session. Use pcb_parse_step first.")
+        result = compute_3d_clearances(data.board_3d, data.step_components)
+        return result
+
+    if name == "pcb_check_enclosure_fit":
+        from .parsers.step_parser import check_enclosure_fit
+        data = _get_session(args["session_id"])
+        if not data.board_3d:
+            raise ValueError("No STEP/3D data in session. Use pcb_parse_step first.")
+        result = check_enclosure_fit(
+            board_3d=data.board_3d,
+            step_components=data.step_components,
+            enclosure_width_mm=args["enclosure_width_mm"],
+            enclosure_depth_mm=args["enclosure_depth_mm"],
+            enclosure_height_mm=args["enclosure_height_mm"],
+            clearance_mm=args.get("clearance_mm", 1.0),
+        )
+        return result
+
+    # === VISUALIZATION ===
+    if name == "pcb_render_board":
+        from .visualization.board_renderer import BoardRenderer
+        data = _get_session(args["session_id"])
+        width_px = args.get("width_px", 800)
+        renderer = BoardRenderer(data, width_px=width_px)
+        svg = renderer.render_board(
+            layers=args.get("layers"),
+            highlight_nets=args.get("highlight_nets"),
+            highlight_components=args.get("highlight_components"),
+        )
+        return {"svg": svg, "width_px": width_px, "height_px": renderer.height_px}
+
+    if name == "pcb_render_stackup":
+        from .visualization.stackup_renderer import StackupRenderer
+        data = _get_session(args["session_id"])
+        renderer = StackupRenderer(data)
+        svg = renderer.render()
+        return {"svg": svg}
+
+    if name == "pcb_render_net":
+        from .visualization.board_renderer import BoardRenderer
+        data = _get_session(args["session_id"])
+        renderer = BoardRenderer(data)
+        svg = renderer.render_net(args["net_name"])
+        return {"svg": svg, "net_name": args["net_name"]}
+
+    if name == "pcb_annotate_board":
+        from .visualization.annotator import Annotator
+        data = _get_session(args["session_id"])
+        annotator = Annotator(data)
+        svg = annotator.render_annotated_board(annotations=args["annotations"])
+        return {"svg": svg, "annotation_count": len(args["annotations"])}
+
+    # === SCHEMATIC PDF ===
+    if name == "pcb_parse_schematic_pdf":
+        from .parsers.pdf_schematic_parser import PDFSchematicParser
+
+        parser = PDFSchematicParser()
+        pdf_result = parser.parse(args["file_path"])
+
+        page_dicts = []
+        for pg in pdf_result.pages:
+            page_dicts.append({
+                "page_number": pg.page_number,
+                "text": pg.text,
+                "components": pg.components,
+                "nets": pg.nets,
+                "width_pts": pg.width_pts,
+                "height_pts": pg.height_pts,
+            })
+
+        session_id = args.get("session_id")
+        if session_id:
+            data = _get_session(session_id)
+            data.schematic_components = pdf_result.components
+            data.schematic_nets = pdf_result.nets
+            data.schematic_pages = page_dicts
+            data.schematic_pdf_path = pdf_result.file_path
+        else:
+            from .models.pcb_data import PCBDesignData
+            data = PCBDesignData(
+                source_file=args["file_path"],
+                source_format="schematic_pdf",
+                schematic_components=pdf_result.components,
+                schematic_nets=pdf_result.nets,
+                schematic_pages=page_dicts,
+                schematic_pdf_path=pdf_result.file_path,
+            )
+            session_id = sessions.create_session(data)
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            **pdf_result.to_summary(),
+        }
+
+    if name == "pcb_get_schematic_page":
+        data = _get_session(args["session_id"])
+        page_number = args["page_number"]
+
+        if not data.schematic_pages:
+            raise ValueError("No schematic PDF data in this session. Use pcb_parse_schematic_pdf first.")
+
+        if page_number < 1 or page_number > len(data.schematic_pages):
+            raise ValueError(f"Page {page_number} out of range (1-{len(data.schematic_pages)})")
+
+        page = data.schematic_pages[page_number - 1]
+        result = {
+            "page_number": page["page_number"],
+            "text": page.get("text", ""),
+            "components": page.get("components", []),
+            "nets": page.get("nets", []),
+            "component_count": len(page.get("components", [])),
+            "net_count": len(page.get("nets", [])),
+            "width_pts": page.get("width_pts", 0),
+            "height_pts": page.get("height_pts", 0),
+        }
+
+        if args.get("render_image") and data.schematic_pdf_path:
+            from .parsers.pdf_schematic_parser import PDFSchematicParser
+            import tempfile
+            parser = PDFSchematicParser()
+            output_dir = tempfile.mkdtemp(prefix="pcb_schematic_")
+            image_path = parser.render_page_image(
+                data.schematic_pdf_path, page_number, output_dir
+            )
+            if image_path:
+                result["image_path"] = image_path
+            else:
+                result["image_note"] = "PyMuPDF not installed. Cannot render page image."
+
+        return result
+
+    if name == "pcb_cross_reference_schematic":
+        from .analyzers.validation.schematic_layout_validator import SchematicLayoutValidator
+        data = _get_session(args["session_id"])
+
+        if not data.schematic_components:
+            raise ValueError(
+                "No schematic data in this session. "
+                "Use pcb_parse_schematic_pdf (with session_id) to attach schematic data first."
+            )
+        if not data.components:
+            raise ValueError(
+                "No layout data in this session. "
+                "Use pcb_parse_layout to load a PCB layout first, then attach schematic data."
+            )
+
+        validator = SchematicLayoutValidator()
+        validation = validator.validate(data)
+
+        return {
+            "total_schematic_components": validation.total_schematic_components,
+            "total_layout_components": validation.total_layout_components,
+            "matching_components": validation.matching_components,
+            "match_percentage": round(validation.calculate_match_percentage(), 1),
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+            "component_mismatches": [_serialize(m) for m in validation.component_mismatches],
+            "net_mismatches": [_serialize(m) for m in validation.net_mismatches],
+        }
+
+    # === DESIGN REVIEW ORCHESTRATION ===
+    if name == "pcb_set_review_context":
+        from .orchestrator import set_review_context
+        data = _get_session(args["session_id"])
+        ctx = set_review_context(
+            design=data,
+            design_intent=args.get("design_intent", ""),
+            target_standards=args.get("target_standards"),
+            known_issues=args.get("known_issues"),
+            impedance_targets=args.get("impedance_targets"),
+            thermal_limits=args.get("thermal_limits"),
+            operating_conditions=args.get("operating_conditions"),
+        )
+        return {"success": True, "session_id": args["session_id"], "review_context": ctx}
+
+    if name == "pcb_run_design_review":
+        from .orchestrator import run_design_review
+        data = _get_session(args["session_id"])
+        result = run_design_review(data, args["session_id"])
+        return result.to_dict()
+
+    if name == "pcb_generate_report":
+        from .orchestrator import generate_report
+        data = _get_session(args["session_id"])
+        report = generate_report(data, args["session_id"], args.get("format", "detailed"))
+        return report
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":

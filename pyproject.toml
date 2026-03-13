@@ -30,11 +30,13 @@ altium = ["olefile>=0.47"]
 excel = ["openpyxl>=3.1.0"]
 sparams = ["numpy>=1.26"]
 ground = ["networkx>=3.2"]
+pdf = ["pymupdf>=1.24.0"]
 all = [
     "olefile>=0.47",
     "openpyxl>=3.1.0",
     "numpy>=1.26",
     "networkx>=3.2",
+    "pymupdf>=1.24.0",
 ]
 
 [project.scripts]
