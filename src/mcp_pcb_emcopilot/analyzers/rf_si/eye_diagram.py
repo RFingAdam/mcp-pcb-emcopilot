@@ -8,6 +8,8 @@ pattern, and estimates eye opening metrics.
 All calculations are pure Python -- no numpy dependency.
 """
 
+from __future__ import annotations
+
 import math
 from typing import Optional
 

@@ -4,6 +4,8 @@ Copper Spreading Analyzer.
 Analyzes copper plane heat spreading effectiveness
 for thermal management.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from typing import Optional

@@ -4,6 +4,8 @@ Crosstalk analyzer for PCB trace coupling analysis.
 Calculates NEXT (Near-End Crosstalk) and FEXT (Far-End Crosstalk)
 for parallel trace configurations.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Optional, List

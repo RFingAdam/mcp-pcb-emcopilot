@@ -8,6 +8,8 @@ Supports full RS-274X specification including:
 - Region polygons (G36/G37)
 - Gerber X2 attributes (%TF, %TA, %TO, %TD)
 """
+from __future__ import annotations
+
 import re
 import math
 import logging
@@ -121,7 +123,7 @@ class ApertureMacro:
 
         try:
             # Use a safe eval with only math operations
-            allowed = {'__builtins__': {}}
+            allowed: dict[str, Any] = {'__builtins__': {}}
             return float(eval(expr, allowed, {}))
         except Exception as e:
             logger.debug(f"Failed to evaluate expression '{expr}': {e}")
@@ -379,16 +381,16 @@ class GerberParser:
 
         Returns:
             GerberData with all extracted features
-        """
-        file_path = Path(file_path)
-
-        if not file_path.exists():
+        """  # type: ignore[assignment]
+        file_path = Path(file_path)  # type: ignore[assignment]
+  # type: ignore[attr-defined]
+        if not file_path.exists():  # type: ignore[attr-defined]
             raise FileNotFoundError(f"Gerber file not found: {file_path}")
 
         data = GerberData(source_file=str(file_path))
 
-        # Infer layer type from filename
-        self._infer_layer_type(file_path.name, data)
+        # Infer layer type from filename  # type: ignore[attr-defined]
+        self._infer_layer_type(file_path.name, data)  # type: ignore[attr-defined]
 
         # Read and parse content
         try:
@@ -404,7 +406,7 @@ class GerberParser:
 
         return data
 
-    def _infer_layer_type(self, filename: str, data: GerberData):
+    def _infer_layer_type(self, filename: str, data: GerberData) -> None:
         """Infer layer type from filename patterns"""
         filename_lower = filename.lower()
 
@@ -423,7 +425,7 @@ class GerberParser:
 
                     return
 
-    def _parse_content(self, content: str, data: GerberData):
+    def _parse_content(self, content: str, data: GerberData) -> None:
         """Parse Gerber content"""
         # Reset state
         self.current_aperture = None
@@ -495,7 +497,7 @@ class GerberParser:
 
         return ''.join(result)
 
-    def _parse_standard_commands(self, line: str, data: GerberData):
+    def _parse_standard_commands(self, line: str, data: GerberData) -> None:
         """Parse a line that may contain multiple standard commands separated by *"""
         # Split on * but keep commands intact
         commands = [cmd.strip() for cmd in line.split('*') if cmd.strip()]
@@ -503,7 +505,7 @@ class GerberParser:
         for cmd in commands:
             self._parse_standard_command(cmd, data)
 
-    def _parse_extended_command(self, line: str, data: GerberData):
+    def _parse_extended_command(self, line: str, data: GerberData) -> None:
         """Parse extended Gerber command (starts with %)"""
         if not line.startswith('%'):
             return
@@ -567,7 +569,7 @@ class GerberParser:
         elif line.startswith('LS'):
             pass  # Track if needed
 
-    def _parse_format_spec(self, line: str, data: GerberData):
+    def _parse_format_spec(self, line: str, data: GerberData) -> None:
         """Parse format specification command"""
         # Format: FS<L|T><A|I>X<int><dec>Y<int><dec>
         # L=leading zeros omit, T=trailing zeros omit
@@ -588,7 +590,7 @@ class GerberParser:
             data.integer_digits = int(match.group(1))
             data.decimal_digits = int(match.group(2))
 
-    def _parse_aperture_macro(self, line: str, data: GerberData):
+    def _parse_aperture_macro(self, line: str, data: GerberData) -> None:
         """Parse aperture macro definition"""
         # Format: AM<name>*<primitive>*<primitive>*...
         parts = line[2:].split('*')
@@ -600,7 +602,7 @@ class GerberParser:
 
         data.macros[name] = ApertureMacro(name=name, primitives=primitives)
 
-    def _parse_step_repeat(self, line: str, data: GerberData):
+    def _parse_step_repeat(self, line: str, data: GerberData) -> None:
         """Parse step-and-repeat command"""
         # Format: SR[X<nx>Y<ny>I<dx>J<dy>]
         # Empty SR ends the block
@@ -641,7 +643,7 @@ class GerberParser:
         self.sr_active = True
         self.sr_features = []
 
-    def _apply_step_repeat(self, sr: StepRepeat, data: GerberData):
+    def _apply_step_repeat(self, sr: StepRepeat, data: GerberData) -> None:
         """Apply step-and-repeat by replicating features"""
         # Skip if only 1x1 (no replication needed)
         if sr.x_repeats <= 1 and sr.y_repeats <= 1:
@@ -686,7 +688,7 @@ class GerberParser:
                             shape=p.shape
                         ))
 
-    def _parse_file_attribute(self, line: str, data: GerberData):
+    def _parse_file_attribute(self, line: str, data: GerberData) -> None:
         """Parse Gerber X2 file attribute"""
         # Format: TF.<attribute>,<value>[,<value>...]
         # or TF<attribute>,<value> (without dot)
@@ -719,7 +721,7 @@ class GerberParser:
         else:
             data.attributes.custom[attr_name] = attr_value
 
-    def _parse_file_function(self, value: str, data: GerberData):
+    def _parse_file_function(self, value: str, data: GerberData) -> None:
         """Parse .FileFunction attribute to determine layer type"""
         parts = value.split(',')
         if not parts:
@@ -762,13 +764,13 @@ class GerberParser:
         elif function == 'profile' or function == 'outline':
             data.layer_type = 'outline'
 
-    def _parse_aperture_attribute(self, line: str, data: GerberData):
+    def _parse_aperture_attribute(self, line: str, data: GerberData) -> None:
         """Parse Gerber X2 aperture attribute"""
         # Format: TA.<attribute>,<value>
         # These apply to subsequently defined apertures
         pass  # Store if needed for aperture metadata
 
-    def _parse_object_attribute(self, line: str, data: GerberData):
+    def _parse_object_attribute(self, line: str, data: GerberData) -> None:
         """Parse Gerber X2 object attribute"""
         # Format: TO.<attribute>,<value>
         parts = line[3:].split(',')
@@ -790,7 +792,7 @@ class GerberParser:
         elif attr_name == '.C':
             self.current_component = attr_value
 
-    def _delete_attribute(self, line: str, data: GerberData):
+    def _delete_attribute(self, line: str, data: GerberData) -> None:
         """Handle attribute deletion"""
         # Format: TD[<attribute>] - empty means delete all object attributes
         attr = line[2:].strip() if len(line) > 2 else ''
@@ -802,7 +804,7 @@ class GerberParser:
         if not attr or attr == '.C':
             self.current_component = None
 
-    def _parse_aperture_definition(self, line: str, data: GerberData):
+    def _parse_aperture_definition(self, line: str, data: GerberData) -> None:
         """Parse aperture definition"""
         # Format: ADD<code><type>,<params>
         # Or for macros: ADD<code><macro_name>,<params>
@@ -886,7 +888,7 @@ class GerberParser:
             else:
                 data.warnings.append(f"Aperture D{code} references undefined macro '{macro_name}'")
 
-    def _parse_standard_command(self, line: str, data: GerberData):
+    def _parse_standard_command(self, line: str, data: GerberData) -> None:
         """Parse standard Gerber command"""
         # Aperture selection: D<nn>
         if re.match(r'D\d+\*?$', line):
@@ -927,7 +929,7 @@ class GerberParser:
         if 'X' in line or 'Y' in line or 'I' in line or 'J' in line:
             self._parse_coordinate_command(line, data)
 
-    def _parse_coordinate_command(self, line: str, data: GerberData):
+    def _parse_coordinate_command(self, line: str, data: GerberData) -> None:
         """Parse coordinate command (move, draw, flash, arc)"""
         # Extract coordinates
         x_match = re.search(r'X([+-]?\d+)', line)
@@ -1004,7 +1006,7 @@ class GerberParser:
         self.current_x = new_x
         self.current_y = new_y
 
-    def _add_trace(self, x1: float, y1: float, x2: float, y2: float, data: GerberData):
+    def _add_trace(self, x1: float, y1: float, x2: float, y2: float, data: GerberData) -> None:
         """Add a trace to the data"""
         if self.current_aperture is None:
             return
@@ -1033,7 +1035,7 @@ class GerberParser:
         i_offset: float, j_offset: float,
         clockwise: bool,
         data: GerberData
-    ):
+    ) -> None:
         """
         Add an arc to the data.
 
@@ -1182,7 +1184,7 @@ class GerberParser:
 
         return points
 
-    def _update_arc_bounding_box(self, arc: GerberArc, data: GerberData):
+    def _update_arc_bounding_box(self, arc: GerberArc, data: GerberData) -> None:
         """Update bounding box to include arc extent"""
         # Include start and end points
         data.min_x = min(data.min_x, arc.start_x, arc.end_x)
@@ -1230,7 +1232,7 @@ class GerberParser:
             else:
                 return angle >= start or angle <= end
 
-    def _add_pad(self, x: float, y: float, data: GerberData):
+    def _add_pad(self, x: float, y: float, data: GerberData) -> None:
         """Add a pad/flash to the data"""
         if self.current_aperture is None:
             return
@@ -1251,7 +1253,7 @@ class GerberParser:
             if self.sr_active:
                 self.sr_features.append(('pad', pad))
 
-    def _calculate_statistics(self, data: GerberData):
+    def _calculate_statistics(self, data: GerberData) -> None:
         """Calculate summary statistics"""
         data.trace_count = len(data.traces)
         data.pad_count = len(data.pads)

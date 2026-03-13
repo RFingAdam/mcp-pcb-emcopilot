@@ -1,11 +1,13 @@
 """ODB++ archive parser for complete PCB data extraction"""
+from __future__ import annotations
+
 import tarfile
 import gzip
 import os
 import re
 import math
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, BinaryIO
+from typing import Any, Optional, List, Dict, Tuple, BinaryIO
 import tempfile
 import shutil
 
@@ -88,17 +90,17 @@ class ODBParser:
         Returns:
             ODBData with all extracted information
         """
-        archive_path = Path(archive_path)
+        archive_path_p = Path(archive_path)
 
-        if not archive_path.exists():
-            raise FileNotFoundError(f"Archive not found: {archive_path}")
+        if not archive_path_p.exists():
+            raise FileNotFoundError(f"Archive not found: {archive_path_p}")
 
         # Create extraction directory
-        extract_dir = self._get_extract_dir(archive_path)
+        extract_dir = self._get_extract_dir(archive_path_p)
 
         try:
             # Extract archive
-            self._extract_archive(archive_path, extract_dir)
+            self._extract_archive(archive_path_p, extract_dir)
 
             # Find ODB++ root (may be nested)
             odb_root = self._find_odb_root(extract_dir)
@@ -168,7 +170,7 @@ class ODBParser:
             self._temp_dir = Path(tempfile.mkdtemp(prefix="odb_"))
             return self._temp_dir
 
-    def _extract_archive(self, archive_path: Path, extract_dir: Path):
+    def _extract_archive(self, archive_path: Path, extract_dir: Path) -> None:
         """Extract ODB++ archive (tgz or zip)"""
         archive_str = str(archive_path).lower()
 
@@ -221,7 +223,7 @@ class ODBParser:
 
         return None
 
-    def _parse_matrix(self, odb_root: Path, data: ODBData):
+    def _parse_matrix(self, odb_root: Path, data: ODBData) -> None:
         """Parse the matrix file for layer stackup"""
         matrix_file = odb_root / "matrix" / "matrix"
 
@@ -347,7 +349,7 @@ class ODBParser:
             material=material
         )
 
-    def _parse_symbols(self, odb_root: Path, data: ODBData):
+    def _parse_symbols(self, odb_root: Path, data: ODBData) -> None:
         """Parse symbols directory to get pad/aperture definitions.
 
         ODB++ symbols define pad shapes and sizes that are referenced by dcodes
@@ -533,7 +535,7 @@ class ODBParser:
 
         return None
 
-    def _parse_profile(self, step_path: Path, data: ODBData):
+    def _parse_profile(self, step_path: Path, data: ODBData) -> None:
         """Parse board profile/outline"""
         profile_file = step_path / "profile"
 
@@ -581,7 +583,7 @@ class ODBParser:
         except Exception as e:
             data.parse_warnings.append(f"Error parsing profile: {str(e)}")
 
-    def _parse_netlist(self, step_path: Path, data: ODBData):
+    def _parse_netlist(self, step_path: Path, data: ODBData) -> None:
         """Parse netlist from cadnet or other netlist formats"""
         netlist_dir = step_path / "netlists"
 
@@ -646,7 +648,7 @@ class ODBParser:
             pins=net_dict.get('pins', []),
         )
 
-    def _parse_components(self, step_path: Path, data: ODBData):
+    def _parse_components(self, step_path: Path, data: ODBData) -> None:
         """Parse component placement from component layers"""
         layers_dir = step_path / "layers"
 
@@ -669,7 +671,7 @@ class ODBParser:
 
         data.component_count = len(data.components)
 
-    def _parse_component_layer(self, comp_dir: Path, data: ODBData, layer: str):
+    def _parse_component_layer(self, comp_dir: Path, data: ODBData, layer: str) -> None:
         """Parse components from a component layer directory"""
         components_file = comp_dir / "components"
 
@@ -679,7 +681,7 @@ class ODBParser:
         try:
             content = self._read_file(components_file)
             self._detect_file_units(content)
-            current_comp: Optional[Dict] = None
+            current_comp: Dict[str, Any] | None = None
 
             for line in content.split('\n'):
                 line = line.strip()
@@ -729,7 +731,7 @@ class ODBParser:
                 elif line.startswith('PIN'):
                     # Pin definition
                     if current_comp:
-                        pin_data = self._parse_pin_line(line)
+                        pin_data = self._parse_pin_line(line)  # type: ignore[assignment]
                         if pin_data:
                             current_comp['pins'].append(pin_data)
 
@@ -775,7 +777,7 @@ class ODBParser:
             pins=pins,
         )
 
-    def _parse_layer_features(self, step_path: Path, data: ODBData):
+    def _parse_layer_features(self, step_path: Path, data: ODBData) -> None:
         """Parse features from signal/plane layers"""
         layers_dir = step_path / "layers"
 
@@ -797,7 +799,7 @@ class ODBParser:
             if layer_dir.exists():
                 self._parse_features_file(layer_dir, layer_info.name, data)
 
-    def _parse_features_file(self, layer_dir: Path, layer_name: str, data: ODBData):
+    def _parse_features_file(self, layer_dir: Path, layer_name: str, data: ODBData) -> None:
         """Parse the features file for a layer"""
         features_file = layer_dir / "features"
 
@@ -821,7 +823,7 @@ class ODBParser:
         self._detect_file_units(content)
         traces = []
         pours = []
-        current_points = []
+        current_points: list[tuple[float, float]] = []
         current_width = 0.1  # Default width in mm
 
         for line in content.split('\n'):
@@ -897,7 +899,7 @@ class ODBParser:
         if pours:
             data.copper_pours[layer_name] = pours
 
-    def _parse_drills(self, step_path: Path, data: ODBData):
+    def _parse_drills(self, step_path: Path, data: ODBData) -> None:
         """Parse drill hits from drill layers"""
         layers_dir = step_path / "layers"
 
@@ -926,7 +928,7 @@ class ODBParser:
             if drill_dir.exists():
                 self._parse_drill_features(drill_dir, None, data)
 
-    def _parse_drill_features(self, layer_dir: Path, layer_info: Optional[ODBLayer], data: ODBData):
+    def _parse_drill_features(self, layer_dir: Path, layer_info: Optional[ODBLayer], data: ODBData) -> None:
         """Parse drill hits from a drill layer.
 
         Extracts actual pad sizes from symbol definitions (dcodes) instead of
@@ -1052,7 +1054,7 @@ class ODBParser:
 
         return max(calculated_pad, min_pad_size)
 
-    def _parse_layer_attributes(self, step_path: Path, data: ODBData):
+    def _parse_layer_attributes(self, step_path: Path, data: ODBData) -> None:
         """Parse attrlist files from each layer directory for per-layer design rules.
 
         ODB++ layers can have an attrlist file containing attributes like:
@@ -1091,7 +1093,7 @@ class ODBParser:
                     f"Error parsing attrlist for layer {layer_info.name}: {e}"
                 )
 
-    def _parse_misc_attributes(self, odb_root: Path, data: ODBData):
+    def _parse_misc_attributes(self, odb_root: Path, data: ODBData) -> None:
         """Parse design-level attributes from misc/attrlist.
 
         This file contains global design rules and fabrication parameters:
@@ -1112,7 +1114,7 @@ class ODBParser:
 
     def _extract_design_rules_from_attrlist(
         self, content: str, data: ODBData, layer_scope: Optional[str]
-    ):
+    ) -> None:
         """Extract design rule constraints from an attrlist file.
 
         ODB++ attrlist format:
@@ -1189,7 +1191,7 @@ class ODBParser:
                 except ValueError:
                     continue
 
-    def _parse_misc_info(self, odb_root: Path, data: ODBData):
+    def _parse_misc_info(self, odb_root: Path, data: ODBData) -> None:
         """Parse manufacturing notes and general info from misc/info.
 
         The misc/info file contains free-form text with design metadata,
@@ -1290,7 +1292,7 @@ class ODBParser:
                 })
         return summary
 
-    def _calculate_statistics(self, data: ODBData):
+    def _calculate_statistics(self, data: ODBData) -> None:
         """Calculate summary statistics for parsed data"""
         # Count vias
         data.via_count = len(data.vias)
@@ -1314,7 +1316,7 @@ class ODBParser:
             data.outline.area_mm2 = self._calculate_polygon_area(data.outline.outline)
 
         # Estimate total stackup thickness
-        total_thickness = 0
+        total_thickness: float = 0
         for layer in data.layers:
             if layer.thickness_mm:
                 total_thickness += layer.thickness_mm
@@ -1327,7 +1329,7 @@ class ODBParser:
             return 0
 
         n = len(points)
-        area = 0
+        area: float = 0
         for i in range(n):
             j = (i + 1) % n
             area += points[i][0] * points[j][1]
@@ -1396,5 +1398,5 @@ class ODBParser:
             return self.parse(str(temp_path))
 
         finally:
-            if temp_path.exists():
+            if temp_path.exists():  # type: ignore[attr-defined]
                 temp_path.unlink()

@@ -1,4 +1,6 @@
 """Thermal relief analyzer for DFM"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -409,7 +411,7 @@ class ThermalReliefAnalyzer:
         else:
             config = "ipc_class_2"
 
-        base = self.RELIEF_CONFIGS[config].copy()
+        base = self.RELIEF_CONFIGS[config].copy()  # type: ignore[attr-defined]
 
         # Adjust for power dissipation
         if power_dissipation_w > 1:

@@ -1,5 +1,7 @@
 """DFM (Design for Manufacturability) analysis modules"""
 
+from __future__ import annotations
+
 from .solder_paste import SolderPasteAnalyzer, SolderPasteResult
 from .thermal_relief import ThermalReliefAnalyzer, ThermalReliefResult
 from .component_placement import PlacementAnalyzer, PlacementResult

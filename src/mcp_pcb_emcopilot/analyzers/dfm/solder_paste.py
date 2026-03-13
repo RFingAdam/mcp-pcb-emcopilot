@@ -1,4 +1,6 @@
 """Solder paste stencil analyzer for DFM"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -243,10 +245,10 @@ class SolderPasteAnalyzer:
             pad_width_mm=first_pad.width_mm,
             pad_length_mm=first_pad.length_mm,
             pad_area_mm2=round(first_pad.width_mm * first_pad.length_mm, 4),
-            aperture_width_mm=first_result["aperture_width_mm"],
-            aperture_length_mm=first_result["aperture_length_mm"],
+            aperture_width_mm=first_result["aperture_width_mm"],  # type: ignore
+            aperture_length_mm=first_result["aperture_length_mm"],  # type: ignore
             aperture_area_mm2=round(
-                first_result["aperture_width_mm"] * first_result["aperture_length_mm"], 4
+                first_result["aperture_width_mm"] * first_result["aperture_length_mm"], 4  # type: ignore
             ),
             stencil_thickness_mm=stencil_thickness_mm,
             area_ratio=round(worst_area_ratio, 3),
@@ -305,9 +307,9 @@ class SolderPasteAnalyzer:
 
         # Aspect ratio modifier
         if aspect_ratio < 1.0:
-            base_efficiency *= 0.7
+            base_efficiency *= 0.7  # type: ignore[assignment]
         elif aspect_ratio < 1.5:
-            base_efficiency *= 0.85
+            base_efficiency *= 0.85  # type: ignore[assignment]
 
         return min(100, base_efficiency)
 

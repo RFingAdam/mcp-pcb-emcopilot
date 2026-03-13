@@ -4,6 +4,8 @@ Via electrical modeler for PCB signal integrity analysis.
 Models via structures as transmission line discontinuities,
 calculating impedance, inductance, capacitance, and stub effects.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Optional, List

@@ -4,6 +4,8 @@ Hotspot Detector.
 Identifies thermal hotspots from clustered high-power components
 and analyzes thermal coupling effects.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from typing import Optional

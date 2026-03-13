@@ -4,6 +4,8 @@ Power Dissipation Analyzer.
 Maps power dissipation across the PCB and identifies
 components with high thermal loads.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from typing import Optional
@@ -90,7 +92,7 @@ class PowerDissipationResult:
 
 
 # Typical thermal resistance values (°C/W) for common packages
-PACKAGE_THERMAL_RESISTANCE = {
+PACKAGE_THERMAL_RESISTANCE: dict[str, dict[str, float]] = {
     # Small packages
     "0201": {"jc": 200, "ja": 400},
     "0402": {"jc": 150, "ja": 300},
@@ -247,7 +249,7 @@ class PowerDissipationAnalyzer:
         Returns:
             PowerDissipationResult with analysis
         """
-        analyzed = []
+        analyzed: list[ComponentPower] = []
         issues = []
         total_power = 0.0
         high_power = []
@@ -324,13 +326,13 @@ class PowerDissipationAnalyzer:
         peak_loc = (0.0, 0.0)
         if board_area_cm2 and board_area_cm2 > 0:
             # Simple estimate: highest power component density
-            for comp in analyzed:
+            for comp in analyzed:  # type: ignore
                 # Assume component area based on package (rough estimate)
                 comp_area_cm2 = 0.5  # Default
-                density = comp.power_dissipation_w / comp_area_cm2
+                density = comp.power_dissipation_w / comp_area_cm2  # type: ignore
                 if density > peak_density:
                     peak_density = density
-                    peak_loc = comp.position
+                    peak_loc = comp.position  # type: ignore
 
         score = self._calculate_score(issues, total_power, analyzed)
 

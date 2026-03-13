@@ -1,4 +1,6 @@
 """Grounding analyzer for EMC assessment"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple, Set
 import math
@@ -116,7 +118,7 @@ class GroundingAnalyzer:
         board_area_cm2 = (board_width_mm * board_height_mm) / 100
 
         # Analyze each plane
-        total_coverage = 0
+        total_coverage: float = 0
         total_splits = 0
         total_islands = 0
         total_vias = 0

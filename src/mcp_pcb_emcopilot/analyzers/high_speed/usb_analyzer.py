@@ -11,6 +11,8 @@ Analyzes USB 2.0/3.x/4 routing for compliance:
 - Stub detection
 - Common-mode impedance (USB 3.x/4)
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Dict, Any
@@ -135,7 +137,7 @@ class USBResult:
 
 
 # USB specifications by version
-USB_SPECS = {
+USB_SPECS: dict[USBVersion, dict[str, Any]] = {
     USBVersion.USB2_LS: {
         "data_rate_gbps": 0.0015,
         "pair_skew_ps": 500,

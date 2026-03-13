@@ -5,6 +5,8 @@ Analyzers:
 - BOMValidator: Validate BOM completeness and accuracy
 """
 
+from __future__ import annotations
+
 from .schematic_layout_validator import (
     SchematicLayoutValidator,
     SchematicLayoutValidationResult,

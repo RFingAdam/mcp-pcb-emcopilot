@@ -5,6 +5,8 @@ Supports:
 - Future: Altium, OrCAD, Eagle formats
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -95,7 +97,7 @@ class KiCadSchematicParser:
             logger.error(f"Failed to parse KiCad schematic: {e}")
             raise ValueError(f"KiCad schematic parse error: {str(e)}")
 
-    def _parse_kicad_sch(self, content: str):
+    def _parse_kicad_sch(self, content: str) -> None:
         """Parse KiCad schematic S-expression content."""
         # Extract symbols (components)
         symbol_pattern = r'\(symbol\s+\(lib_id\s+"([^"]+)"\)'
@@ -193,7 +195,7 @@ class KiCadSchematicParser:
 
         return pins
 
-    def _extract_nets_from_labels(self, content: str):
+    def _extract_nets_from_labels(self, content: str) -> None:
         """Extract nets from hierarchical and global labels."""
         # Hierarchical labels
         hier_label_pattern = r'\(hierarchical_label\s+"([^"]+)"'
@@ -209,7 +211,7 @@ class KiCadSchematicParser:
             if net_name not in self.nets:
                 self.nets[net_name] = ParsedNet(net_name=net_name)
 
-    def _extract_power_nets(self, content: str):
+    def _extract_power_nets(self, content: str) -> None:
         """Extract power symbols and classify as power/ground nets."""
         # Power port pattern (e.g., +3V3, VCC, GND, etc.)
         power_pattern = r'\(lib_id\s+"power:([^"]+)"\)'
@@ -232,7 +234,7 @@ class SchematicParserFactory:
     """Factory to create appropriate parser based on file type."""
 
     @staticmethod
-    def create_parser(file_path: str):
+    def create_parser(file_path: str) -> KiCadSchematicParser | object:
         """Create parser based on file extension.
 
         Args:
@@ -273,4 +275,4 @@ class SchematicParserFactory:
             ValueError: If file format is not supported
         """
         parser = SchematicParserFactory.create_parser(file_path)
-        return parser.parse(file_path)
+        return parser.parse(file_path)  # type: ignore[no-any-return, attr-defined]

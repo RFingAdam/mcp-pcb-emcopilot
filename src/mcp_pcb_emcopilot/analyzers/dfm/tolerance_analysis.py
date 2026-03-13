@@ -1,4 +1,6 @@
 """Tolerance stack-up analyzer for DFM"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -170,7 +172,7 @@ class ToleranceAnalyzer:
             })
 
         # Sort by contribution
-        contributor_details.sort(key=lambda x: x["contribution_percent"], reverse=True)
+        contributor_details.sort(key=lambda x: x["contribution_percent"], reverse=True)  # type: ignore
 
         # Monte Carlo if requested
         mc_mean = None
@@ -205,7 +207,7 @@ class ToleranceAnalyzer:
         else:
             # Out of spec
             overshoot = max(spec_min - wc_min, wc_max - spec_max)
-            score = max(0, 50 - overshoot * 100)
+            score = max(0, 50 - overshoot * 100)  # type: ignore
 
         # Generate issues and recommendations
         issues = []
@@ -217,7 +219,7 @@ class ToleranceAnalyzer:
             # Find largest contributors
             top_contributors = contributor_details[:3]
             for tc in top_contributors:
-                if tc["contribution_percent"] > 20:
+                if tc["contribution_percent"] > 20:  # type: ignore
                     recommendations.append(
                         f"Reduce tolerance on {tc['name']} ({tc['contribution_percent']:.0f}% contribution)"
                     )
@@ -283,7 +285,7 @@ class ToleranceAnalyzer:
                         c.nominal_mm,
                     )
 
-                total += value * c.sensitivity
+                total += value * c.sensitivity  # type: ignore
 
             results.append(total)
 

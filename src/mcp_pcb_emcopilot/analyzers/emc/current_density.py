@@ -9,8 +9,10 @@ within acceptable bounds at a given frequency.
 All calculations are pure Python — no external dependencies.
 """
 
+from __future__ import annotations
+
 import math
-from typing import Optional
+from typing import Any, Optional
 
 # Speed of light (m/s)
 C0 = 299792458.0
@@ -550,7 +552,7 @@ def optimize_ground_stitching(
             suggested_vias.append({"x_mm": round(x, 2), "y_mm": round(y, 2)})
 
     # Gap stitching vias
-    gap_stitch_vias = []
+    gap_stitch_vias: list[dict[str, Any]] = []
     if plane_gaps:
         for gap in plane_gaps:
             gx_s = gap.get("x_start_mm", 0)
@@ -602,7 +604,7 @@ def optimize_ground_stitching(
         ("bottom_left", 0, plane_height_mm / 2, plane_width_mm / 2, plane_height_mm),
         ("bottom_right", plane_width_mm / 2, plane_height_mm / 2, plane_width_mm, plane_height_mm),
     ]
-    coverage_analysis = []
+    coverage_analysis: list[dict[str, Any]] = []
     for qn, xn, yn, xx, yx in quadrants:
         cnt = sum(1 for vx, vy in all_positions if xn <= vx <= xx and yn <= vy <= yx)
         qa = ((xx - xn) * (yx - yn)) / 100.0

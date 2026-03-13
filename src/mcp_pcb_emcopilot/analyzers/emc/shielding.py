@@ -1,4 +1,6 @@
 """Shielding effectiveness analyzer for EMC"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 import math
@@ -299,8 +301,8 @@ class ShieldingAnalyzer:
             (total_leakage_db, largest_aperture_mm)
         """
         wavelength_mm = 300000 / frequency_mhz
-        max_aperture = 0
-        total_leakage_linear = 0
+        max_aperture: float = 0
+        total_leakage_linear: float = 0
 
         for ap in apertures:
             ap_type = ap.get("type", "circle")
@@ -315,7 +317,7 @@ class ShieldingAnalyzer:
             elif ap_type == "slot":
                 length = ap.get("length", 10)
                 width = ap.get("width", 1)
-                max_aperture = max(max_aperture, length)
+                max_aperture = max(max_aperture, float(length))
                 # Slot aperture SE reduction (worse than circular)
                 if length < wavelength_mm / 2:
                     se_reduction = 20 * math.log10(wavelength_mm / (2 * length))

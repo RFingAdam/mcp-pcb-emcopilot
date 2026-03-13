@@ -8,10 +8,12 @@ what separates this tool from basic impedance calculators.
 Operates on in-memory PCBDesignData from any parser.
 """
 
+from __future__ import annotations
+
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +155,8 @@ def _point_in_polygon(x: float, y: float, polygon: list) -> bool:
         if isinstance(p, (list, tuple)) and len(p) >= 2:
             points.append((float(p[0]), float(p[1])))
         elif isinstance(p, dict):
-            px = p.get("x", p.get("x_mm", 0))
-            py = p.get("y", p.get("y_mm", 0))
+            px = p.get("x", p.get("x_mm", 0)) or 0
+            py = p.get("y", p.get("y_mm", 0)) or 0
             points.append((float(px), float(py)))
         else:
             return False
@@ -543,7 +545,7 @@ class ReturnPathAnalyzer:
         }
 
         # Find ground zones by layer
-        ground_zones_by_layer = {}
+        ground_zones_by_layer: dict[str, list[Any]] = {}
         for zone in design_data.zones:
             if zone.net_name in ground_net_names or zone.net_index in ground_net_indices:
                 ground_zones_by_layer.setdefault(zone.layer, []).append(zone)

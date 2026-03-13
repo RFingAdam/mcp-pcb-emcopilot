@@ -4,6 +4,8 @@ Analytical S-parameter calculator for PCB traces and vias.
 Uses ABCD matrix cascading with scikit-rf to calculate frequency-dependent
 S-parameters from trace geometry without FDTD simulation.
 """
+from __future__ import annotations
+
 import math
 import cmath
 import numpy as np
@@ -422,7 +424,7 @@ class SParameterCalculator:
         abcd_C = np.array([[1, 0], [1j * omega * C, 1]], dtype=complex)
 
         # Cascade
-        return abcd_L @ abcd_C
+        return abcd_L @ abcd_C  # type: ignore[no-any-return]
 
     def _abcd_to_s(self, abcd: np.ndarray, z0: float = 50.0) -> np.ndarray:
         """
@@ -570,7 +572,7 @@ class HighSpeedInterfaceDetector:
         for iface_type, spec in self.INTERFACE_SPECS.items():
             matched_nets = []
             for net in net_names:
-                for pattern in spec["patterns"]:
+                for pattern in spec["patterns"]:  # type: ignore[attr-defined]
                     if re.search(pattern, net, re.IGNORECASE):
                         matched_nets.append(net)
                         break
@@ -590,7 +592,7 @@ class HighSpeedInterfaceDetector:
                 })
 
         # Sort by confidence
-        detected.sort(key=lambda x: x["confidence"], reverse=True)
+        detected.sort(key=lambda x: x["confidence"], reverse=True)  # type: ignore[arg-type, return-value]
         return detected
 
     def get_interface_spec(self, interface_type: str) -> Optional[dict]:

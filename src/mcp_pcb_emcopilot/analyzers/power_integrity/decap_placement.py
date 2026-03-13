@@ -8,6 +8,8 @@ Analyzes and recommends decoupling capacitor placement:
 - Capacitor value selection
 - Optimal placement locations
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum

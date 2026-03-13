@@ -1,5 +1,7 @@
 """RF and Signal Integrity analysis modules"""
 
+from __future__ import annotations
+
 from .impedance_calculator import ImpedanceCalculator, ImpedanceResult
 from .crosstalk_analyzer import CrosstalkAnalyzer, CrosstalkResult
 from .via_modeler import ViaModeler, ViaModel

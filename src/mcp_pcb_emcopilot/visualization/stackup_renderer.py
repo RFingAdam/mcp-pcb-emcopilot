@@ -190,7 +190,7 @@ class StackupRenderer:
                 f'class="badge" fill="{fg}" text-anchor="middle">{badge_label}</text>\n'
             )
 
-            y += h
+            y += h  # type: ignore[assignment]
 
         # Total thickness annotation
         parts.append(

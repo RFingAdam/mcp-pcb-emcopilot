@@ -6,6 +6,8 @@ and structured report generation for PCB design reviews.
 Calls analyzer classes directly (not MCP tools) for efficiency.
 """
 
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -36,8 +38,9 @@ class ReviewFinding:
     signal_name: Optional[str] = None
     related_findings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        d = {
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize finding to a JSON-safe dictionary."""
+        d: dict[str, Any] = {
             "domain": self.domain,
             "severity": self.severity,
             "title": self.title,
@@ -67,18 +70,22 @@ class DomainResult:
 
     @property
     def critical_count(self) -> int:
+        """Count of critical-severity findings."""
         return sum(1 for f in self.findings if f.severity == "critical")
 
     @property
     def warning_count(self) -> int:
+        """Count of warning-severity findings."""
         return sum(1 for f in self.findings if f.severity in ("warning", "medium", "high"))
 
     @property
     def info_count(self) -> int:
+        """Count of info-severity findings."""
         return sum(1 for f in self.findings if f.severity in ("info", "low"))
 
-    def to_dict(self) -> dict:
-        d = {
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize domain result to a JSON-safe dictionary."""
+        d: dict[str, Any] = {
             "domain": self.domain,
             "status": self.status,
             "analyzer": self.analyzer_name,
@@ -101,8 +108,9 @@ class CrossCorrelation:
     severity: str
     recommendation: str
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize cross-correlation to a JSON-safe dictionary."""
+        return {  # type: ignore[return-value]
             "domains": self.domains,
             "title": self.title,
             "description": self.description,
@@ -119,8 +127,9 @@ class RiskEntry:
     likelihood: str  # high, medium, low
     risk_score: int  # 1-9
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize risk entry to a JSON-safe dictionary."""
+        return {  # type: ignore[return-value]
             "finding": self.finding_title,
             "severity": self.severity,
             "likelihood": self.likelihood,
@@ -142,8 +151,9 @@ class ReviewResult:
     recommendations: list[dict] = field(default_factory=list)
     review_context: dict = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the full review result to a JSON-safe dictionary."""
+        return {  # type: ignore[return-value]
             "session_id": self.session_id,
             "timestamp": self.timestamp,
             "design_classification": self.design_classification,
@@ -519,7 +529,7 @@ def _run_dfm_placement_analysis(design: PCBDesignData) -> DomainResult:
             ))
 
         if len(components) >= 2:
-            placement_result = analyzer.analyze(
+            placement_result = analyzer.analyze(  # type: ignore[attr-defined]
                 components=components,
                 board_width_mm=design.board_width_mm or 100,
                 board_height_mm=design.board_height_mm or 100,
@@ -1390,11 +1400,11 @@ def generate_report(
 # Helpers
 # =============================================================================
 
-def _safe_serialize(obj) -> dict:
+def _safe_serialize(obj: Any) -> dict[str, Any]:
     """Safely serialize an object to a dict."""
     try:
         if hasattr(obj, "to_dict"):
-            return obj.to_dict()
+            return obj.to_dict()  # type: ignore[no-any-return]
         elif hasattr(obj, "__dataclass_fields__"):
             from dataclasses import asdict
             return asdict(obj)
@@ -1438,7 +1448,7 @@ def _estimate_voltage_from_name(name: str) -> float:
     return 0.0
 
 
-def _estimate_component_power(comp) -> float:
+def _estimate_component_power(comp: Any) -> float:
     """Estimate power dissipation from component properties."""
     ref = comp.reference.upper()
     fp = (comp.footprint or comp.package or "").upper()

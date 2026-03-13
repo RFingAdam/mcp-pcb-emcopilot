@@ -13,6 +13,8 @@ Uses analytical methods to estimate radiated emissions based on:
 - PCB stackup and shielding
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -196,11 +198,11 @@ class EMCCompliancePredictor:
         self.pcb_shielding_db: float = 0.0
         self.enclosure_shielding_db: float = 0.0
 
-    def add_clock(self, clock: ClockSource):
+    def add_clock(self, clock: ClockSource) -> None:
         """Add a clock source to analyze."""
         self.clocks.append(clock)
 
-    def add_cable(self, cable: CableInterface):
+    def add_cable(self, cable: CableInterface) -> None:
         """Add an external cable interface."""
         self.cables.append(cable)
 
@@ -208,7 +210,7 @@ class EMCCompliancePredictor:
         self,
         pcb_shielding_db: float = 0.0,
         enclosure_shielding_db: float = 0.0,
-    ):
+    ) -> None:
         """Set shielding effectiveness values."""
         self.pcb_shielding_db = pcb_shielding_db
         self.enclosure_shielding_db = enclosure_shielding_db
@@ -446,8 +448,8 @@ class EMCCompliancePredictor:
         return predictions
 
     def _get_limit_at_frequency(
-        self, freq_mhz: float, limits: list[tuple]
-    ) -> Optional[float]:
+        self, freq_mhz: float, limits: list[tuple[float, float, float]]
+    ) -> float | None:
         """Get emission limit at a specific frequency."""
         for freq_min, freq_max, limit in limits:
             if freq_min <= freq_mhz <= freq_max:

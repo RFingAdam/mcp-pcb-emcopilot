@@ -33,6 +33,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from .session import DesignSessionManager
+from .models.pcb_data import PCBDesignData
 from .parsers import parse_pcb_file, detect_format
 from .errors import (
     PCBError, ValidationError, ParseError, SessionError,
@@ -390,7 +391,7 @@ def calc_plane_resonance(plane_width_mm: float, plane_length_mm: float, dielectr
     L = plane_length_mm / 1000  # meters
     W = plane_width_mm / 1000
 
-    resonances = []
+    resonances: list[dict[str, Any]] = []
     for m in range(0, 4):
         for n in range(0, 4):
             if m == 0 and n == 0:
@@ -1127,7 +1128,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=json.dumps({"success": False, "error": str(e)}))]
 
 
-def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
+def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     """Route tool call to handler."""
 
     # === FILE PARSING ===
@@ -1172,7 +1173,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         layer = args.get("layer")
         if layer:
             traces = [t for t in traces if t.layer == layer]
-        widths = {}
+        widths: dict[float, int] = {}
         for t in traces:
             w = round(t.width_mm, 3)
             widths[w] = widths.get(w, 0) + 1
@@ -1231,7 +1232,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
             "min_via_drill_mm": data.min_via_drill_mm,
         }
         # Group rules by type
-        by_type = {}
+        by_type: dict[str, list[Any]] = {}
         for r in rules:
             rtype = r.get("type", "other")
             if rtype not in by_type:
@@ -1423,7 +1424,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         delays = {n: l * prop_delay_ps_per_mm for n, l in lengths.items()}
         min_d, max_d = min(delays.values()), max(delays.values())
         skew_ps = max_d - min_d
-        ref_name = min(delays, key=delays.get)
+        ref_name = min(delays, key=lambda k: delays[k])
         mismatches = {n: {"length_mm": round(lengths[n], 2), "delay_ps": round(d, 1), "delta_ps": round(d - delays[ref_name], 1)} for n, d in delays.items()}
         return {"max_skew_ps": round(skew_ps, 1), "allowed_skew_ps": max_skew_ps, "compliant": skew_ps <= max_skew_ps, "reference_net": ref_name, "signals": mismatches}
 
@@ -1465,26 +1466,26 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         if args.get("aperture_mm"):
             apertures = [{"type": "circular", "diameter": args["aperture_mm"]}]
         config = ShieldConfig(material=args["material"], thickness_mm=args["thickness_mm"], apertures=apertures)
-        res = analyzer.analyze_shield(config=config, frequency_mhz=args["frequency_mhz"])
+        res = analyzer.analyze_shield(config=config, frequency_mhz=args["frequency_mhz"])  # type: ignore[assignment]
         return _serialize(res)
 
     if name == "pcb_analyze_esd":
         from .analyzers.emc.esd_assessment import ESDAnalyzer, ESDInterface
-        analyzer = ESDAnalyzer()
+        analyzer = ESDAnalyzer()  # type: ignore[assignment]
         iface = ESDInterface(
             name=args["interface_type"], interface_type=args["interface_type"],
             connector_location=(0, 0), has_tvs=args.get("has_tvs", False),
             trace_length_to_ic_mm=args.get("trace_length_mm", 50),
         )
-        res = analyzer.analyze_interface(interface=iface)
+        res = analyzer.analyze_interface(interface=iface)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_grounding":
         from .analyzers.emc.grounding import GroundingAnalyzer, GroundPlane
-        analyzer = GroundingAnalyzer()
+        analyzer = GroundingAnalyzer()  # type: ignore[assignment]
         size = args.get("board_size_mm", 100)
         planes = [GroundPlane(layer_number=1, name=args["topology"], coverage_percent=90, width_mm=size, height_mm=size)]
-        res = analyzer.analyze_grounding(planes=planes, board_width_mm=size, board_height_mm=size, max_frequency_mhz=args["max_frequency_mhz"])
+        res = analyzer.analyze_grounding(planes=planes, board_width_mm=size, board_height_mm=size, max_frequency_mhz=args["max_frequency_mhz"])  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_predict_compliance":
@@ -1495,7 +1496,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
             predictor.set_shielding(enclosure_shielding_db=20.0)
         std_map = {"FCC_A": "fcc_class_a", "FCC_B": "fcc_class_b", "CISPR_A": "cispr_32_class_a", "CISPR_B": "cispr_32_class_b"}
         std_val = std_map.get(args.get("standard", "FCC_B"), args.get("standard", "fcc_class_b"))
-        res = predictor.predict_compliance(standard=EMCStandard(std_val))
+        res = predictor.predict_compliance(standard=EMCStandard(std_val))  # type: ignore[assignment]
         return _serialize(res)
 
     if name == "pcb_analyze_return_current_density":
@@ -1524,8 +1525,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         classified = classifier.classify(data)
         net_categories = {nc.net_name: nc.category for nc in classified.classified_nets}
         category = net_categories.get(args["net_name"], "unknown")
-        analyzer = ReturnPathAnalyzer()
-        result = analyzer.analyze_net(data, args["net_name"], net_category=category, net_categories=net_categories)
+        analyzer = ReturnPathAnalyzer()  # type: ignore[assignment]
+        result = analyzer.analyze_net(data, args["net_name"], net_category=category, net_categories=net_categories)  # type: ignore[attr-defined]
         return _serialize(result)
 
     if name == "pcb_analyze_return_paths":
@@ -1534,15 +1535,15 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         data = _get_session(args["session_id"])
         classifier = NetClassifier()
         classified = classifier.classify(data)
-        analyzer = ReturnPathAnalyzer()
-        result = analyzer.analyze(data, classified, max_frequency_mhz=args.get("max_frequency_mhz", 0))
+        analyzer = ReturnPathAnalyzer()  # type: ignore[assignment]
+        result = analyzer.analyze(data, classified, max_frequency_mhz=args.get("max_frequency_mhz", 0))  # type: ignore[attr-defined]
         return _serialize(result)
 
     if name == "pcb_find_split_crossings":
         from .analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
         data = _get_session(args["session_id"])
-        analyzer = ReturnPathAnalyzer()
-        crossings = analyzer.find_split_crossings(data)
+        analyzer = ReturnPathAnalyzer()  # type: ignore[assignment]
+        crossings = analyzer.find_split_crossings(data)  # type: ignore[attr-defined]
         return {"split_crossings": [_serialize(c) for c in crossings], "count": len(crossings)}
 
     if name == "pcb_analyze_emi_risk":
@@ -1602,19 +1603,19 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     # === HIGH-SPEED DIGITAL ===
     if name == "pcb_analyze_ddr":
         from .analyzers.high_speed.ddr_analyzer import DDRAnalyzer, DDRStandard
-        analyzer = DDRAnalyzer()
+        analyzer = DDRAnalyzer()  # type: ignore[assignment]
         tl = args.get("trace_length_mm", 50)
         byte_lanes = [{"name": "DQ0", "data_lengths_mm": [tl] * 8, "dqs_p_length_mm": tl, "dqs_n_length_mm": tl}]
-        res = analyzer.analyze(ddr_standard=DDRStandard(args["ddr_standard"]), data_rate_mtps=args.get("data_rate_mtps", 3200), byte_lanes=byte_lanes, trace_impedance_ohm=args.get("trace_impedance_ohm"))
+        res = analyzer.analyze(ddr_standard=DDRStandard(args["ddr_standard"]), data_rate_mtps=args.get("data_rate_mtps", 3200), byte_lanes=byte_lanes, trace_impedance_ohm=args.get("trace_impedance_ohm"))  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_pcie":
         from .analyzers.high_speed.pcie_analyzer import PCIeAnalyzer, PCIeGeneration
-        analyzer = PCIeAnalyzer()
+        analyzer = PCIeAnalyzer()  # type: ignore[assignment]
         tl = args.get("trace_length_mm", 100)
         lane_count = args.get("lane_count", 1)
         lanes = [{"name": f"Lane{i}", "tx_p_length_mm": tl, "tx_n_length_mm": tl, "rx_p_length_mm": tl, "rx_n_length_mm": tl} for i in range(lane_count)]
-        res = analyzer.analyze(generation=PCIeGeneration(args["pcie_gen"]), lanes=lanes, differential_impedance_ohm=args.get("differential_impedance_ohm"))
+        res = analyzer.analyze(generation=PCIeGeneration(args["pcie_gen"]), lanes=lanes, differential_impedance_ohm=args.get("differential_impedance_ohm"))  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_calc_pcie_link_budget":
@@ -1640,19 +1641,19 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
 
     if name == "pcb_analyze_usb":
         from .analyzers.high_speed.usb_analyzer import USBAnalyzer, USBVersion
-        analyzer = USBAnalyzer()
+        analyzer = USBAnalyzer()  # type: ignore[assignment]
         tl = args.get("trace_length_mm", 100)
         usb2_pair = {"p_length_mm": tl, "n_length_mm": tl, "via_count": 2}
-        res = analyzer.analyze(usb_version=USBVersion(args["usb_version"]), usb2_pair=usb2_pair, usb2_impedance_ohm=args.get("differential_impedance_ohm"))
+        res = analyzer.analyze(usb_version=USBVersion(args["usb_version"]), usb2_pair=usb2_pair, usb2_impedance_ohm=args.get("differential_impedance_ohm"))  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_ethernet":
         from .analyzers.high_speed.ethernet_analyzer import EthernetAnalyzer, EthernetSpeed
-        analyzer = EthernetAnalyzer()
+        analyzer = EthernetAnalyzer()  # type: ignore[assignment]
         tl = args.get("trace_length_mm", 50)
         skew = args.get("pair_skew_ps", 0)
         mdi_pairs = [{"name": f"MDI{i}", "p_length_mm": tl, "n_length_mm": tl + skew * 0.17} for i in range(4)]
-        res = analyzer.analyze(speed=EthernetSpeed(args["speed"]), mdi_pairs=mdi_pairs)
+        res = analyzer.analyze(speed=EthernetSpeed(args["speed"]), mdi_pairs=mdi_pairs)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_validate_ddr_topology":
@@ -1692,8 +1693,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     # === POWER INTEGRITY ===
     if name == "pcb_analyze_pdn":
         from .analyzers.power_integrity.pdn_analyzer import PDNAnalyzer
-        analyzer = PDNAnalyzer()
-        res = analyzer.analyze(
+        analyzer = PDNAnalyzer()  # type: ignore[assignment]
+        res = analyzer.analyze(  # type: ignore[attr-defined]
             voltage=args["supply_voltage_v"], max_current=args["max_current_a"],
             ripple_percent=args.get("ripple_percent", 5),
         )
@@ -1718,18 +1719,18 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
 
     if name == "pcb_analyze_decoupling":
         from .analyzers.power_integrity.decap_placement import DecapAnalyzer
-        analyzer = DecapAnalyzer()
+        analyzer = DecapAnalyzer()  # type: ignore[assignment]
         cap_values = args.get("cap_values_uf", [0.1, 1.0, 10.0])
         decaps = [{"ref": f"C{i+1}", "capacitance_uf": c, "package": "0402", "position": (i * 2, 0), "via_count": 2} for i, c in enumerate(cap_values)]
         freq_hz = args["max_frequency_mhz"] * 1e6
-        res = analyzer.analyze_ic_decoupling(ic_ref="U1", ic_position=(0, 0), power_rail="VCC", target_frequency_hz=freq_hz, decaps=decaps)
+        res = analyzer.analyze_ic_decoupling(ic_ref="U1", ic_position=(0, 0), power_rail="VCC", target_frequency_hz=freq_hz, decaps=decaps)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_vrm":
         from .analyzers.power_integrity.vrm_analyzer import VRMAnalyzer
-        analyzer = VRMAnalyzer()
+        analyzer = VRMAnalyzer()  # type: ignore[assignment]
         dist = args.get("distance_to_load_mm", 25)
-        res = analyzer.analyze_vrm(
+        res = analyzer.analyze_vrm(  # type: ignore[attr-defined]
             vrm_ref="U_VRM", vrm_position=(0, 0), output_rail="VOUT",
             output_voltage=args["output_voltage_v"], output_current=args["output_current_a"],
             input_voltage=args.get("input_voltage_v", 12.0), components=[],
@@ -1740,27 +1741,27 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     # === DFM ===
     if name == "pcb_analyze_solder_paste":
         from .analyzers.dfm.solder_paste import SolderPasteAnalyzer, PadDefinition, ComponentPads
-        analyzer = SolderPasteAnalyzer()
+        analyzer = SolderPasteAnalyzer()  # type: ignore[assignment]
         pad = PadDefinition(pad_id="1", width_mm=args["pad_width_mm"], length_mm=args["pad_length_mm"], pitch_mm=args["pitch_mm"])
         comp = ComponentPads(reference="U1", package="custom", pads=[pad])
-        res = analyzer.analyze_component(component=comp, stencil_thickness_mm=args.get("stencil_thickness_mm", 0.12))
+        res = analyzer.analyze_component(component=comp, stencil_thickness_mm=args.get("stencil_thickness_mm", 0.12))  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_placement":
         from .analyzers.dfm.component_placement import PlacementAnalyzer, Component
-        analyzer = PlacementAnalyzer()
+        analyzer = PlacementAnalyzer()  # type: ignore[assignment]
         pitch = args["component_pitch_mm"]
         comps = [
-            Component(reference="U1", package="QFN32", x_mm=0, y_mm=0, width_mm=5, height_mm=5, rotation_deg=0, side="top"),
-            Component(reference="U2", package="QFN32", x_mm=pitch, y_mm=0, width_mm=5, height_mm=5, rotation_deg=0, side="bottom" if args.get("has_bottom_components") else "top"),
+            Component(reference="U1", package="QFN32", x_mm=0, y_mm=0, width_mm=5, height_mm=5, rotation_deg=0, side="top"),  # type: ignore[list-item]
+            Component(reference="U2", package="QFN32", x_mm=pitch, y_mm=0, width_mm=5, height_mm=5, rotation_deg=0, side="bottom" if args.get("has_bottom_components") else "top"),  # type: ignore[list-item]
         ]
         size = max(pitch * 3, 50)
-        res = analyzer.analyze_placement(components=comps, board_width_mm=size, board_height_mm=size)
+        res = analyzer.analyze_placement(components=comps, board_width_mm=size, board_height_mm=size)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_assembly":
         from .analyzers.dfm.assembly_check import AssemblyAnalyzer, AssemblyComponent
-        analyzer = AssemblyAnalyzer.for_standard_smt()
+        analyzer = AssemblyAnalyzer.for_standard_smt()  # type: ignore[assignment]
         comps = []
         fp = args.get("finest_pitch_mm", 0.5)
         def _assy_comp(ref, pkg, side="top", pitch=fp, pin_count=2, pad_w=0.3, pad_l=0.5):
@@ -1774,24 +1775,24 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         if not comps:
             for i in range(args["component_count"]):
                 comps.append(_assy_comp(f"C{i+1}", "0603"))
-        res = analyzer.analyze_assembly(components=comps)
+        res = analyzer.analyze_assembly(components=comps)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_tolerance":
         from .analyzers.dfm.tolerance_analysis import ToleranceAnalyzer, ToleranceContributor
-        analyzer = ToleranceAnalyzer()
+        analyzer = ToleranceAnalyzer()  # type: ignore[assignment]
         contributors = [ToleranceContributor(name=f"dim_{i+1}", nominal_mm=args["nominal_mm"] / len(args["tolerances_mm"]), tolerance_plus_mm=t, tolerance_minus_mm=t) for i, t in enumerate(args["tolerances_mm"])]
         total_tol = sum(args["tolerances_mm"])
         spec = (args["nominal_mm"] - total_tol, args["nominal_mm"] + total_tol)
         run_mc = args.get("method", "worst_case") == "monte_carlo"
-        res = analyzer.analyze_stack(contributors=contributors, specification_mm=spec, run_monte_carlo=run_mc)
+        res = analyzer.analyze_stack(contributors=contributors, specification_mm=spec, run_monte_carlo=run_mc)  # type: ignore[attr-defined]
         return _serialize(res)
 
     # === THERMAL ===
     if name == "pcb_analyze_thermal":
         from .analyzers.thermal.power_dissipation import PowerDissipationAnalyzer
-        analyzer = PowerDissipationAnalyzer()
-        temp_rise = analyzer.estimate_temp_rise(power_w=args["power_watts"], theta_ja=args["theta_ja_c_per_w"])
+        analyzer = PowerDissipationAnalyzer()  # type: ignore[assignment]
+        temp_rise = analyzer.estimate_temp_rise(power_w=args["power_watts"], theta_ja=args["theta_ja_c_per_w"])  # type: ignore[attr-defined]
         ambient = args.get("ambient_temp_c", 25)
         max_tj = args.get("max_junction_temp_c", 125)
         junction_temp = ambient + temp_rise
@@ -1799,10 +1800,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
 
     if name == "pcb_analyze_thermal_via":
         from .analyzers.thermal.thermal_via import ThermalViaAnalyzer
-        analyzer = ThermalViaAnalyzer()
+        analyzer = ThermalViaAnalyzer()  # type: ignore[assignment]
         fill = args.get("copper_fill_percent", 25)
         vias = [{"diameter_mm": args["via_diameter_mm"], "count": args["via_count"], "filled": fill >= 90}]
-        res = analyzer.analyze_component(
+        res = analyzer.analyze_component(  # type: ignore[attr-defined]
             component_ref="U1", pad_area_mm2=args["via_count"] * 3.14 * (args["via_diameter_mm"] / 2) ** 2 * 4,
             power_w=args["power_watts"], vias=vias, board_thickness_mm=args.get("board_thickness_mm", 1.6),
         )
@@ -1810,10 +1811,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
 
     if name == "pcb_analyze_copper_spreading":
         from .analyzers.thermal.copper_spreading import CopperSpreadingAnalyzer
-        analyzer = CopperSpreadingAnalyzer()
+        analyzer = CopperSpreadingAnalyzer()  # type: ignore[assignment]
         oz = args["copper_thickness_oz"]
         area = args["copper_area_mm2"]
-        res = analyzer.analyze_component(
+        res = analyzer.analyze_component(  # type: ignore[attr-defined]
             component_ref="U1", power_w=args["power_watts"],
             footprint_area_mm2=min(area / 4, 100),
             connected_copper=[{"layer": "top", "area_mm2": area, "thickness_oz": oz}],
@@ -1823,38 +1824,38 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     # === ANTENNA/EMI ===
     if name == "pcb_analyze_trace_antenna":
         from .analyzers.antenna.trace_antenna import TraceAntennaAnalyzer
-        analyzer = TraceAntennaAnalyzer()
+        analyzer = TraceAntennaAnalyzer()  # type: ignore[assignment]
         trace = {"name": "trace", "length_mm": args["trace_length_mm"], "dielectric_constant": args.get("dielectric_constant", 4.3)}
-        issues = analyzer.analyze_trace(trace=trace, max_frequency_mhz=args["frequency_mhz"])
+        issues = analyzer.analyze_trace(trace=trace, max_frequency_mhz=args["frequency_mhz"])  # type: ignore[attr-defined]
         return {"trace_length_mm": args["trace_length_mm"], "frequency_mhz": args["frequency_mhz"], "issues": [_serialize(i) for i in issues], "antenna_risk": len(issues) > 0}
 
     if name == "pcb_analyze_slot_antenna":
         from .analyzers.antenna.slot_antenna import SlotAntennaAnalyzer
-        analyzer = SlotAntennaAnalyzer()
+        analyzer = SlotAntennaAnalyzer()  # type: ignore[assignment]
         slot = {"id": "slot1", "length_mm": args["slot_length_mm"], "width_mm": args.get("slot_width_mm", 1.0)}
-        issue = analyzer.analyze_slot(slot=slot, operating_frequencies=[args["frequency_mhz"]])
+        issue = analyzer.analyze_slot(slot=slot, operating_frequencies=[args["frequency_mhz"]])  # type: ignore[attr-defined]
         return {"slot_length_mm": args["slot_length_mm"], "frequency_mhz": args["frequency_mhz"], "issue": _serialize(issue) if issue else None, "resonant": issue is not None}
 
     if name == "pcb_analyze_common_mode":
         from .analyzers.antenna.common_mode import CommonModeAnalyzer
-        analyzer = CommonModeAnalyzer()
+        analyzer = CommonModeAnalyzer()  # type: ignore[assignment]
         pair = {
             "name": "pair", "differential_impedance_ohm": args["differential_impedance_ohm"],
             "common_mode_impedance_ohm": args.get("common_mode_impedance_ohm", args["differential_impedance_ohm"] / 2),
             "cable_length_m": args.get("cable_length_m", 1.0), "frequency_mhz": args["frequency_mhz"],
         }
-        res = analyzer.analyze_pair(pair=pair)
+        res = analyzer.analyze_pair(pair=pair)  # type: ignore[attr-defined]
         return _serialize(res)
 
     if name == "pcb_analyze_cable_coupling":
         from .analyzers.antenna.cable_coupling import CableCouplingAnalyzer
-        analyzer = CableCouplingAnalyzer()
+        analyzer = CableCouplingAnalyzer()  # type: ignore[assignment]
         conn = {
             "name": "connector", "cable_spacing_mm": args["cable_spacing_mm"],
             "parallel_length_mm": args["parallel_length_mm"], "frequency_mhz": args["frequency_mhz"],
             "cable_type": args.get("cable_type", "unshielded"),
         }
-        res = analyzer.analyze_connector(connector=conn)
+        res = analyzer.analyze_connector(connector=conn)  # type: ignore[attr-defined]
         return _serialize(res)
 
     # === CLASSIFICATION ===
@@ -1878,7 +1879,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     if name == "pcb_classify_design":
         from .classifiers.design_classifier import DesignClassifier
         data = _get_session(args["session_id"])
-        classifier = DesignClassifier()
+        classifier = DesignClassifier()  # type: ignore[assignment]
         result = classifier.classify(data)
         return result.to_dict()
 
@@ -1963,8 +1964,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     if name == "pcb_render_stackup":
         from .visualization.stackup_renderer import StackupRenderer
         data = _get_session(args["session_id"])
-        renderer = StackupRenderer(data)
-        svg = renderer.render()
+        renderer = StackupRenderer(data)  # type: ignore[assignment]
+        svg = renderer.render()  # type: ignore[attr-defined]
         return {"svg": svg}
 
     if name == "pcb_render_net":
@@ -1998,8 +1999,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
             )
         elif render_type == "stackup":
             from .visualization.stackup_renderer import StackupRenderer
-            renderer = StackupRenderer(data)
-            svg = renderer.render()
+            renderer = StackupRenderer(data)  # type: ignore[assignment]
+            svg = renderer.render()  # type: ignore[attr-defined]
         elif render_type == "net":
             net_name = args.get("net_name")
             if not net_name:
@@ -2071,8 +2072,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     if name == "pcb_parse_schematic_pdf":
         from .parsers.pdf_schematic_parser import PDFSchematicParser
 
-        parser = PDFSchematicParser()
-        pdf_result = parser.parse(args["file_path"])
+        parser = PDFSchematicParser()  # type: ignore[assignment]
+        pdf_result = parser.parse(args["file_path"])  # type: ignore[attr-defined]
 
         page_dicts = []
         for pg in pdf_result.pages:
@@ -2135,9 +2136,9 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         if args.get("render_image") and data.schematic_pdf_path:
             from .parsers.pdf_schematic_parser import PDFSchematicParser
             import tempfile
-            parser = PDFSchematicParser()
+            parser = PDFSchematicParser()  # type: ignore[assignment]
             output_dir = tempfile.mkdtemp(prefix="pcb_schematic_")
-            image_path = parser.render_page_image(
+            image_path = parser.render_page_image(  # type: ignore[attr-defined]
                 data.schematic_pdf_path, page_number, output_dir
             )
             if image_path:
@@ -2263,7 +2264,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     raise ValueError(f"Unknown tool: {name}")
 
 
-def _get_session(session_id: str):
+def _get_session(session_id: str) -> PCBDesignData:
     """Get session or raise SessionError."""
     data = sessions.get_session(session_id)
     if data is None:

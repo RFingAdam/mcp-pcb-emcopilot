@@ -8,6 +8,8 @@ Calculates:
 - Estimated radiated-emission increase from common-mode energy
 """
 
+from __future__ import annotations
+
 import math
 from typing import Optional
 

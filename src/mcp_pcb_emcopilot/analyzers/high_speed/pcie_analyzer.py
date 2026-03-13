@@ -8,6 +8,8 @@ Analyzes PCIe lane routing for compliance:
 - Via transitions
 - Impedance control
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional

@@ -9,6 +9,8 @@ Provides analysis for high-speed digital interfaces:
 - Generic length matching
 """
 
+from __future__ import annotations
+
 from .ddr_analyzer import DDRAnalyzer, DDRResult, DDRIssue, DDRStandard
 from .ddr_topology import validate_ddr_topology, analyze_ddr_timing_budget
 from .pcie_analyzer import PCIeAnalyzer, PCIeResult, PCIeIssue, PCIeGeneration

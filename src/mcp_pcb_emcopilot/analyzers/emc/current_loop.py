@@ -1,4 +1,6 @@
 """Current loop analyzer for EMC assessment"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -213,7 +215,7 @@ class CurrentLoopAnalyzer:
         Returns:
             (area_mm2, perimeter_mm, effective_height_mm)
         """
-        total_length = 0
+        total_length: float = 0
         for seg in signal_path.segments:
             dx = seg.get("x2", 0) - seg.get("x1", 0)
             dy = seg.get("y2", 0) - seg.get("y1", 0)

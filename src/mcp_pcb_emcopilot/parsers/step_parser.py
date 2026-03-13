@@ -7,10 +7,12 @@ This is a text-only parser — NO heavy 3D dependencies (cadquery, OCP, trimesh)
 STEP files are ASCII text with a well-defined entity structure.
 """
 
+from __future__ import annotations
+
 import math
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class STEPEntity:
@@ -99,7 +101,7 @@ class STEPParser:
             "warnings": self._warnings,
         }
 
-    def _parse_entities(self, content: str):
+    def _parse_entities(self, content: str) -> None:
         """Parse STEP entities from content.
 
         STEP entities look like:
@@ -186,7 +188,7 @@ class STEPParser:
                 j = i + 1
                 while j < len(raw) and raw[j].isdigit():
                     j += 1
-                params.append(int(raw[i + 1:j]))
+                params.append(int(raw[i + 1:j]))  # type: ignore[arg-type]
                 i = j
             elif ch == '(':
                 # Tuple/list — find matching close paren
@@ -199,10 +201,10 @@ class STEPParser:
                         depth -= 1
                     j += 1
                 inner = raw[i + 1:j - 1]
-                params.append(self._parse_param_list(inner))
+                params.append(self._parse_param_list(inner))  # type: ignore[arg-type]
                 i = j
             elif ch == '$':
-                params.append(None)
+                params.append(None)  # type: ignore[arg-type]
                 i += 1
             elif ch == '*':
                 params.append('*')
@@ -221,7 +223,7 @@ class STEPParser:
                     val = float(raw[i:j])
                     if val == int(val) and 'e' not in raw[i:j].lower() and '.' not in raw[i:j]:
                         val = int(val)
-                    params.append(val)
+                    params.append(val)  # type: ignore[arg-type]
                 except ValueError:
                     params.append(raw[i:j])
                 i = j
@@ -231,7 +233,7 @@ class STEPParser:
 
         return params
 
-    def _extract_cartesian_points(self):
+    def _extract_cartesian_points(self) -> None:
         """Extract all CARTESIAN_POINT entities to a dict of id -> (x, y, z)."""
         for eid, entity in self.entities.items():
             if entity.type_name == "CARTESIAN_POINT":
@@ -258,7 +260,7 @@ class STEPParser:
                         except (ValueError, TypeError):
                             pass
 
-    def _extract_products(self):
+    def _extract_products(self) -> None:
         """Extract PRODUCT entities — these represent components in EDA exports."""
         for eid, entity in self.entities.items():
             if entity.type_name == "PRODUCT":
@@ -273,7 +275,7 @@ class STEPParser:
                         "description": description,
                     })
 
-    def _extract_shape_representations(self):
+    def _extract_shape_representations(self) -> None:
         """Extract SHAPE_REPRESENTATION and related entities for geometry."""
         for eid, entity in self.entities.items():
             if entity.type_name in (
@@ -511,7 +513,7 @@ class STEPParser:
 
     def _collect_points_for_product(self, product_entity_id: int) -> list[tuple[float, float, float]]:
         """Collect all cartesian points associated with a product's shape."""
-        points = []
+        points: list[Any] = []
 
         # Find shape representation IDs linked to this product
         shape_rep_ids = self._find_shape_reps_for_product(product_entity_id)
@@ -571,7 +573,7 @@ class STEPParser:
 
         return result
 
-    def _collect_points_recursive(self, entity_id: int, points: list, depth: int = 0):
+    def _collect_points_recursive(self, entity_id: int, points: list, depth: int = 0) -> None:
         """Recursively collect cartesian points from a shape item tree."""
         if depth > 12:
             return  # Prevent infinite recursion
@@ -664,7 +666,7 @@ class STEPParser:
 
         for eid, entity in self.entities.items():
             if entity.type_name in ("CLOSED_SHELL", "MANIFOLD_SOLID_BREP"):
-                points = []
+                points: list[Any] = []
                 self._collect_points_recursive(eid, points, depth=0)
                 if len(points) < 4:
                     continue

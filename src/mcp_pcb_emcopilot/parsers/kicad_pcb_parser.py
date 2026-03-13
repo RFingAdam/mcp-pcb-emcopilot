@@ -22,6 +22,8 @@ Format Benefits for AI Review:
 - Design rules embedded in file
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -233,7 +235,7 @@ class SExpressionParser:
         self._skip_whitespace()
         return self._parse_element()
 
-    def _skip_whitespace(self):
+    def _skip_whitespace(self) -> None:
         """Skip whitespace and comments."""
         while self.pos < self.length:
             if self.text[self.pos].isspace():
@@ -416,14 +418,14 @@ class KiCadPcbParser:
 
         return result
 
-    def _parse_general(self, element: List, result: KiCadBoardData):
+    def _parse_general(self, element: List, result: KiCadBoardData) -> None:
         """Parse general section."""
         for item in element[1:]:
             if isinstance(item, list) and len(item) >= 2:
                 if item[0] == "thickness":
                     result.thickness_mm = float(item[1])
 
-    def _parse_title_block(self, element: List, result: KiCadBoardData):
+    def _parse_title_block(self, element: List, result: KiCadBoardData) -> None:
         """Parse title block."""
         for item in element[1:]:
             if isinstance(item, list) and len(item) >= 2:
@@ -436,7 +438,7 @@ class KiCadPcbParser:
                 elif item[0] == "company":
                     result.company = str(item[1])
 
-    def _parse_layers(self, element: List, result: KiCadBoardData):
+    def _parse_layers(self, element: List, result: KiCadBoardData) -> None:
         """Parse layer definitions."""
         for item in element[1:]:
             if isinstance(item, list) and len(item) >= 3:
@@ -455,7 +457,7 @@ class KiCadPcbParser:
         copper_layers = [l for l in result.layers if "Cu" in l.name]
         result.layer_count = len(copper_layers)
 
-    def _parse_setup(self, element: List, result: KiCadBoardData):
+    def _parse_setup(self, element: List, result: KiCadBoardData) -> None:
         """Parse setup section (design rules, stackup)."""
         rules = KiCadDesignRules()
 
@@ -476,7 +478,7 @@ class KiCadPcbParser:
 
         result.design_rules = rules
 
-    def _parse_stackup(self, element: List, result: KiCadBoardData):
+    def _parse_stackup(self, element: List, result: KiCadBoardData) -> None:
         """Parse stackup definition."""
         for item in element[1:]:
             if not isinstance(item, list) or not item:
@@ -502,7 +504,7 @@ class KiCadPcbParser:
 
                 result.stackup.append(layer)
 
-    def _parse_net(self, element: List, result: KiCadBoardData):
+    def _parse_net(self, element: List, result: KiCadBoardData) -> None:
         """Parse net definition."""
         if len(element) >= 3:
             net_index = int(element[1])
@@ -512,7 +514,7 @@ class KiCadPcbParser:
             result.nets.append(net)
             self._net_map[net_index] = net_name
 
-    def _parse_net_class(self, element: List, result: KiCadBoardData):
+    def _parse_net_class(self, element: List, result: KiCadBoardData) -> None:
         """Parse net class definition."""
         if len(element) >= 2:
             class_name = str(element[1])
@@ -545,7 +547,7 @@ class KiCadPcbParser:
 
             result.net_classes[class_name] = net_class
 
-    def _parse_footprint(self, element: List, result: KiCadBoardData):
+    def _parse_footprint(self, element: List, result: KiCadBoardData) -> None:
         """Parse footprint (module) definition."""
         component = KiCadComponent(reference="?", value="")
 
@@ -600,7 +602,7 @@ class KiCadPcbParser:
 
         result.components.append(component)
 
-    def _parse_fp_text(self, element: List, component: KiCadComponent):
+    def _parse_fp_text(self, element: List, component: KiCadComponent) -> None:
         """Parse footprint text (reference, value)."""
         if len(element) >= 3:
             text_type = str(element[1])
@@ -653,7 +655,7 @@ class KiCadPcbParser:
 
         return pad
 
-    def _parse_segment(self, element: List, result: KiCadBoardData):
+    def _parse_segment(self, element: List, result: KiCadBoardData) -> None:
         """Parse trace segment."""
         trace = KiCadTrace(
             x1_mm=0.0, y1_mm=0.0,
@@ -685,7 +687,7 @@ class KiCadPcbParser:
 
         result.traces.append(trace)
 
-    def _parse_arc(self, element: List, result: KiCadBoardData):
+    def _parse_arc(self, element: List, result: KiCadBoardData) -> None:
         """Parse arc segment."""
         arc = KiCadArc(
             x_start_mm=0.0, y_start_mm=0.0,
@@ -719,7 +721,7 @@ class KiCadPcbParser:
 
         result.arcs.append(arc)
 
-    def _parse_via(self, element: List, result: KiCadBoardData):
+    def _parse_via(self, element: List, result: KiCadBoardData) -> None:
         """Parse via definition."""
         via = KiCadVia(
             x_mm=0.0,
@@ -759,7 +761,7 @@ class KiCadPcbParser:
 
         result.vias.append(via)
 
-    def _parse_zone(self, element: List, result: KiCadBoardData):
+    def _parse_zone(self, element: List, result: KiCadBoardData) -> None:
         """Parse copper zone (pour)."""
         zone = KiCadZone(net_index=0)
 
@@ -793,7 +795,7 @@ class KiCadPcbParser:
 
         result.zones.append(zone)
 
-    def _parse_zone_polygon(self, element: List, zone: KiCadZone):
+    def _parse_zone_polygon(self, element: List, zone: KiCadZone) -> None:
         """Parse zone polygon outline."""
         for item in element[1:]:
             if isinstance(item, list) and item[0] == "pts":
@@ -803,7 +805,7 @@ class KiCadPcbParser:
                         y = float(pt[2])
                         zone.outline.append((x, y))
 
-    def _calculate_board_dimensions(self, result: KiCadBoardData):
+    def _calculate_board_dimensions(self, result: KiCadBoardData) -> None:
         """Calculate board dimensions from all geometry."""
         all_x = []
         all_y = []
@@ -844,7 +846,7 @@ class KiCadPcbParser:
                 (min_x, max_y),
             ]
 
-    def _calculate_trace_statistics(self, result: KiCadBoardData):
+    def _calculate_trace_statistics(self, result: KiCadBoardData) -> None:
         """Calculate trace length statistics and per-net routed lengths.
 
         Aggregates total trace length and calculates length per net

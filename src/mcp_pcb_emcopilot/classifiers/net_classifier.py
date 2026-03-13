@@ -47,7 +47,7 @@ class NetClassificationResult:
     summary: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        cats = {}
+        cats: dict[str, list[str]] = {}
         for nc in self.classified_nets:
             cats.setdefault(nc.category, []).append(nc.net_name)
 
@@ -482,7 +482,7 @@ class NetClassifier:
             if nc_lower in nc_map and nc_map[nc_lower]:
                 return NetClassification(
                     net_name=name, net_index=net.index,
-                    category=nc_map[nc_lower], confidence=0.80,
+                    category=nc_map[nc_lower], confidence=0.80,  # type: ignore[arg-type]
                     source='net_class', subcategory=net.net_class,
                 )
 

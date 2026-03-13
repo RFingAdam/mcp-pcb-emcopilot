@@ -9,10 +9,12 @@ Validates:
 Decoupled from SQLAlchemy — operates on PCBDesignData.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from .impedance_calculator import ImpedanceCalculator
 
@@ -162,7 +164,7 @@ class RFImpedanceAnalyzer:
 
     def _check_net_impedance(self, design_data, net_name: str) -> list[RFImpedanceViolation]:
         """Check impedance for a specific RF net."""
-        violations = []
+        violations: list[RFImpedanceViolation] = []
 
         # Find the net
         net = design_data.get_net_by_name(net_name)

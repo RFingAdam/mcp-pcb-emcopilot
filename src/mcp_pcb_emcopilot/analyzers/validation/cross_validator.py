@@ -14,6 +14,8 @@ Detects:
 - BOM quantity errors
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -196,7 +198,7 @@ class CrossValidator:
         footprint: Optional[str] = None,
         part_number: Optional[str] = None,
         pins: Optional[list[str]] = None,
-    ):
+    ) -> None:
         """Add a component from schematic."""
         self.schematic_components[reference] = ComponentData(
             reference=reference,
@@ -214,7 +216,7 @@ class CrossValidator:
         footprint: Optional[str] = None,
         part_number: Optional[str] = None,
         pins: Optional[list[str]] = None,
-    ):
+    ) -> None:
         """Add a component from layout."""
         self.layout_components[reference] = ComponentData(
             reference=reference,
@@ -232,7 +234,7 @@ class CrossValidator:
         part_number: Optional[str] = None,
         manufacturer: Optional[str] = None,
         footprint: Optional[str] = None,
-    ):
+    ) -> None:
         """Add a component from BOM."""
         self.bom_components[reference] = ComponentData(
             reference=reference,
@@ -247,7 +249,7 @@ class CrossValidator:
         self,
         name: str,
         pins: list[tuple[str, str]],  # List of (component_ref, pin_number)
-    ):
+    ) -> None:
         """Add a net from schematic."""
         self.schematic_nets[name] = NetData(
             name=name,
@@ -259,7 +261,7 @@ class CrossValidator:
         self,
         name: str,
         pins: list[tuple[str, str]],
-    ):
+    ) -> None:
         """Add a net from layout."""
         self.layout_nets[name] = NetData(
             name=name,
@@ -657,7 +659,7 @@ class CrossValidator:
             if num1 == 0 or num2 == 0:
                 return num1 == num2
             diff_percent = abs(num1 - num2) / max(num1, num2) * 100
-            return diff_percent <= self.value_tolerance_percent
+            return diff_percent <= self.value_tolerance_percent  # type: ignore[no-any-return]
 
         # String comparison with normalization
         return self._normalize_value(val1) == self._normalize_value(val2)
