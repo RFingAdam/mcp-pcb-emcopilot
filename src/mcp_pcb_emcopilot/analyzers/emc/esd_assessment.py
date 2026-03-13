@@ -1,4 +1,6 @@
 """ESD (Electrostatic Discharge) protection assessment analyzer"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -90,7 +92,7 @@ class ESDAnalyzer:
     """
 
     # IEC 61000-4-2 test levels
-    IEC_LEVELS = {
+    IEC_LEVELS: dict[int | str, dict[str, int]] = {
         1: {"contact": 2, "air": 2},
         2: {"contact": 4, "air": 4},
         3: {"contact": 6, "air": 8},
@@ -99,7 +101,7 @@ class ESDAnalyzer:
     }
 
     # Interface-specific requirements
-    INTERFACE_REQUIREMENTS = {
+    INTERFACE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "usb": {"level": 4, "max_capacitance_pf": 5},
         "usb3": {"level": 4, "max_capacitance_pf": 0.5},
         "hdmi": {"level": 4, "max_capacitance_pf": 0.5},
@@ -394,7 +396,7 @@ class ESDAnalyzer:
         # Overall assessment
         if critical_count > 0:
             overall_risk = "critical"
-            overall_score = 20
+            overall_score: float = 20
         elif high_count > len(interfaces) / 2:
             overall_risk = "high"
             overall_score = 40

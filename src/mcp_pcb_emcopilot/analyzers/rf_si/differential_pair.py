@@ -1,4 +1,6 @@
 """Differential pair analyzer for skew, mode conversion, and impedance analysis"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -355,7 +357,7 @@ class DifferentialPairAnalyzer:
             (1/18.7) * math.log(1 + (u/18.1)**3)
         b = 0.564 * ((er - 0.9) / (er + 3))**0.053
         er_eff = (er + 1) / 2 + ((er - 1) / 2) * (1 + 10/u)**(-a*b)
-        return er_eff
+        return er_eff  # type: ignore[no-any-return]
 
     def _calculate_mode_conversion(
         self, geometry: DiffPairGeometry, z_odd: float, z_even: float
@@ -477,7 +479,7 @@ class DifferentialPairAnalyzer:
                         "coupling_coefficient": round((z_even - z_odd) / (z_even + z_odd), 4),
                     }
 
-        return best_result
+        return best_result  # type: ignore[return-value]
 
     def analyze_routing_path(
         self,

@@ -1,4 +1,6 @@
 """Component placement analyzer for DFM"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -277,7 +279,7 @@ class PlacementAnalyzer:
 
                 # Get minimum required clearance
                 types = tuple(sorted([c1.component_type, c2.component_type]))
-                min_required = self.MIN_CLEARANCES.get(types, 0.5)
+                min_required = self.MIN_CLEARANCES.get(types, 0.5)  # type: ignore[arg-type]
 
                 # Also check package-specific clearances
                 for pkg, pkg_clearance in self.PACKAGE_CLEARANCES.items():

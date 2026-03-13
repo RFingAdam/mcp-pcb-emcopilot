@@ -189,7 +189,7 @@ class DesignClassifier:
 
         # Score based on net categories
         for dtype, config in _TYPE_SIGNALS.items():
-            for cat, weight in config['net_categories'].items():
+            for cat, weight in config['net_categories'].items():  # type: ignore[attr-defined]
                 count = cat_counts.get(cat, 0)
                 if count > 0:
                     # Logarithmic scaling so 100 DDR nets don't dominate
@@ -199,7 +199,7 @@ class DesignClassifier:
         # Score based on detected interfaces
         for iface in iface_det.interfaces:
             for dtype, config in _TYPE_SIGNALS.items():
-                for iface_pattern, weight in config['interfaces'].items():
+                for iface_pattern, weight in config['interfaces'].items():  # type: ignore[attr-defined]
                     if iface_pattern.lower() in iface.interface_type.lower():
                         scores[dtype] += weight * iface.confidence
 

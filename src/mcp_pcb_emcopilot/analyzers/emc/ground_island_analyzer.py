@@ -9,6 +9,8 @@ Detects:
 Decoupled from SQLAlchemy — operates on PCBDesignData.
 """
 
+from __future__ import annotations
+
 import logging
 import math
 from dataclasses import dataclass, field

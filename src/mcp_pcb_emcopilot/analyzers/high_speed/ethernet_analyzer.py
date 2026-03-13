@@ -9,6 +9,8 @@ Analyzes Ethernet PHY routing for 10/100/1G/2.5G/5G/10G:
 - Via count validation
 - Ground plane stitching
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Dict, Any

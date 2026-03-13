@@ -4,6 +4,8 @@ Slot Antenna Analyzer.
 Detects slots in ground/power planes that may act as
 unintentional slot antennas.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -324,7 +326,7 @@ class SlotAntennaAnalyzer:
     def analyze(
         self,
         slots: list[dict],
-        operating_frequencies_mhz: list[float] = None,
+        operating_frequencies_mhz: list[float] = None,  # type: ignore[assignment]
     ) -> SlotAntennaResult:
         """
         Analyze all slots for antenna behavior.

@@ -4,6 +4,8 @@ Trace Antenna Analyzer.
 Detects traces that may act as unintentional antennas
 at frequencies where their length approaches λ/4 or λ/2.
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum

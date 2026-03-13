@@ -1,4 +1,6 @@
 """Assembly check analyzer for DFM"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 from enum import Enum

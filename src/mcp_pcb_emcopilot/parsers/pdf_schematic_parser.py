@@ -12,6 +12,8 @@ Usage::
     print(result.nets)         # [{"name": "VCC", "page": 1}, ...]
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import re

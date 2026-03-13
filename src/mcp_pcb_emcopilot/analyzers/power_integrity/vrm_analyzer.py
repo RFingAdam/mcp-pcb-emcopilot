@@ -8,6 +8,8 @@ Analyzes VRM placement and routing for power integrity:
 - Current carrying capability
 - Thermal considerations
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum

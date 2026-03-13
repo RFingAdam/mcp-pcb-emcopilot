@@ -8,6 +8,8 @@ Analyzes power and ground plane integrity:
 - Return path continuity
 - Copper coverage
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum

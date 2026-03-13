@@ -9,6 +9,8 @@ Validates:
 Decoupled from SQLAlchemy — operates on PCBDesignData.
 """
 
+from __future__ import annotations
+
 import logging
 import math
 import re
@@ -165,7 +167,7 @@ class RFIsolationAnalyzer:
                     break
         return filters
 
-    def _identify_ports(self, mux: RFMultiplexer, nets):
+    def _identify_ports(self, mux: RFMultiplexer, nets) -> None:
         for net in nets:
             net_name = net.name.upper()
             for port_type, patterns in self.PORT_PATTERNS.items():

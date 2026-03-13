@@ -1,4 +1,6 @@
 """Radiated emissions analyzer for EMC compliance"""
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 import math
@@ -117,9 +119,9 @@ class EmissionsAnalyzer:
             EmissionsResult with complete analysis
         """
         harmonics = []
-        worst_margin = 100
+        worst_margin: float = 100
         worst_freq = source.frequency_mhz
-        worst_emission = -100
+        worst_emission: float = -100
 
         # Calculate harmonic content based on signal shape
         harmonic_amplitudes = self._calculate_harmonic_amplitudes(
@@ -143,7 +145,7 @@ class EmissionsAnalyzer:
             )
 
             # Common mode emission (cable antenna)
-            cm_emission = -100  # dBuV/m
+            cm_emission: float = -100  # dBuV/m
             if source.cable_length_m > 0:
                 cm_emission = self._common_mode_emission(
                     source.cable_length_m,

@@ -7,6 +7,8 @@ Provides thermal risk analysis for PCB designs:
 - Copper heat spreading
 """
 
+from __future__ import annotations
+
 from .power_dissipation import PowerDissipationAnalyzer, PowerDissipationResult, ComponentPower
 from .thermal_via import ThermalViaAnalyzer, ThermalViaResult, ThermalViaIssue
 from .hotspot_detector import HotspotDetector, HotspotResult, Hotspot

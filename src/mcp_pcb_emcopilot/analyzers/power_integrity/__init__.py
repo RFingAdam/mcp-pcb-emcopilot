@@ -8,6 +8,8 @@ Provides comprehensive power distribution network (PDN) analysis including:
 - Power plane integrity checking
 """
 
+from __future__ import annotations
+
 from .pdn_analyzer import PDNAnalyzer, PDNResult, PDNImpedancePoint
 from .pdn_impedance import calculate_pdn_impedance
 from .decap_placement import DecapAnalyzer, DecapResult, DecapRecommendation

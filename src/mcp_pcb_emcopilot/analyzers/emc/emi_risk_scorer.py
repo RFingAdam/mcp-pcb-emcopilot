@@ -13,10 +13,12 @@ quantitative, actionable results.
 Operates on in-memory PCBDesignData from any parser.
 """
 
+from __future__ import annotations
+
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +210,7 @@ SENSITIVE_BANDS = [
 # Helper functions
 # =============================================================================
 
-def _get_limit_at_freq(frequency_mhz: float, limits: dict) -> float:
+def _get_limit_at_freq(frequency_mhz: float, limits: dict[Any, float]) -> float:
     """Interpolate emission limit at a given frequency.
 
     Limits dict has {frequency_boundary_mhz: limit_dbuv_m}.
@@ -410,7 +412,7 @@ class EMIRiskScorer:
                 rp_lookup[nr.net_name] = nr
 
         # Score each signal net
-        all_frequency_emissions = {}  # freq_mhz -> [(emission_dbuv, net_name)]
+        all_frequency_emissions: dict[float, list[tuple[float, str]]] = {}  # freq_mhz -> [(emission_dbuv, net_name)]
 
         for net in design_data.nets:
             category = net_categories.get(net.name, "unknown")
@@ -591,7 +593,7 @@ class EMIRiskScorer:
 
         # Factor 1: Emission margin (0-40 points)
         if margin < 0:
-            emission_score = 40  # Over limit
+            emission_score: float = 40  # Over limit
         elif margin < 6:
             emission_score = 30 + (6 - margin) * 10 / 6  # 30-40
         elif margin < 12:
@@ -610,7 +612,7 @@ class EMIRiskScorer:
 
         # Factor 2: Loop area (0-25 points)
         if loop_area_mm2 > 500:
-            area_score = 25
+            area_score: float = 25
         elif loop_area_mm2 > 100:
             area_score = 15 + (loop_area_mm2 - 100) * 10 / 400
         elif loop_area_mm2 > 25:
@@ -870,12 +872,12 @@ class EMIRiskScorer:
 
                 # Find nets in this region
                 contributing = []
-                total_risk = 0
+                total_risk: float = 0
 
                 for net_name, (nx_loc, ny_loc) in net_locations.items():
                     dist = _distance(cx, cy, nx_loc, ny_loc)
                     if dist <= radius:
-                        risk = risk_lookup.get(net_name)
+                        risk: NetEMIRisk | None = risk_lookup.get(net_name)  # type: ignore[no-redef]
                         if risk:
                             contributing.append(net_name)
                             total_risk += risk.risk_score
@@ -922,7 +924,7 @@ class EMIRiskScorer:
             return 1.0  # Minimal default
 
         # Calculate total trace length
-        total_length = sum(t.calc_length() for t in traces)
+        total_length: float = sum(t.calc_length() for t in traces)
 
         # Estimate layer-to-plane distance
         # For a 4-layer board, typical is 0.2mm; for 2-layer, ~0.8mm

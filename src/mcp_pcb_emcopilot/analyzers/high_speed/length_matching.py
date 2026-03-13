@@ -6,6 +6,8 @@ Provides length matching analysis for any signal group:
 - Inter-group skew calculation
 - Timing margin analysis
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional
 

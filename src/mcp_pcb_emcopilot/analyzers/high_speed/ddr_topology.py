@@ -8,6 +8,8 @@ address/command-to-clock skew, and fly-by topology.
 All calculations are pure Python -- no numpy dependency.
 """
 
+from __future__ import annotations
+
 import math
 import re
 from typing import Optional, Dict, List, Any
@@ -212,11 +214,11 @@ def validate_ddr_topology(
     ddr_signals: Dict[str, Dict] = {}  # net_name -> classification info
     for net in nets_list:
         if isinstance(net, dict):
-            name = net.get("name", net.get("net_name", ""))
-            cat = net.get("category", "")
+            name: str = net.get("name", net.get("net_name", "")) or ""
+            cat: str = net.get("category", "") or ""
         else:
-            name = getattr(net, "net_name", "")
-            cat = getattr(net, "category", "")
+            name = getattr(net, "net_name", "") or ""
+            cat = getattr(net, "category", "") or ""
 
         info = _classify_ddr_net(name)
         if info is not None:
@@ -313,7 +315,7 @@ def validate_ddr_topology(
             lane_info["intra_byte_pass"] = max_skew_ps <= limit
 
             if max_skew_ps > limit:
-                worst_net = max(dq_skews, key=dq_skews.get) if dq_skews else "?"
+                worst_net = max(dq_skews, key=lambda k: dq_skews[k]) if dq_skews else "?"
                 issues.append({
                     "severity": "critical" if max_skew_ps > limit * 2 else "high",
                     "type": "dq_dqs_skew",

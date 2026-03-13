@@ -1,5 +1,7 @@
 """EMC (Electromagnetic Compatibility) analysis modules"""
 
+from __future__ import annotations
+
 from .current_loop import CurrentLoopAnalyzer, LoopAnalysisResult
 from .shielding import ShieldingAnalyzer, ShieldingResult
 from .radiated_emissions import EmissionsAnalyzer, EmissionsResult

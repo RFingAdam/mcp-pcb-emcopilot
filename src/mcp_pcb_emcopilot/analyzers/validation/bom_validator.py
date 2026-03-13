@@ -9,6 +9,8 @@ Validates:
 Decoupled from SQLAlchemy — operates on PCBDesignData.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
@@ -87,7 +89,7 @@ class BOMValidator:
                 bom_map[ref] = item
 
         # Build layout ref counts
-        layout_ref_counts = {}
+        layout_ref_counts: dict[str, int] = {}
         for comp in layout_components:
             layout_ref_counts[comp.reference] = layout_ref_counts.get(comp.reference, 0) + 1
 

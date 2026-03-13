@@ -8,6 +8,8 @@ Analyzes the PDN impedance profile and identifies potential issues:
 - Anti-resonance identification
 - Decoupling effectiveness evaluation
 """
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -436,7 +438,7 @@ class PDNAnalyzer:
 
         # Check for anti-resonance peaks
         for freq in anti_resonance_freqs:
-            point = next((p for p in profile if abs(p.frequency_hz - freq) < freq * 0.1), None)
+            point = next((p for p in profile if abs(p.frequency_hz - freq) < freq * 0.1), None)  # type: ignore[assignment]
             if point and point.impedance_ohm > z_target * 0.8:
                 issues.append(PDNIssue(
                     issue_type=PDNIssueType.ANTI_RESONANCE,
