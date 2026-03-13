@@ -15,6 +15,7 @@ from .pdn_impedance import calculate_pdn_impedance
 from .decap_placement import DecapAnalyzer, DecapResult, DecapRecommendation
 from .vrm_analyzer import VRMAnalyzer, VRMResult, VRMIssue
 from .power_plane_analyzer import PowerPlaneAnalyzer, PowerPlaneResult, PlaneIssue
+from .cavity_resonance import analyze_cavity_resonance
 
 __all__ = [
     # PDN Analysis
@@ -35,4 +36,6 @@ __all__ = [
     "PowerPlaneAnalyzer",
     "PowerPlaneResult",
     "PlaneIssue",
+    # Cavity Resonance
+    "analyze_cavity_resonance",
 ]
