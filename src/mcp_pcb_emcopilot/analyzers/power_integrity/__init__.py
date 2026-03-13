@@ -10,12 +10,12 @@ Provides comprehensive power distribution network (PDN) analysis including:
 
 from __future__ import annotations
 
-from .pdn_analyzer import PDNAnalyzer, PDNResult, PDNImpedancePoint
-from .pdn_impedance import calculate_pdn_impedance
-from .decap_placement import DecapAnalyzer, DecapResult, DecapRecommendation
-from .vrm_analyzer import VRMAnalyzer, VRMResult, VRMIssue
-from .power_plane_analyzer import PowerPlaneAnalyzer, PowerPlaneResult, PlaneIssue
 from .cavity_resonance import analyze_cavity_resonance
+from .decap_placement import DecapAnalyzer, DecapRecommendation, DecapResult
+from .pdn_analyzer import PDNAnalyzer, PDNImpedancePoint, PDNResult
+from .pdn_impedance import calculate_pdn_impedance
+from .power_plane_analyzer import PlaneIssue, PowerPlaneAnalyzer, PowerPlaneResult
+from .vrm_analyzer import VRMAnalyzer, VRMIssue, VRMResult
 
 __all__ = [
     # PDN Analysis

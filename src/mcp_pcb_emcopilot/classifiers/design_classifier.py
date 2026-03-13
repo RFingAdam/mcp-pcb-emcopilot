@@ -9,9 +9,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..models.pcb_data import PCBDesignData
-from .net_classifier import NetClassifier, NetClassificationResult
-from .interface_detector import InterfaceDetector, InterfaceDetectionResult
-
+from .interface_detector import InterfaceDetectionResult, InterfaceDetector
+from .net_classifier import NetClassificationResult, NetClassifier
 
 # =============================================================================
 # Data structures

@@ -1220,6 +1220,67 @@ async def list_tools() -> list[Tool]:
         }, ["sources"]),
 
         # =====================================================================
+        # RETURN PATH VISUALIZATION (1 tool)
+        # =====================================================================
+        _make_tool("pcb_visualize_return_path", "Visualize return current path discontinuities. Calculates skin-depth-based current density at plane splits, via transition current spreading, loop area increase, and slot crossing impedance.", {
+            "discontinuities": {"type": "array", "items": {"type": "object", "properties": {
+                "type": {"type": "string", "description": "Discontinuity type: split_crossing, via_transition, layer_change, slot_crossing"},
+                "frequency_hz": {"type": "number", "description": "Signal frequency in Hz"},
+                "gap_width_mm": {"type": "number", "description": "Split/slot gap width in mm"},
+                "trace_width_mm": {"type": "number", "description": "Signal trace width in mm"},
+                "dielectric_height_mm": {"type": "number", "description": "Dielectric height between signal and return plane (mm)"},
+                "copper_thickness_mm": {"type": "number", "description": "Copper thickness in mm (default 0.035)"},
+            }}, "description": "List of return path discontinuities to analyze"},
+        }, ["discontinuities"]),
+
+        # =====================================================================
+        # IBIS-DRIVEN EYE DIAGRAM (1 tool)
+        # =====================================================================
+        _make_tool("pcb_calc_ibis_eye", "Generate IBIS-driven eye diagram from parsed IBIS model data (V-T curves, I-V curves) convolved with channel S-parameter loss. More accurate than purely analytical eye diagrams.", {
+            "ibis_model": {"type": "object", "properties": {
+                "buffer_type": {"type": "string", "description": "Buffer type: lpddr4, usb2, generic_cmos"},
+                "voh": {"type": "number", "description": "Output high voltage (V)"},
+                "vol": {"type": "number", "description": "Output low voltage (V)"},
+                "rise_time_ps": {"type": "number", "description": "20-80% rise time (ps)"},
+                "fall_time_ps": {"type": "number", "description": "20-80% fall time (ps)"},
+                "z_driver_ohm": {"type": "number", "description": "Driver output impedance (ohm)"},
+            }, "description": "IBIS model parameters"},
+            "data_rate_gbps": {"type": "number", "description": "Data rate in Gbps"},
+            "channel_loss_db": {"type": "number", "description": "Total channel insertion loss at Nyquist (dB)"},
+            "trace_length_mm": {"type": "number", "description": "Trace length in mm"},
+        }, ["ibis_model", "data_rate_gbps"]),
+
+        # =====================================================================
+        # STACKUP OPTIMIZATION (1 tool)
+        # =====================================================================
+        _make_tool("pcb_optimize_stackup", "Analyze current stackup and generate alternative proposals with impedance/loss/resonance comparisons and cost scoring.", {
+            "current_stackup": {"type": "object", "properties": {
+                "layer_count": {"type": "integer", "description": "Current number of layers"},
+                "total_thickness_mm": {"type": "number", "description": "Total board thickness (mm)"},
+                "dielectric_constant": {"type": "number", "description": "Dielectric constant (e.g. 4.2 for FR-4)"},
+                "target_impedance_ohm": {"type": "number", "description": "Target impedance (ohm)"},
+            }, "description": "Current stackup parameters"},
+            "design_requirements": {"type": "object", "properties": {
+                "max_layers": {"type": "integer", "description": "Maximum layer count budget"},
+                "interfaces": {"type": "array", "items": {"type": "string"}, "description": "List of high-speed interfaces (ddr4, usb3, pcie_gen3, ethernet)"},
+                "cost_priority": {"type": "string", "description": "Cost priority: low, medium, high"},
+            }, "description": "Design requirements and constraints"},
+        }, ["current_stackup"]),
+
+        # =====================================================================
+        # PRE-COMPLIANCE TEST PLAN (1 tool)
+        # =====================================================================
+        _make_tool("pcb_generate_test_plan", "Auto-generate a prioritized pre-compliance test plan from design review risk findings. Lists tests by priority, setup instructions, expected failure frequencies, equipment, and duration estimates.", {
+            "findings": {"type": "array", "items": {"type": "object", "properties": {
+                "severity": {"type": "string", "description": "Risk severity: critical, high, medium, low"},
+                "category": {"type": "string", "description": "Risk category: radiated_emissions, conducted_emissions, immunity, esd, power_integrity"},
+                "frequency_mhz": {"type": "number", "description": "Relevant frequency in MHz"},
+                "description": {"type": "string", "description": "Risk description"},
+                "standard": {"type": "string", "description": "Applicable standard (e.g. FCC Part 15, CISPR 25)"},
+            }}, "description": "List of risk findings from design review"},
+        }, ["findings"]),
+
+        # =====================================================================
         # SESSION MANAGEMENT (2 tools)
         # =====================================================================
         _make_tool("pcb_list_sessions", "List all active design sessions.", {}, None),
@@ -2561,6 +2622,83 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         nf_analyzer = NearFieldAnalyzer()
         nf_result = nf_analyzer.analyze_sources(args["sources"])
         return nf_analyzer.to_dict(nf_result)
+
+    # === RETURN PATH VISUALIZATION ===
+    if name == "pcb_visualize_return_path":
+        from .analyzers.signal_integrity.return_path_viz import ReturnPathVisualizer
+        rpv = ReturnPathVisualizer()
+        loop_items = []
+        for disc in args["discontinuities"]:
+            dtype = disc.get("type", "split_crossing")
+            gap = disc.get("gap_width_mm", 0.5)
+            tw = disc.get("trace_width_mm", 0.15)
+            dh = disc.get("dielectric_height_mm", 0.1)
+            if dtype in ("split_crossing", "layer_change"):
+                la = rpv.loop_area_plane_split(tw, gap, dh)
+            elif dtype == "via_transition":
+                la = rpv.loop_area_via_transition(dh, gap)
+            elif dtype == "slot_crossing":
+                la = rpv.loop_area_slot_crossing(tw, gap, dh)
+            else:
+                la = rpv.loop_area_plane_split(tw, gap, dh)
+            loop_items.append(la)
+        disc_summary = rpv.summarize_discontinuities(loop_items)
+        from dataclasses import asdict
+        return asdict(disc_summary)
+
+    # === IBIS-DRIVEN EYE DIAGRAM ===
+    if name == "pcb_calc_ibis_eye":
+        from .analyzers.signal_integrity.ibis_eye import IBISEyeGenerator
+        ibis_gen = IBISEyeGenerator()
+        ibis_params = args["ibis_model"]
+        buffer_type = ibis_params.get("buffer_type", "generic_cmos")
+        # Build an IBIS model from the specified buffer type
+        if buffer_type == "lpddr4":
+            ibis_mdl = ibis_gen.create_lpddr4_model()
+        elif buffer_type in ("usb2", "usb_2.0"):
+            ibis_mdl = ibis_gen.create_usb2_model()
+        else:
+            ibis_mdl = ibis_gen.create_generic_cmos_model(
+                v_supply=ibis_params.get("voh", 3.3),
+                rise_time_ps=ibis_params.get("rise_time_ps", 500.0),
+                ron=ibis_params.get("z_driver_ohm", 50.0),
+            )
+        eye_result = ibis_gen.generate_eye(
+            ibis_model=ibis_mdl,
+            data_rate_gbps=args["data_rate_gbps"],
+            channel_loss_db=args.get("channel_loss_db", 3.0),
+            protocol=buffer_type,
+        )
+        return eye_result.to_dict()
+
+    # === STACKUP OPTIMIZATION ===
+    if name == "pcb_optimize_stackup":
+        from .analyzers.stackup_optimizer import StackupOptimizer
+        so = StackupOptimizer()
+        stackup = args["current_stackup"]
+        so_result = so.optimize(
+            target_layer_count=stackup.get("layer_count", 4),
+            target_impedance_ohm=stackup.get("target_impedance_ohm", 50.0),
+        )
+        from dataclasses import asdict
+        return asdict(so_result)
+
+    # === PRE-COMPLIANCE TEST PLAN ===
+    if name == "pcb_generate_test_plan":
+        from .reports.test_plan import RiskFinding, TestPlanGenerator
+        tpg = TestPlanGenerator()
+        risk_findings = []
+        for f in args["findings"]:
+            freq = f.get("frequency_mhz", 100.0)
+            risk_findings.append(RiskFinding(
+                severity=f.get("severity", "medium"),
+                category=f.get("category", "radiated_emissions"),
+                frequency_range_mhz=(freq * 0.9, freq * 1.1),
+                description=f.get("description", ""),
+            ))
+        plan = tpg.generate(risk_findings)
+        from dataclasses import asdict
+        return asdict(plan)
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":

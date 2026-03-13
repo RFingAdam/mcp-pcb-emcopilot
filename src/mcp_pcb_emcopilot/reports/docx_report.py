@@ -43,7 +43,7 @@ class ReportSection:
     findings: list[ReportFinding] = field(default_factory=list)
     tables: list[dict] = field(default_factory=list)
     images: list[ReportImage] = field(default_factory=list)
-    subsections: list["ReportSection"] = field(default_factory=list)
+    subsections: list[ReportSection] = field(default_factory=list)
 
 
 def _check_docx():
@@ -64,17 +64,17 @@ def _check_docx():
 
 def _set_cell_shading(cell, color_hex: str):
     """Set table cell background colour."""
-    from docx.oxml.ns import nsdecls
     from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
     shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')
     cell._tc.get_or_add_tcPr().append(shading)
 
 
 def _add_styled_table(doc, headers, rows, col_widths=None, header_color="1F4E79"):
     """Add a professionally styled table to the document."""
-    from docx.shared import Inches, Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Inches, Pt, RGBColor
 
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -114,7 +114,7 @@ def _add_styled_table(doc, headers, rows, col_widths=None, header_color="1F4E79"
 
 def _add_finding_box(doc, severity, title, detail, recommendation=""):
     """Add a colour-coded finding box."""
-    from docx.shared import Pt, Inches, RGBColor
+    from docx.shared import Inches, Pt, RGBColor
 
     colors = {
         "CRITICAL": ("C00000", "FBE5D6"),
@@ -157,8 +157,8 @@ def _add_finding_box(doc, severity, title, detail, recommendation=""):
 
 def _add_image_with_caption(doc, path, caption, width_inches=6.0):
     """Add an image with a centred caption."""
-    from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Inches, Pt, RGBColor
 
     if not os.path.exists(path):
         p = doc.add_paragraph(f"[Image not available: {path}]")
@@ -199,10 +199,10 @@ def generate_all_renders(
     Returns:
         Dict mapping render label to output PNG path.
     """
-    from ..visualization.board_renderer import BoardRenderer
-    from ..visualization.stackup_renderer import StackupRenderer
     from ..visualization.annotator import Annotator
+    from ..visualization.board_renderer import BoardRenderer
     from ..visualization.exporter import svg_to_png
+    from ..visualization.stackup_renderer import StackupRenderer
 
     os.makedirs(output_dir, exist_ok=True)
     results: dict[str, str] = {}
@@ -378,9 +378,9 @@ def generate_docx_report(
     """
     _check_docx()
     from docx import Document
-    from docx.shared import Inches, Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Inches, Pt, RGBColor
 
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".docx", prefix="pcb_review_")

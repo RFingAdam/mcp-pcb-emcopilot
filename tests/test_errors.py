@@ -1,10 +1,20 @@
 """Tests for structured error types and validation helpers."""
 import math
+
 import pytest
+
 from mcp_pcb_emcopilot.errors import (
-    PCBError, ParseError, ValidationError, AnalysisError, SessionError,
-    error_response, validate_positive, validate_non_negative,
-    validate_range, validate_session, validate_string,
+    AnalysisError,
+    ParseError,
+    PCBError,
+    SessionError,
+    ValidationError,
+    error_response,
+    validate_non_negative,
+    validate_positive,
+    validate_range,
+    validate_session,
+    validate_string,
 )
 
 

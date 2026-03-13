@@ -6,14 +6,20 @@ through their dispatch handlers.
 
 import json
 import math
-import sys
 import os
+import sys
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mcp_pcb_emcopilot.models.pcb_data import (
-    PCBDesignData, PCBLayer, PCBNet, PCBTrace, PCBVia, PCBZone, PCBComponent,
+    PCBComponent,
+    PCBDesignData,
+    PCBLayer,
+    PCBNet,
+    PCBTrace,
+    PCBVia,
+    PCBZone,
 )
 
 
@@ -193,7 +199,7 @@ def test_return_path_analyzer_full():
           f"{result.nets_with_issues} with issues, "
           f"{len(result.split_crossings)} split crossings, "
           f"{len(result.via_transition_issues)} via issues")
-    print(f"  Worst loop areas:")
+    print("  Worst loop areas:")
     for wla in result.worst_loop_areas[:5]:
         print(f"    {wla['net_name']}: {wla['loop_area_mm2']:.1f}mm2 ({wla['quality']})")
     print("  PASS: Full return path analysis works correctly")
@@ -239,12 +245,12 @@ def test_emi_risk_scorer():
     assert result.executive_summary != ""
 
     print(f"  Overall risk: {result.overall_risk_level} (score: {result.overall_risk_score})")
-    print(f"  Top risk nets:")
+    print("  Top risk nets:")
     for nr in result.net_risks[:5]:
         print(f"    {nr.net_name} ({nr.net_category}): score={nr.risk_score}, "
               f"level={nr.risk_level}, emission={nr.predicted_emission_dbuv_m:.1f}dBuV/m")
 
-    print(f"  Frequency risks (worst 5):")
+    print("  Frequency risks (worst 5):")
     for fr in result.frequency_risks[:5]:
         print(f"    {fr.frequency_mhz:.0f}MHz: {fr.predicted_level_dbuv_m:.1f}dBuV/m, "
               f"limit={fr.limit_dbuv_m:.1f}, margin={fr.margin_db:.1f}dB ({fr.risk_level})")
@@ -313,8 +319,8 @@ def test_emi_hotspots():
 
 def test_dispatch_all_tools():
     """Test all 6 new tools through the dispatch system."""
-    from mcp_pcb_emcopilot.session import DesignSessionManager
     from mcp_pcb_emcopilot.server import _dispatch, sessions
+    from mcp_pcb_emcopilot.session import DesignSessionManager
 
     design = make_mock_design()
     sid = sessions.create_session(design)
@@ -366,6 +372,7 @@ def test_dispatch_all_tools():
 def test_tool_registration():
     """Verify all 6 new tools appear in the tool list."""
     import asyncio
+
     from mcp_pcb_emcopilot.server import list_tools
 
     tools = asyncio.run(list_tools())
@@ -388,8 +395,8 @@ def test_tool_registration():
 
 def test_edge_cases():
     """Test edge cases: empty design, missing nets, etc."""
-    from mcp_pcb_emcopilot.analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
     from mcp_pcb_emcopilot.analyzers.emc.emi_risk_scorer import EMIRiskScorer
+    from mcp_pcb_emcopilot.analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
 
     analyzer = ReturnPathAnalyzer()
     scorer = EMIRiskScorer()

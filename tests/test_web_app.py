@@ -1,8 +1,9 @@
 """Tests for the web UI dashboard."""
 from __future__ import annotations
 
-import os
 import json
+import os
+
 import pytest
 
 # Flask may not be installed

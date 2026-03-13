@@ -233,7 +233,7 @@ def calculate_clock_emi(
 
     notes = []
     notes.append(f"Knee frequency: {f_knee_mhz:.0f} MHz (1/(pi*{rise_time_ns} ns))")
-    notes.append(f"Harmonics above knee frequency roll off at -40 dB/decade")
+    notes.append("Harmonics above knee frequency roll off at -40 dB/decade")
     if ssc_enabled:
         notes.append(f"SSC enabled: {ssc_deviation_percent}% deviation — reduces peak emissions")
     if rise_time_ns < 0.5:

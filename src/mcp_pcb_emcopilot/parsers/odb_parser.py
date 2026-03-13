@@ -1,34 +1,34 @@
 """ODB++ archive parser for complete PCB data extraction"""
 from __future__ import annotations
 
-import tarfile
 import gzip
+import math
 import os
 import re
-import math
-from pathlib import Path
-from typing import Any, Optional, List, Dict, Tuple, BinaryIO
-import tempfile
 import shutil
+import tarfile
+import tempfile
+from pathlib import Path
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
 from .odb_models import (
-    ODBData,
-    ODBLayer,
-    ODBComponent,
-    ODBPin,
-    ODBNet,
-    ODBVia,
-    ODBTrace,
-    ODBCopperPour,
-    ODBDrill,
-    ODBBoardOutline,
-    ODBPad,
-    ODBDesignRule,
-    ODBPadStack,
     LayerType,
+    ODBBoardOutline,
+    ODBComponent,
+    ODBCopperPour,
+    ODBData,
+    ODBDesignRule,
+    ODBDrill,
+    ODBLayer,
+    ODBNet,
+    ODBPad,
+    ODBPadStack,
+    ODBPin,
+    ODBTrace,
+    ODBVia,
+    PadShape,
     Polarity,
     ViaType,
-    PadShape,
 )
 
 
@@ -249,7 +249,7 @@ class ODBParser:
                     if current_layer:
                         data.layers.append(self._create_layer(current_layer))
                         current_layer = None
-                
+
                 elif line.startswith('UNITS') or (current_layer is None and 'UNITS' in line):
                      # Global units often at top of matrix or step
                      parts = line.split('=') if '=' in line else line.split()
@@ -300,7 +300,7 @@ class ODBParser:
                     val_str = ''.join(c for c in layer_dict[key] if c.isdigit() or c == '.' or c == '-')
                     if not val_str: continue
                     val = float(val_str)
-                    
+
                     # Convert to mm
                     if self._units == 'mil':
                         thickness = val * self.MIL_TO_MM
@@ -315,7 +315,7 @@ class ODBParser:
         # Parse dielectric properties
         dk = None
         df = None
-        
+
         # Dielectric constant keys
         for key in ['diel_const', 'epsilon', 'er', 'dielectric_constant']:
             if key in layer_dict:
@@ -331,7 +331,7 @@ class ODBParser:
                     df = float(layer_dict[key])
                     break
                 except ValueError: pass
-        
+
         # If material name is present
         material = layer_dict.get('material', layer_dict.get('mat_name'))
 
@@ -1344,10 +1344,10 @@ class ODBParser:
                 return f.read()
         else:
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, encoding='utf-8', errors='ignore') as f:
                     return f.read()
             except UnicodeDecodeError:
-                with open(file_path, 'r', encoding='latin-1') as f:
+                with open(file_path, encoding='latin-1') as f:
                     return f.read()
 
     def _detect_file_units(self, content: str) -> None:

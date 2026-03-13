@@ -16,7 +16,6 @@ import cmath
 import math
 from typing import Optional
 
-
 # Vacuum permittivity (F/m)
 _EPS0 = 8.854187817e-12
 

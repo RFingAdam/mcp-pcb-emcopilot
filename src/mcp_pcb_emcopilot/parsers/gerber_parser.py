@@ -10,14 +10,14 @@ Supports full RS-274X specification including:
 """
 from __future__ import annotations
 
-import re
-import math
 import logging
-from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any, Union
+import math
+import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
-from copy import deepcopy
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -394,7 +394,7 @@ class GerberParser:
 
         # Read and parse content
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(file_path, encoding='utf-8', errors='ignore') as f:
                 content = f.read()
 
             self._parse_content(content, data)

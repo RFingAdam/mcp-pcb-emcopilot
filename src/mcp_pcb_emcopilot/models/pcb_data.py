@@ -5,7 +5,7 @@ that hold parsed design data from any format (KiCad, ODB++, Gerber, Altium, IPC-
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any, Optional
 
 
 @dataclass

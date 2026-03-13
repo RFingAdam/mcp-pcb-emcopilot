@@ -96,7 +96,7 @@ class EquipmentRecommendation:
 
 
 @dataclass
-class TestEntry:
+class ComplianceTestEntry:
     """A single test in the test plan.
 
     Parameters
@@ -145,12 +145,12 @@ class TestEntry:
 
 
 @dataclass
-class TestPlan:
+class ComplianceTestPlan:
     """A complete pre-compliance test plan.
 
     Parameters
     ----------
-    entries : list[TestEntry]
+    entries : list[ComplianceTestEntry]
         Ordered list of test entries (CRITICAL first).
     total_estimated_duration_minutes : int
         Sum of all test durations.
@@ -160,7 +160,7 @@ class TestPlan:
         Executive summary of the test plan.
     """
 
-    entries: list[TestEntry] = field(default_factory=list)
+    entries: list[ComplianceTestEntry] = field(default_factory=list)
     total_estimated_duration_minutes: int = 0
     standards_covered: list[str] = field(default_factory=list)
     summary: str = ""
@@ -563,7 +563,7 @@ class TestPlanGenerator:
             print(entry.test_id, entry.standard, entry.priority)
     """
 
-    def generate(self, findings: list[RiskFinding]) -> TestPlan:
+    def generate(self, findings: list[RiskFinding]) -> ComplianceTestPlan:
         """Generate a complete test plan from risk findings.
 
         Parameters
@@ -573,19 +573,19 @@ class TestPlanGenerator:
 
         Returns
         -------
-        TestPlan
+        ComplianceTestPlan
             Prioritized test plan with setup instructions, equipment
             recommendations, and duration estimates.
         """
         if not findings:
-            return TestPlan(
+            return ComplianceTestPlan(
                 entries=[],
                 total_estimated_duration_minutes=0,
                 standards_covered=[],
                 summary="No risk findings provided. No tests required.",
             )
 
-        entries: list[TestEntry] = []
+        entries: list[ComplianceTestEntry] = []
         test_counter = 0
         standards_seen: set[str] = set()
 
@@ -614,7 +614,7 @@ class TestPlanGenerator:
                         # No overlap -- use the standard's full range
                         merged_low, merged_high = std_freq
 
-                    entry = TestEntry(
+                    entry = ComplianceTestEntry(
                         test_id=test_id,
                         standard=standard,
                         test_name=profile.get("test_name", f"{test_type} test"),
@@ -657,17 +657,17 @@ class TestPlanGenerator:
             f"({total_duration / 60:.1f} hours)."
         )
 
-        return TestPlan(
+        return ComplianceTestPlan(
             entries=entries,
             total_estimated_duration_minutes=total_duration,
             standards_covered=standards_list,
             summary=" ".join(summary_parts),
         )
 
-    def get_pre_compliance_matrix(self, plan: TestPlan) -> list[TestEntry]:
+    def get_pre_compliance_matrix(self, plan: ComplianceTestPlan) -> list[ComplianceTestEntry]:
         """Return only tests suitable for pre-compliance testing."""
         return [e for e in plan.entries if e.is_pre_compliance]
 
-    def get_full_compliance_matrix(self, plan: TestPlan) -> list[TestEntry]:
+    def get_full_compliance_matrix(self, plan: ComplianceTestPlan) -> list[ComplianceTestEntry]:
         """Return only tests required for full compliance testing."""
         return [e for e in plan.entries if e.is_full_compliance]

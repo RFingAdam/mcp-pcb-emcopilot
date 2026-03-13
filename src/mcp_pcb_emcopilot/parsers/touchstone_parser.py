@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-
 # Frequency unit multipliers
 _FREQ_UNITS: dict[str, float] = {
     "hz": 1.0,

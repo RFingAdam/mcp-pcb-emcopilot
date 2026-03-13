@@ -9,10 +9,10 @@ Provides thermal risk analysis for PCB designs:
 
 from __future__ import annotations
 
-from .power_dissipation import PowerDissipationAnalyzer, PowerDissipationResult, ComponentPower
-from .thermal_via import ThermalViaAnalyzer, ThermalViaResult, ThermalViaIssue
-from .hotspot_detector import HotspotDetector, HotspotResult, Hotspot
 from .copper_spreading import CopperSpreadingAnalyzer, CopperSpreadingResult
+from .hotspot_detector import Hotspot, HotspotDetector, HotspotResult
+from .power_dissipation import ComponentPower, PowerDissipationAnalyzer, PowerDissipationResult
+from .thermal_via import ThermalViaAnalyzer, ThermalViaIssue, ThermalViaResult
 
 __all__ = [
     # Power Dissipation

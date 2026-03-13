@@ -1,9 +1,9 @@
 """Grounding analyzer for EMC assessment"""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Tuple, Set
 import math
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass

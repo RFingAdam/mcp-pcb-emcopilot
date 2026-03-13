@@ -1,8 +1,9 @@
 """Tests for design revision comparison module."""
 from __future__ import annotations
 
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from mcp_pcb_emcopilot.analyzers.comparison import (
     ComponentChange,

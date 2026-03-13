@@ -1,8 +1,8 @@
 """PCB design classifiers — net classification, interface detection, and design type analysis."""
 
-from .net_classifier import NetClassifier, NetClassificationResult, NetClassification, DifferentialPair
-from .interface_detector import InterfaceDetector, InterfaceDetectionResult, DetectedInterface
-from .design_classifier import DesignClassifier, DesignClassificationResult
+from .design_classifier import DesignClassificationResult, DesignClassifier
+from .interface_detector import DetectedInterface, InterfaceDetectionResult, InterfaceDetector
+from .net_classifier import DifferentialPair, NetClassification, NetClassificationResult, NetClassifier
 
 __all__ = [
     "NetClassifier",

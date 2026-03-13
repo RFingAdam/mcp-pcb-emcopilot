@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any, Optional
 
 from .automotive_emc import CISPR25_CONDUCTED_LIMITS
-
 
 # =============================================================================
 # FCC Part 15 Subpart B conducted emission limits (dBµV, voltage method)

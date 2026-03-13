@@ -1,10 +1,10 @@
 """Assembly check analyzer for DFM"""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Tuple
-from enum import Enum
 import math
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class ManufacturingCapability(Enum):
@@ -218,22 +218,22 @@ class AssemblyAnalyzer:
             self.profile = MANUFACTURING_PROFILES[capability]
 
     @classmethod
-    def for_standard_smt(cls) -> "AssemblyAnalyzer":
+    def for_standard_smt(cls) -> AssemblyAnalyzer:
         """Create analyzer for standard SMT assembly."""
         return cls(capability=ManufacturingCapability.STANDARD)
 
     @classmethod
-    def for_fine_pitch(cls) -> "AssemblyAnalyzer":
+    def for_fine_pitch(cls) -> AssemblyAnalyzer:
         """Create analyzer for fine-pitch assembly."""
         return cls(capability=ManufacturingCapability.FINE_PITCH)
 
     @classmethod
-    def for_hdi(cls) -> "AssemblyAnalyzer":
+    def for_hdi(cls) -> AssemblyAnalyzer:
         """Create analyzer for HDI assembly."""
         return cls(capability=ManufacturingCapability.HDI)
 
     @classmethod
-    def for_advanced(cls) -> "AssemblyAnalyzer":
+    def for_advanced(cls) -> AssemblyAnalyzer:
         """Create analyzer for advanced/state-of-the-art assembly."""
         return cls(capability=ManufacturingCapability.ADVANCED)
 

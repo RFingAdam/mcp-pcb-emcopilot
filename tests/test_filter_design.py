@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 import math
+
 import pytest
 
 from mcp_pcb_emcopilot.analyzers.emc.filter_design import (
     FilterDesigner,
+    FilterDesignResult,
     FilterSpec,
     InsertionLossResult,
-    FilterDesignResult,
-    _pi_filter_transfer,
-    _lc_lowpass_transfer,
     _cmc_impedance,
     _ferrite_bead_impedance,
+    _lc_lowpass_transfer,
+    _pi_filter_transfer,
 )
 
 

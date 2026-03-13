@@ -12,11 +12,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from .classifiers.design_classifier import DesignClassificationResult, DesignClassifier
+from .classifiers.interface_detector import InterfaceDetectionResult, InterfaceDetector
+from .classifiers.net_classifier import NetClassificationResult, NetClassifier
 from .models.pcb_data import PCBDesignData
-from .classifiers.net_classifier import NetClassifier, NetClassificationResult
-from .classifiers.interface_detector import InterfaceDetector, InterfaceDetectionResult
-from .classifiers.design_classifier import DesignClassifier, DesignClassificationResult
-
 
 # =============================================================================
 # Data structures
@@ -508,7 +507,7 @@ def _run_thermal_analysis(
 
 def _run_dfm_placement_analysis(design: PCBDesignData) -> DomainResult:
     """Run DFM placement analysis."""
-    from .analyzers.dfm.component_placement import PlacementAnalyzer, Component
+    from .analyzers.dfm.component_placement import Component, PlacementAnalyzer
 
     result = DomainResult(domain="dfm", analyzer_name="PlacementAnalyzer")
     try:

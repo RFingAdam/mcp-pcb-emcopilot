@@ -6,8 +6,8 @@ Sessions persist for the lifetime of the MCP server process.
 
 from __future__ import annotations
 
-import uuid
 import time
+import uuid
 
 from .models.pcb_data import PCBDesignData
 

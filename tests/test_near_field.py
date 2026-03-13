@@ -15,32 +15,31 @@ from __future__ import annotations
 
 import asyncio
 import math
-import sys
 import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mcp_pcb_emcopilot.analyzers.emc.near_field import (
+    _C,
+    ELECTRIC_SOURCE_TYPES,
+    MAGNETIC_SOURCE_TYPES,
+    FieldPoint,
+    NearFieldAnalysis,
     NearFieldAnalyzer,
     NearFieldSource,
-    NearFieldAnalysis,
     SourceResult,
-    FieldPoint,
     classify_source,
-    wavelength,
-    transition_distance,
-    h_field_magnetic_dipole,
-    e_field_electric_dipole,
-    to_db_h,
-    to_db_e,
     determine_region,
-    MAGNETIC_SOURCE_TYPES,
-    ELECTRIC_SOURCE_TYPES,
-    _C,
+    e_field_electric_dipole,
+    h_field_magnetic_dipole,
+    to_db_e,
+    to_db_h,
+    transition_distance,
+    wavelength,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

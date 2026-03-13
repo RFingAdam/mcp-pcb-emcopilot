@@ -99,7 +99,7 @@ class BOMParser:
     def _parse_csv(self, file_path: str) -> ParsedBOMData:
         """Parse CSV BOM file with automatic delimiter detection."""
         # Detect delimiter
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             sample = f.read(4096)
             sniffer = csv.Sniffer()
             try:
@@ -109,7 +109,7 @@ class BOMParser:
                 delimiter = ','  # Default to comma
 
         # Parse CSV
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             reader = csv.DictReader(f, delimiter=delimiter)
 
             # Map column names to standardized keys

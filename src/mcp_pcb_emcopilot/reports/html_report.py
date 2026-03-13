@@ -24,7 +24,6 @@ from typing import Any, Optional
 
 from ..models.pcb_data import PCBDesignData
 
-
 # ---------------------------------------------------------------------------
 # Standalone dataclasses (class-based API)
 # ---------------------------------------------------------------------------
@@ -569,7 +568,7 @@ def _embed_image(path: str, caption: str = "") -> str:
 # Standalone class-based report generation
 # ---------------------------------------------------------------------------
 
-def _generate_html_from_data(data: "HTMLReportData") -> str:
+def _generate_html_from_data(data: HTMLReportData) -> str:
     """Build a self-contained HTML string from *HTMLReportData*.
 
     This is the class-based API counterpart to :func:`generate_html_report`.

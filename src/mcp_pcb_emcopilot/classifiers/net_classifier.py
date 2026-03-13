@@ -9,8 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ..models.pcb_data import PCBDesignData, PCBNet, PCBComponent
-
+from ..models.pcb_data import PCBComponent, PCBDesignData, PCBNet
 
 # =============================================================================
 # Data structures

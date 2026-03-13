@@ -12,14 +12,14 @@ Covers Issue #26:
 from __future__ import annotations
 
 import math
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mcp_pcb_emcopilot.analyzers.power_integrity.cavity_resonance import (
-    analyze_cavity_resonance,
     _format_cap,
+    analyze_cavity_resonance,
 )
 
 # Speed of light for reference calculations
@@ -440,6 +440,7 @@ def test_dispatch_cavity_resonance():
 def test_tool_registration():
     """Verify pcb_analyze_cavity_resonance appears in tool list."""
     import asyncio
+
     from mcp_pcb_emcopilot.server import list_tools
 
     tools = asyncio.run(list_tools())

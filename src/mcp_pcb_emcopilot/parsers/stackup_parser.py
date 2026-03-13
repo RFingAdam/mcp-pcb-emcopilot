@@ -1,10 +1,10 @@
 """Stackup parser for extracting and computing layer stackup properties"""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
-from enum import Enum
 import math
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class MaterialType(Enum):

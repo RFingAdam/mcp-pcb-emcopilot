@@ -5,14 +5,14 @@ import math
 
 import pytest
 
+from mcp_pcb_emcopilot.analyzers.emc.automotive_emc import CISPR25_CONDUCTED_LIMITS
 from mcp_pcb_emcopilot.analyzers.emc.conducted_emissions import (
-    ConductedEmissionAnalyzer,
+    FCC_PART15_CONDUCTED_LIMITS,
     ConductedEmissionAnalysis,
+    ConductedEmissionAnalyzer,
     ConductedEmissionFinding,
     LISNModel,
-    FCC_PART15_CONDUCTED_LIMITS,
 )
-from mcp_pcb_emcopilot.analyzers.emc.automotive_emc import CISPR25_CONDUCTED_LIMITS
 
 
 @pytest.fixture

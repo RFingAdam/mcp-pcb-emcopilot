@@ -9,16 +9,16 @@ Validates against known physics:
 """
 
 import math
+
 import pytest
 
+from mcp_pcb_emcopilot.analyzers.rf_si.mode_conversion import (
+    analyze_mode_conversion,
+)
 from mcp_pcb_emcopilot.analyzers.rf_si.sparam_extractor import (
     calculate_insertion_loss,
     calculate_return_loss,
 )
-from mcp_pcb_emcopilot.analyzers.rf_si.mode_conversion import (
-    analyze_mode_conversion,
-)
-
 
 # ============================================================================
 # S-Parameter Extractor Tests (Issue #8)

@@ -1,7 +1,7 @@
 """Tests for the Gerber RS-274X parser using synthetic fixture files."""
 import pytest
 
-from mcp_pcb_emcopilot.parsers.gerber_parser import GerberParser, ApertureType
+from mcp_pcb_emcopilot.parsers.gerber_parser import ApertureType, GerberParser
 
 
 class TestGerberParsing:

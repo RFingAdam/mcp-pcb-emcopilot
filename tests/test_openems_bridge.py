@@ -10,8 +10,8 @@ Covers Issue #28:
 """
 
 import math
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -20,7 +20,6 @@ from mcp_pcb_emcopilot.integrations.openems_bridge import (
     OpenEMSModel,
     ValidationResult,
 )
-
 
 # =============================================================================
 # Microstrip model generation
@@ -628,8 +627,8 @@ def test_dispatch_validate_stripline():
 
 def test_dispatch_validate_invalid_model_type():
     """Test pcb_validate_with_openems rejects invalid model type."""
-    from mcp_pcb_emcopilot.server import _dispatch
     from mcp_pcb_emcopilot.errors import ValidationError
+    from mcp_pcb_emcopilot.server import _dispatch
     try:
         _dispatch("pcb_validate_with_openems", {"model_type": "bogus"})
         assert False, "Should have raised ValidationError"

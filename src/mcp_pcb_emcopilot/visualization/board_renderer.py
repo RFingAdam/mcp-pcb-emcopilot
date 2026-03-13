@@ -445,7 +445,7 @@ class BoardRenderer:
         parts.append(self._draw_board_outline())
 
         # Dimmed background
-        parts.append(f'<g opacity="0.12">\n')
+        parts.append('<g opacity="0.12">\n')
         parts.append(self._draw_traces())
         parts.append(self._draw_vias())
         parts.append(self._draw_components())

@@ -6,10 +6,10 @@ import math
 import pytest
 
 from mcp_pcb_emcopilot.analyzers.emc.immunity import (
-    ImmunityAnalyzer,
-    ImmunityAnalysisResult,
-    InterfaceImmunityResult,
     IC_THRESHOLDS,
+    ImmunityAnalysisResult,
+    ImmunityAnalyzer,
+    InterfaceImmunityResult,
     antenna_factor,
     bci_pin_voltage,
     effective_height,
@@ -18,7 +18,6 @@ from mcp_pcb_emcopilot.analyzers.emc.immunity import (
     transfer_impedance_unshielded,
     voltage_from_field,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
