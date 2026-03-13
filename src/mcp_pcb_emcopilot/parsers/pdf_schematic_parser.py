@@ -175,7 +175,11 @@ class PDFSchematicParser:
 
         if self._load_fitz():
             result.pymupdf_available = True
-            self._parse_with_fitz(result)
+            try:
+                self._parse_with_fitz(result)
+            except Exception as e:
+                result.warnings.append(f"PyMuPDF failed to parse: {e}")
+                result.page_count = 0
         else:
             result.pymupdf_available = False
             self._parse_fallback(result)
