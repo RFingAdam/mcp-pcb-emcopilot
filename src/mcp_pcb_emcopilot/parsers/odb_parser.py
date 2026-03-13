@@ -542,6 +542,7 @@ class ODBParser:
 
         try:
             content = self._read_file(profile_file)
+            self._detect_file_units(content)
             outline_points = []
 
             for line in content.split('\n'):
@@ -677,6 +678,7 @@ class ODBParser:
 
         try:
             content = self._read_file(components_file)
+            self._detect_file_units(content)
             current_comp: Optional[Dict] = None
 
             for line in content.split('\n'):
@@ -687,7 +689,21 @@ class ODBParser:
                     if current_comp:
                         data.components.append(self._create_component(current_comp, layer))
 
+                    # Parse CMP line: CMP <pkg_ref> <x> <y> <rotation> <mirror> <refdes> <part_name> ;attrs
                     current_comp = {'pins': []}
+                    # Strip trailing attributes after ';'
+                    cmp_line = line.split(';')[0].strip()
+                    cmp_parts = cmp_line.split()
+                    # CMP <pkg_ref> <x> <y> <rotation> <mirror> [refdes] [part_name]
+                    if len(cmp_parts) >= 6:
+                        current_comp['x'] = self._convert_coord(cmp_parts[2])
+                        current_comp['y'] = self._convert_coord(cmp_parts[3])
+                        current_comp['rotation'] = float(cmp_parts[4])
+                        current_comp['mirror'] = cmp_parts[5].upper() == 'M'
+                    if len(cmp_parts) >= 7:
+                        current_comp['comp_name'] = cmp_parts[6]
+                    if len(cmp_parts) >= 8:
+                        current_comp['part_name'] = cmp_parts[7]
 
                 elif line.startswith('PRP'):
                     # Property: PRP key value
@@ -699,14 +715,16 @@ class ODBParser:
                             current_comp[key] = value
 
                 elif line.startswith('TOP'):
-                    # Placement: TOP x y rotation mirror
+                    # Pin placement: TOP <pin_num> <x> <y> <rotation> <mirror> <net_num> <subnet_num> <toeprint_num>
                     if current_comp:
                         parts = line.split()
-                        if len(parts) >= 4:
-                            current_comp['x'] = self._convert_coord(parts[1])
-                            current_comp['y'] = self._convert_coord(parts[2])
-                            current_comp['rotation'] = float(parts[3])
-                            current_comp['mirror'] = len(parts) > 4 and parts[4].upper() == 'M'
+                        if len(parts) >= 5:
+                            pin_data = {
+                                'name': parts[1],
+                                'x': self._convert_coord(parts[2]),
+                                'y': self._convert_coord(parts[3]),
+                            }
+                            current_comp['pins'].append(pin_data)
 
                 elif line.startswith('PIN'):
                     # Pin definition
@@ -800,6 +818,7 @@ class ODBParser:
         else:
             content = self._read_file(features_file)
 
+        self._detect_file_units(content)
         traces = []
         pours = []
         current_points = []
@@ -885,13 +904,20 @@ class ODBParser:
         if not layers_dir.exists():
             return
 
-        # Find drill layers
+        # Build case-insensitive directory lookup
+        dir_map = {}
+        if layers_dir.exists():
+            for d in layers_dir.iterdir():
+                if d.is_dir():
+                    dir_map[d.name.lower()] = d
+
+        # Find drill layers (case-insensitive)
         for layer_info in data.layers:
             if layer_info.layer_type != LayerType.DRILL:
                 continue
 
-            layer_dir = layers_dir / layer_info.name
-            if layer_dir.exists():
+            layer_dir = dir_map.get(layer_info.name.lower())
+            if layer_dir and layer_dir.exists():
                 self._parse_drill_features(layer_dir, layer_info, data)
 
         # Also check for common drill layer names
@@ -914,47 +940,54 @@ class ODBParser:
 
         try:
             content = self._read_file(features_file)
-            current_tool_size = 0.3  # Default drill size mm
-            current_dcode = None
-            tool_sizes: Dict[str, float] = {}
+            self._detect_file_units(content)
+            symbol_sizes: Dict[str, float] = {}  # symbol_index -> drill_size_mm
 
-            # First pass: parse tool definitions (T records)
+            # First pass: parse symbol definitions ($<index> <name>) and tool defs
             for line in content.split('\n'):
                 line = line.strip()
 
-                # Tool definition: T<dcode> <size> [type]
-                if line.startswith('T') and not line.startswith('TOP'):
+                # Symbol definition: $<index> <symbol_name> (e.g. "$0 r6")
+                if line.startswith('$'):
+                    sym_match = re.match(r'\$(\d+)\s+(\S+)', line)
+                    if sym_match:
+                        sym_idx = sym_match.group(1)
+                        sym_name = sym_match.group(2)
+                        # Symbol names use mil convention (r6 = 6 mil round)
+                        pad = self._parse_symbol_name(sym_name)
+                        if pad:
+                            symbol_sizes[sym_idx] = max(pad.width_mm, pad.height_mm)
+
+                # Tool definition: T<dcode> <size> [type] (alternative format)
+                elif line.startswith('T') and not line.startswith('TOP'):
                     match = re.match(r'T(\d+)\s+(\d+(?:\.\d+)?)', line)
                     if match:
                         dcode = match.group(1)
-                        size = self._convert_coord(match.group(2))
-                        tool_sizes[dcode] = size
+                        # Tool sizes in ODB++ use mil convention
+                        size = float(match.group(2)) * self.MIL_TO_MM
+                        symbol_sizes[dcode] = size
+
+            default_drill = 0.3  # mm fallback
 
             # Second pass: parse drill hits
             for line in content.split('\n'):
                 line = line.strip()
 
-                # Pad (drill hit): P x y dcode [rotation] [mirror]
+                # Pad (drill hit): P x y symbol_index polarity rotation mirror ;attrs
                 if line.startswith('P '):
-                    parts = line.split()
+                    parts = line.split(';')[0].split()  # strip attributes
                     if len(parts) >= 3:
                         x = self._convert_coord(parts[1])
                         y = self._convert_coord(parts[2])
 
-                        # Extract dcode if present (4th field or parse from symbol ref)
-                        dcode = None
-                        if len(parts) >= 4:
-                            dcode_str = parts[3]
-                            # Remove any non-numeric prefix
-                            dcode_match = re.search(r'(\d+)', dcode_str)
-                            if dcode_match:
-                                dcode = dcode_match.group(1)
+                        # Symbol index is the 4th field
+                        sym_idx = parts[3] if len(parts) >= 4 else None
 
-                        # Get drill size from tool definition or current
-                        drill_size = tool_sizes.get(dcode, current_tool_size) if dcode else current_tool_size
+                        # Get drill size from symbol definition
+                        drill_size = symbol_sizes.get(sym_idx, default_drill) if sym_idx else default_drill
 
                         # Get pad size from symbol templates
-                        pad_size = self._get_via_pad_size(dcode, drill_size, data)
+                        pad_size = self._get_via_pad_size(sym_idx, drill_size, data)
 
                         data.drills.append(ODBDrill(
                             x_mm=x,
@@ -1315,12 +1348,30 @@ class ODBParser:
                 with open(file_path, 'r', encoding='latin-1') as f:
                     return f.read()
 
+    def _detect_file_units(self, content: str) -> None:
+        """Detect UNITS= header in a file and update self._units."""
+        for line in content.split('\n')[:10]:
+            line = line.strip()
+            if line.startswith('UNITS=') or line.startswith('UNITS ='):
+                unit_val = line.split('=', 1)[1].strip().lower()
+                if 'mm' in unit_val:
+                    self._units = 'mm'
+                elif 'inch' in unit_val:
+                    self._units = 'inch'
+                elif 'mil' in unit_val:
+                    self._units = 'mil'
+                return
+
     def _convert_coord(self, value: str) -> float:
-        """Convert coordinate string to mm"""
+        """Convert coordinate string to mm based on current units."""
         try:
             num = float(value)
-            # ODB++ typically uses mils
-            return num * self.MIL_TO_MM
+            if self._units == 'inch':
+                return num * self.INCH_TO_MM
+            elif self._units == 'mm':
+                return num
+            else:  # mil (default)
+                return num * self.MIL_TO_MM
         except ValueError:
             return 0.0
 
