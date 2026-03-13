@@ -46,35 +46,46 @@ def _make_design(**overrides) -> PCBDesignData:
 
 
 def _make_review_results():
-    """Create synthetic review_results dict."""
+    """Create synthetic review_results dict matching orchestrator output."""
     return {
-        "overall_status": "WARNING",
-        "domains": {
-            "emc": {
-                "status": "WARNING",
-                "score": 75,
+        "domain_results": [
+            {
+                "domain": "emc_emi_risk",
+                "status": "warning",
+                "analyzer": "EMIRiskScorer",
+                "critical_count": 0,
+                "warning_count": 1,
+                "info_count": 0,
                 "findings": [
                     {
-                        "severity": "WARNING",
+                        "domain": "emc_emi_risk",
+                        "severity": "warning",
                         "title": "EMI risk moderate",
-                        "detail": "Board EMI score 75/100",
+                        "description": "Board EMI score 75/100",
                         "recommendation": "Add shielding",
                     }
                 ],
             },
-            "signal_integrity": {
-                "status": "PASS",
-                "score": 95,
+            {
+                "domain": "high_speed_ddr",
+                "status": "pass",
+                "analyzer": "DDRAnalyzer",
+                "critical_count": 0,
+                "warning_count": 0,
+                "info_count": 1,
                 "findings": [
                     {
-                        "severity": "PASS",
+                        "domain": "high_speed_ddr",
+                        "severity": "info",
                         "title": "DDR eye diagram OK",
-                        "detail": "Eye height 738 mV",
+                        "description": "Eye height 738 mV",
                         "recommendation": "",
                     }
                 ],
             },
-        },
+        ],
+        "executive_summary": {"overall_risk": "moderate"},
+        "cross_correlations": [],
     }
 
 
@@ -108,8 +119,9 @@ class TestSessionHarvesting:
         design = _make_design(review_results=_make_review_results())
         builder = ReportBuilder(design)
         results = builder._harvest_session()
+        # emc_emi_risk maps to "emc", high_speed_ddr maps to "high_speed"
         assert "emc" in results
-        assert "signal_integrity" in results
+        assert "high_speed" in results
 
     def test_harvest_from_analysis_cache(self):
         design = _make_design()
@@ -178,7 +190,7 @@ class TestReportGeneration:
 
     def test_overall_verdict_critical(self, tmp_path):
         results = _make_review_results()
-        results["domains"]["emc"]["findings"][0]["severity"] = "CRITICAL"
+        results["domain_results"][0]["findings"][0]["severity"] = "CRITICAL"
         design = _make_design(review_results=results)
         builder = ReportBuilder(design, output_dir=str(tmp_path))
         result = builder.generate(format="docx")
@@ -186,8 +198,8 @@ class TestReportGeneration:
 
     def test_overall_verdict_pass(self, tmp_path):
         results = _make_review_results()
-        for domain in results["domains"].values():
-            for f in domain["findings"]:
+        for dr in results["domain_results"]:
+            for f in dr["findings"]:
                 f["severity"] = "PASS"
         design = _make_design(review_results=results)
         builder = ReportBuilder(design, output_dir=str(tmp_path))
