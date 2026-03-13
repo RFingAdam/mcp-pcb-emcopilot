@@ -1073,6 +1073,15 @@ async def list_tools() -> list[Tool]:
             "title": {"type": "string", "description": "Report title. Default: 'PCB Design Review Report'"},
             "theme": {"type": "string", "enum": ["light", "dark"], "description": "Color theme: light or dark. Default: light"},
         }, ["session_id"]),
+        _make_tool("pcb_generate_design_review_report", "Generate a professional PCB design review report (DOCX and/or HTML) from all analysis results in the current session. Produces a complete document with executive summary, domain analysis sections, findings with full traceability, simulation plots, and priority action items.", {
+            "session_id": {"type": "string", "description": "Session ID containing analysis results"},
+            "format": {"type": "string", "enum": ["docx", "html", "both"], "default": "both", "description": "Output format"},
+            "output_dir": {"type": "string", "description": "Directory for output files (default: /tmp/pcb_reports/)"},
+            "title": {"type": "string", "description": "Report title (e.g., 'Product X Rev B PCB Design Review')"},
+            "confidentiality": {"type": "string", "default": "CONFIDENTIAL", "description": "Confidentiality marking for header/footer"},
+            "run_analysis": {"type": "boolean", "default": False, "description": "If true, runs pcb_run_design_review first"},
+            "auto_render": {"type": "boolean", "default": True, "description": "Auto-generate board/net renders for findings"},
+        }, ["session_id"]),
 
         # =====================================================================
         # RETURN CURRENT / GROUND STITCHING (2 tools)
@@ -2412,6 +2421,23 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             theme=args.get("theme", "light"),
         )
         return {"success": True, "output_path": path, "session_id": args["session_id"]}
+
+    if name == "pcb_generate_design_review_report":
+        from .reports.report_builder import ReportBuilder
+        data = _get_session(args["session_id"])
+
+        if args.get("run_analysis", False):
+            from .orchestrator import run_design_review
+            run_design_review(data, args["session_id"])
+
+        builder = ReportBuilder(
+            design=data,
+            title=args.get("title"),
+            confidentiality=args.get("confidentiality", "CONFIDENTIAL"),
+            output_dir=args.get("output_dir", "/tmp/pcb_reports"),
+            auto_render=args.get("auto_render", True),
+        )
+        return builder.generate(format=args.get("format", "both"))
 
     # === RETURN CURRENT / GROUND STITCHING ===
     if name == "pcb_analyze_return_current":
