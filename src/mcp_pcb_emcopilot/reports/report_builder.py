@@ -20,6 +20,25 @@ from .tracked_finding import TrackedFinding
 # Domain key → finding-ID prefix mapping
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Orchestrator domain → section key mapping
+# ---------------------------------------------------------------------------
+# The orchestrator uses specific domain names (e.g. "high_speed_ddr") that
+# may not match the report section keys (e.g. "high_speed").  This map
+# normalises orchestrator domains to section keys.
+
+_ORCHESTRATOR_DOMAIN_TO_SECTION: dict[str, str] = {
+    "emc_return_path": "return_path",
+    "emc_emi_risk": "emc",
+    "emc_grounding": "grounding",
+    "high_speed_ddr": "high_speed",
+    "high_speed_usb": "high_speed",
+    "high_speed_pcie": "high_speed",
+    "high_speed_ethernet": "high_speed",
+    # These already match directly:
+    # power_integrity, thermal, dfm, validation
+}
+
 _DOMAIN_PREFIXES: dict[str, str] = {
     "emc": "EMC",
     "signal_integrity": "SI",
@@ -228,18 +247,48 @@ class ReportBuilder:
     # ------------------------------------------------------------------
 
     def _harvest_session(self) -> dict[str, Any]:
-        """Collect review_results['domains'] + analysis_cache into one dict."""
+        """Collect review_results + analysis_cache into one dict keyed by section key."""
         harvested: dict[str, Any] = {}
 
-        # 1. review_results["domains"]
+        # 1. review_results["domain_results"] — a list of dicts, each with
+        #    keys: domain, status, analyzer, findings, critical_count, etc.
         rr = self.design.review_results or {}
-        domains = rr.get("domains", {})
-        for domain_key, domain_data in domains.items():
-            harvested[domain_key] = domain_data
+        for dr in rr.get("domain_results", []):
+            if not isinstance(dr, dict):
+                continue
+            raw_domain = dr.get("domain", "unknown")
+            # Normalise orchestrator domain to section key
+            section_key = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
 
-        # 2. analysis_cache (keyed by tool name)
+            if section_key in harvested:
+                # Merge findings into existing entry (e.g. multiple high_speed_* → high_speed)
+                existing = harvested[section_key]
+                existing.setdefault("findings", []).extend(dr.get("findings", []))
+                # Preserve "worst" status
+                if dr.get("status") in ("fail", "error"):
+                    existing["status"] = dr["status"]
+                elif dr.get("status") == "warning" and existing.get("status") not in ("fail", "error"):
+                    existing["status"] = "warning"
+                # Track sub-domains for reference
+                existing.setdefault("_sub_domains", []).append(raw_domain)
+            else:
+                harvested[section_key] = dict(dr)  # copy
+                harvested[section_key]["_sub_domains"] = [raw_domain]
+
+        # Also store executive_summary / cross_correlations if present
+        if "executive_summary" in rr:
+            harvested["_executive_summary"] = rr["executive_summary"]
+        if "cross_correlations" in rr:
+            harvested["_cross_correlations"] = rr["cross_correlations"]
+        if "risk_matrix" in rr:
+            harvested["_risk_matrix"] = rr["risk_matrix"]
+        if "recommendations" in rr:
+            harvested["_recommendations"] = rr["recommendations"]
+
+        # 2. analysis_cache (keyed by tool name) — supplements orchestrator data
         for tool_name, tool_data in (self.design.analysis_cache or {}).items():
-            harvested[tool_name] = tool_data
+            if tool_name not in harvested:
+                harvested[tool_name] = tool_data
 
         return harvested
 
@@ -248,70 +297,96 @@ class ReportBuilder:
     # ------------------------------------------------------------------
 
     def _collect_findings(self, results: dict) -> list[TrackedFinding]:
-        """Convert raw finding dicts to TrackedFinding objects."""
+        """Convert raw finding dicts to TrackedFinding objects.
+
+        Handles two sources:
+        1. Orchestrator domain_results (list of dicts with 'domain' and 'findings' keys)
+        2. analysis_cache entries (tool_name → result dict with optional 'findings')
+        """
         findings: list[TrackedFinding] = []
         domain_counters: dict[str, int] = {}
+        seen_domains: set[str] = set()
 
-        # Walk review_results domains
+        # Walk review_results domain_results (list of dicts)
         rr = self.design.review_results or {}
-        domains = rr.get("domains", {})
-        for domain_key, domain_data in domains.items():
-            prefix = _prefix_for(domain_key)
-            for raw in domain_data.get("findings", []):
-                count = domain_counters.get(prefix, 0) + 1
-                domain_counters[prefix] = count
-                finding_id = f"{prefix}-{count:03d}"
+        for dr in rr.get("domain_results", []):
+            if not isinstance(dr, dict):
+                continue
+            raw_domain = dr.get("domain", "unknown")
+            section_key = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
+            seen_domains.add(section_key)
+            seen_domains.add(raw_domain)
+            prefix = _prefix_for(section_key)
+            for raw in dr.get("findings", []):
+                finding = self._raw_to_finding(raw, section_key, prefix, domain_counters)
+                findings.append(finding)
 
-                findings.append(TrackedFinding(
-                    finding_id=finding_id,
-                    severity=raw.get("severity", "INFO"),
-                    domain=domain_key,
-                    title=raw.get("title", "Untitled finding"),
-                    what_it_means=raw.get("detail", ""),
-                    how_calculated=raw.get("how_calculated", "Automated analysis"),
-                    physical_mechanism=raw.get("physical_mechanism", ""),
-                    measured_value=str(raw.get("measured_value", "")),
-                    limit_value=str(raw.get("limit_value", "")),
-                    margin=str(raw.get("margin", "")),
-                    recommendation=raw.get("recommendation", ""),
-                    reference_standard=raw.get("reference_standard", ""),
-                    nets=raw.get("nets", []),
-                    layers=raw.get("layers", []),
-                    components=raw.get("components", []),
-                    coordinates_mm=raw.get("coordinates_mm", []),
-                ))
-
-        # Walk analysis_cache entries
+        # Walk analysis_cache entries (supplement — skip domains already covered)
         for tool_name, tool_data in (self.design.analysis_cache or {}).items():
             if not isinstance(tool_data, dict):
                 continue
+            # Derive domain key from tool name
+            domain_key = tool_name.replace("pcb_analyze_", "").replace("pcb_calc_", "").replace("pcb_", "")
+            if domain_key in seen_domains:
+                continue  # orchestrator already covered this domain
+            prefix = _prefix_for(domain_key)
             for raw in tool_data.get("findings", []):
-                domain_key = tool_name.replace("pcb_analyze_", "").replace("pcb_", "")
-                prefix = _prefix_for(domain_key)
-                count = domain_counters.get(prefix, 0) + 1
-                domain_counters[prefix] = count
-                finding_id = f"{prefix}-{count:03d}"
-
-                findings.append(TrackedFinding(
-                    finding_id=finding_id,
-                    severity=raw.get("severity", "INFO"),
-                    domain=domain_key,
-                    title=raw.get("title", "Untitled finding"),
-                    what_it_means=raw.get("detail", ""),
-                    how_calculated=raw.get("how_calculated", "Automated analysis"),
-                    physical_mechanism=raw.get("physical_mechanism", ""),
-                    measured_value=str(raw.get("measured_value", "")),
-                    limit_value=str(raw.get("limit_value", "")),
-                    margin=str(raw.get("margin", "")),
-                    recommendation=raw.get("recommendation", ""),
-                    reference_standard=raw.get("reference_standard", ""),
-                    nets=raw.get("nets", []),
-                    layers=raw.get("layers", []),
-                    components=raw.get("components", []),
-                    coordinates_mm=raw.get("coordinates_mm", []),
-                ))
+                finding = self._raw_to_finding(raw, domain_key, prefix, domain_counters)
+                findings.append(finding)
 
         return findings
+
+    @staticmethod
+    def _normalise_severity(sev: str) -> str:
+        """Map orchestrator severities to TrackedFinding's valid set."""
+        mapping = {
+            "critical": "CRITICAL",
+            "high": "HIGH",
+            "fail": "HIGH",
+            "warning": "WARNING",
+            "medium": "WARNING",
+            "low": "INFO",
+            "info": "INFO",
+            "pass": "PASS",
+        }
+        return mapping.get(sev.lower().strip(), "INFO")
+
+    def _raw_to_finding(
+        self,
+        raw: dict,
+        domain_key: str,
+        prefix: str,
+        counters: dict[str, int],
+    ) -> TrackedFinding:
+        """Convert a single raw finding dict to a TrackedFinding."""
+        count = counters.get(prefix, 0) + 1
+        counters[prefix] = count
+        finding_id = f"{prefix}-{count:03d}"
+
+        # Handle nets: orchestrator uses "signal_name" (single string),
+        # analysis_cache may use "nets" (list)
+        nets = raw.get("nets", [])
+        if not nets and raw.get("signal_name"):
+            nets = [raw["signal_name"]]
+
+        return TrackedFinding(
+            finding_id=finding_id,
+            severity=self._normalise_severity(raw.get("severity", "INFO")),
+            domain=domain_key,
+            title=raw.get("title", "Untitled finding"),
+            what_it_means=raw.get("description", raw.get("detail", "")),
+            how_calculated=raw.get("how_calculated", "Automated analysis"),
+            physical_mechanism=raw.get("physical_mechanism", ""),
+            measured_value=str(raw.get("measured_value", "")),
+            limit_value=str(raw.get("limit_value", "")),
+            margin=str(raw.get("margin", "")),
+            recommendation=raw.get("recommendation", ""),
+            reference_standard=raw.get("reference_standard", ""),
+            nets=nets,
+            layers=raw.get("layers", []),
+            components=raw.get("components", []),
+            coordinates_mm=raw.get("coordinates_mm", []),
+        )
 
     # ------------------------------------------------------------------
     # Verdict logic
