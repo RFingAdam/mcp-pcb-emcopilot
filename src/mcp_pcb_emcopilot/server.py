@@ -985,6 +985,32 @@ async def list_tools() -> list[Tool]:
         }, ["session_id", "annotations"]),
 
         # =====================================================================
+        # EXPORT / RENDER TO FILE (3 tools)
+        # =====================================================================
+        _make_tool("pcb_export_render_png", "Export an SVG render (board, stackup, net, annotated) to a PNG image file. Requires cairosvg.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "render_type": {"type": "string", "enum": ["board", "stackup", "net", "annotated"], "description": "Type of render to export"},
+            "output_path": {"type": "string", "description": "Output PNG file path. If omitted, writes to temp file."},
+            "width_px": {"type": "integer", "description": "Output image width in pixels (default 1600)", "default": 1600},
+            "net_name": {"type": "string", "description": "Net name (required when render_type='net')"},
+            "highlight_nets": {"type": "array", "items": {"type": "string"}, "description": "Nets to highlight (for board render)"},
+            "highlight_components": {"type": "array", "items": {"type": "string"}, "description": "Components to highlight (for board render)"},
+            "annotations": {"type": "array", "items": {"type": "object"}, "description": "Annotation list (for annotated render)"},
+        }, ["session_id", "render_type"]),
+        _make_tool("pcb_export_all_renders", "Generate and export all standard renders (board, stackup, key nets, annotated findings) as PNG files to a directory. Returns mapping of label to file path.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "output_dir": {"type": "string", "description": "Directory to write PNG files"},
+            "width_px": {"type": "integer", "description": "Output image width in pixels (default 1600)", "default": 1600},
+        }, ["session_id", "output_dir"]),
+        _make_tool("pcb_generate_docx_report", "Generate a professional DOCX design review report with embedded board renders, schematic images, and analysis findings. Requires python-docx and cairosvg.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout (must have run design review first)"},
+            "output_path": {"type": "string", "description": "Output .docx file path. If omitted, writes to temp file."},
+            "image_dir": {"type": "string", "description": "Directory containing pre-rendered PNG images (from pcb_export_all_renders). If omitted, renders are generated automatically."},
+            "title": {"type": "string", "description": "Report title (default: 'PCB Design Review Report')"},
+            "subtitle": {"type": "string", "description": "Report subtitle (e.g. project/board name)"},
+        }, ["session_id"]),
+
+        # =====================================================================
         # SCHEMATIC PDF (3 tools)
         # =====================================================================
         _make_tool("pcb_parse_schematic_pdf", "Parse a PDF schematic to extract component references, net labels, and page data. Uses text-layer extraction (requires pymupdf for full support). If session_id provided, attaches schematic data to existing layout session for cross-reference.", {
@@ -1862,6 +1888,92 @@ def _dispatch(name: str, args: dict) -> dict:
         annotator = Annotator(data)
         svg = annotator.render_annotated_board(annotations=args["annotations"])
         return {"svg": svg, "annotation_count": len(args["annotations"])}
+
+    # === EXPORT / RENDER TO FILE ===
+    if name == "pcb_export_render_png":
+        from .visualization.exporter import svg_to_png
+        data = _get_session(args["session_id"])
+        render_type = args["render_type"]
+        width_px = args.get("width_px", 1600)
+        output_path = args.get("output_path")
+
+        if render_type == "board":
+            from .visualization.board_renderer import BoardRenderer
+            renderer = BoardRenderer(data, width_px=width_px)
+            svg = renderer.render_board(
+                highlight_nets=args.get("highlight_nets"),
+                highlight_components=args.get("highlight_components"),
+            )
+        elif render_type == "stackup":
+            from .visualization.stackup_renderer import StackupRenderer
+            renderer = StackupRenderer(data)
+            svg = renderer.render()
+        elif render_type == "net":
+            net_name = args.get("net_name")
+            if not net_name:
+                return {"success": False, "error": "net_name required for render_type='net'"}
+            from .visualization.board_renderer import BoardRenderer
+            renderer = BoardRenderer(data)
+            svg = renderer.render_net(net_name)
+        elif render_type == "annotated":
+            annots = args.get("annotations", [])
+            if not annots:
+                return {"success": False, "error": "annotations required for render_type='annotated'"}
+            from .visualization.annotator import Annotator
+            annotator = Annotator(data)
+            svg = annotator.render_annotated_board(annotations=annots)
+        else:
+            return {"success": False, "error": f"Unknown render_type: {render_type}"}
+
+        png_path = svg_to_png(svg, output_path, width=width_px)
+        import os
+        return {
+            "success": True,
+            "output_path": png_path,
+            "file_size_bytes": os.path.getsize(png_path),
+            "render_type": render_type,
+        }
+
+    if name == "pcb_export_all_renders":
+        from .reports.docx_report import generate_all_renders
+        data = _get_session(args["session_id"])
+        output_dir = args["output_dir"]
+        width_px = args.get("width_px", 1600)
+        render_map = generate_all_renders(data, args["session_id"], output_dir, width_px)
+        return {
+            "success": True,
+            "output_dir": output_dir,
+            "renders": render_map,
+            "count": len(render_map),
+        }
+
+    if name == "pcb_generate_docx_report":
+        from .reports.docx_report import generate_docx_report, generate_all_renders
+        data = _get_session(args["session_id"])
+        image_dir = args.get("image_dir")
+        output_path = args.get("output_path")
+
+        # Auto-generate renders if no image_dir provided
+        if not image_dir:
+            import tempfile
+            image_dir = tempfile.mkdtemp(prefix="pcb_report_images_")
+            generate_all_renders(data, args["session_id"], image_dir)
+
+        docx_path = generate_docx_report(
+            design=data,
+            session_id=args["session_id"],
+            output_path=output_path,
+            image_dir=image_dir,
+            title=args.get("title", "PCB Design Review Report"),
+            subtitle=args.get("subtitle", ""),
+        )
+        import os
+        return {
+            "success": True,
+            "output_path": docx_path,
+            "file_size_bytes": os.path.getsize(docx_path),
+            "image_dir": image_dir,
+        }
 
     # === SCHEMATIC PDF ===
     if name == "pcb_parse_schematic_pdf":
