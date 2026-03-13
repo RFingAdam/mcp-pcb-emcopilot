@@ -623,6 +623,14 @@ async def list_tools() -> list[Tool]:
             "max_frequency_mhz": {"type": "number", "description": "Highest frequency of concern"},
             "dielectric_constant": {"type": "number"},
         }, ["max_frequency_mhz", "dielectric_constant"]),
+        _make_tool("pcb_analyze_cavity_resonance", "Detailed power/ground plane cavity resonance analysis. Calculates all TM modes, Q factors, peak impedances, identifies problematic modes near common clocks, and provides decoupling cap recommendations.", {
+            "plane_width_mm": {"type": "number", "description": "Width of the rectangular plane (mm)"},
+            "plane_height_mm": {"type": "number", "description": "Height/length of the rectangular plane (mm)"},
+            "dielectric_height_mm": {"type": "number", "description": "Dielectric thickness between power and ground planes (mm)"},
+            "dielectric_constant": {"type": "number", "description": "Relative permittivity (FR4: 4.3, Rogers 4350B: 3.66)"},
+            "max_frequency_hz": {"type": "number", "description": "Upper frequency limit for mode search (Hz). Default 5e9"},
+            "loss_tangent": {"type": "number", "description": "Dielectric loss tangent (FR4: 0.02). Default 0.02"},
+        }, ["plane_width_mm", "plane_height_mm", "dielectric_height_mm", "dielectric_constant"]),
 
         # =====================================================================
         # S-PARAMETER / MODE CONVERSION (3 tools — Issues #8 & #12)
@@ -1053,6 +1061,12 @@ async def list_tools() -> list[Tool]:
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
             "format": {"type": "string", "enum": ["summary", "detailed", "json"], "description": "Report format: summary (pass/fail + top risks), detailed (all findings), json (raw structured data)"},
         }, ["session_id"]),
+        _make_tool("pcb_generate_html_report", "Generate an interactive self-contained HTML design review report with collapsible sections, severity filtering, embedded images, and print-friendly styles. Must run pcb_run_design_review first.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "output_path": {"type": "string", "description": "Destination .html file path. Defaults to temp file."},
+            "title": {"type": "string", "description": "Report title. Default: 'PCB Design Review Report'"},
+            "theme": {"type": "string", "enum": ["light", "dark"], "description": "Color theme: light or dark. Default: light"},
+        }, ["session_id"]),
 
         # =====================================================================
         # RETURN CURRENT / GROUND STITCHING (2 tools)
@@ -1097,6 +1111,57 @@ async def list_tools() -> list[Tool]:
             "pcb_loop_area_cm2": {"type": "number", "description": "Hot loop area (cm^2). Default 1.0"},
             "limit_standard": {"type": "string", "enum": ["fcc_classb", "fcc_classa", "cispr32_classb", "cispr32_classa"], "description": "Emission limit standard. Default cispr32_classb"},
         }, ["switching_frequency_khz"]),
+
+        # =====================================================================
+        # OPENEMS INTEGRATION (2 tools)
+        # =====================================================================
+        _make_tool("pcb_validate_with_openems", "Generate an OpenEMS FDTD simulation script to validate analytical impedance/radiation results. Supports microstrip, stripline, via, and trace_antenna models. Returns a standalone Python script.", {
+            "model_type": {"type": "string", "enum": ["microstrip", "stripline", "via", "trace_antenna"], "description": "Type of structure to simulate"},
+            "trace_width_mm": {"type": "number", "description": "Trace width in mm (microstrip/stripline/trace_antenna)"},
+            "dielectric_height_mm": {"type": "number", "description": "Dielectric height to reference plane in mm (microstrip/stripline)"},
+            "trace_thickness_mm": {"type": "number", "description": "Copper thickness in mm. Default 0.035"},
+            "er": {"type": "number", "description": "Dielectric constant. Default 4.3"},
+            "frequency_ghz": {"type": "number", "description": "Target frequency in GHz. Default 1.0"},
+            "trace_length_mm": {"type": "number", "description": "Trace length in mm. Default 50.0"},
+            "drill_diameter_mm": {"type": "number", "description": "Via drill diameter in mm (via model)"},
+            "pad_diameter_mm": {"type": "number", "description": "Via pad diameter in mm (via model)"},
+            "board_thickness_mm": {"type": "number", "description": "Board thickness in mm (via model)"},
+            "height_above_ground_mm": {"type": "number", "description": "Trace height above ground in mm (trace_antenna)"},
+        }, ["model_type"]),
+        _make_tool("pcb_compare_simulation", "Compare analytical calculation vs simulation result to validate accuracy.", {
+            "parameter": {"type": "string", "description": "Name of parameter being compared (e.g. 'impedance')"},
+            "analytical_value": {"type": "number", "description": "Value from analytical calculation"},
+            "simulated_value": {"type": "number", "description": "Value from simulation"},
+            "unit": {"type": "string", "description": "Unit of measurement. Default 'ohms'"},
+            "tolerance_percent": {"type": "number", "description": "Acceptable difference %. Default 5.0"},
+        }, ["parameter", "analytical_value", "simulated_value"]),
+
+        # =====================================================================
+        # DESIGN COMPARISON (1 tool)
+        # =====================================================================
+        _make_tool("pcb_compare_designs", "Compare two design revisions to find differences in board size, layer count, components (added/removed/moved/rotated/value changed), and nets.", {
+            "session_id_a": {"type": "string", "description": "Session ID for the 'before' (old) design revision"},
+            "session_id_b": {"type": "string", "description": "Session ID for the 'after' (new) design revision"},
+        }, ["session_id_a", "session_id_b"]),
+
+        # =====================================================================
+        # AUTOMOTIVE EMC (3 tools)
+        # =====================================================================
+        _make_tool("pcb_analyze_automotive_emc", "Automotive EMC compliance analysis — predicts CISPR 25 radiated emission compliance for clock harmonics and generates ISO 11452 immunity recommendations.", {
+            "clock_frequencies_mhz": {"type": "array", "items": {"type": "number"}, "description": "List of clock frequencies in MHz to analyze"},
+            "cispr_class": {"type": "integer", "description": "CISPR 25 class (1-5, default 3). Class 5 is strictest."},
+            "iso_level": {"type": "integer", "description": "ISO 11452 immunity test level (1-5, default 3)"},
+            "has_shielding": {"type": "boolean", "description": "Whether the design has metallic shielding (adds ~20dB attenuation)"},
+            "has_input_filter": {"type": "boolean", "description": "Whether the design has input power line filtering"},
+        }, ["clock_frequencies_mhz"]),
+        _make_tool("pcb_get_cispr25_limit", "Look up CISPR 25 emission limit for a specific frequency and class.", {
+            "frequency_mhz": {"type": "number", "description": "Frequency in MHz"},
+            "cispr_class": {"type": "integer", "description": "CISPR 25 class (1-5, default 3)"},
+            "category": {"type": "string", "enum": ["radiated", "conducted"], "description": "Emission category (default radiated)"},
+        }, ["frequency_mhz"]),
+        _make_tool("pcb_get_iso11452_level", "Get ISO 11452 immunity test level parameters (field strength, BCI current).", {
+            "level": {"type": "integer", "description": "Test level (1-5, default 3)"},
+        }, []),
 
         # =====================================================================
         # SESSION MANAGEMENT (2 tools)
@@ -1322,6 +1387,20 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         validate_positive(args.get("max_frequency_mhz", 0), "max_frequency_mhz")
         validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
         return _result(calc_via_stitching_requirements(args["max_frequency_mhz"], args["dielectric_constant"]))
+    if name == "pcb_analyze_cavity_resonance":
+        from .analyzers.power_integrity.cavity_resonance import analyze_cavity_resonance
+        validate_positive(args.get("plane_width_mm", 0), "plane_width_mm")
+        validate_positive(args.get("plane_height_mm", 0), "plane_height_mm")
+        validate_positive(args.get("dielectric_height_mm", 0), "dielectric_height_mm")
+        validate_range(args.get("dielectric_constant", 0), 1.0, 100.0, "dielectric_constant")
+        return analyze_cavity_resonance(
+            plane_width_mm=args["plane_width_mm"],
+            plane_height_mm=args["plane_height_mm"],
+            dielectric_height_mm=args["dielectric_height_mm"],
+            dielectric_constant=args["dielectric_constant"],
+            max_frequency_hz=args.get("max_frequency_hz", 5e9),
+            loss_tangent=args.get("loss_tangent", 0.02),
+        )
 
     # === S-PARAMETER / MODE CONVERSION ===
     if name == "pcb_calc_insertion_loss":
@@ -2204,6 +2283,18 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         report = generate_report(data, args["session_id"], args.get("format", "detailed"))
         return report
 
+    if name == "pcb_generate_html_report":
+        from .reports.html_report import generate_html_report
+        data = _get_session(args["session_id"])
+        path = generate_html_report(
+            design=data,
+            session_id=args["session_id"],
+            output_path=args.get("output_path"),
+            title=args.get("title", "PCB Design Review Report"),
+            theme=args.get("theme", "light"),
+        )
+        return {"success": True, "output_path": path, "session_id": args["session_id"]}
+
     # === RETURN CURRENT / GROUND STITCHING ===
     if name == "pcb_analyze_return_current":
         from .analyzers.emc.current_density import calculate_return_current_density
@@ -2253,6 +2344,121 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             pcb_loop_area_cm2=args.get("pcb_loop_area_cm2", 1.0),
             limit_standard=args.get("limit_standard", "cispr32_classb"),
         )
+
+    # === OPENEMS INTEGRATION ===
+    if name == "pcb_validate_with_openems":
+        from .integrations.openems_bridge import OpenEMSBridge
+        bridge = OpenEMSBridge()
+        model_type = args["model_type"]
+        if model_type == "microstrip":
+            model = bridge.generate_microstrip_model(
+                trace_width_mm=args.get("trace_width_mm", 0.2),
+                dielectric_height_mm=args.get("dielectric_height_mm", 0.1),
+                trace_thickness_mm=args.get("trace_thickness_mm", 0.035),
+                er=args.get("er", 4.3),
+                frequency_ghz=args.get("frequency_ghz", 1.0),
+                trace_length_mm=args.get("trace_length_mm", 50.0),
+            )
+        elif model_type == "stripline":
+            model = bridge.generate_stripline_model(
+                trace_width_mm=args.get("trace_width_mm", 0.15),
+                dielectric_height_mm=args.get("dielectric_height_mm", 0.1),
+                trace_thickness_mm=args.get("trace_thickness_mm", 0.035),
+                er=args.get("er", 4.3),
+                frequency_ghz=args.get("frequency_ghz", 1.0),
+                trace_length_mm=args.get("trace_length_mm", 50.0),
+            )
+        elif model_type == "via":
+            model = bridge.generate_via_model(
+                drill_diameter_mm=args.get("drill_diameter_mm", 0.3),
+                pad_diameter_mm=args.get("pad_diameter_mm", 0.6),
+                board_thickness_mm=args.get("board_thickness_mm", 1.6),
+                antipad_diameter_mm=args.get("antipad_diameter_mm", 0.0),
+                er=args.get("er", 4.3),
+                frequency_ghz=args.get("frequency_ghz", 5.0),
+            )
+        elif model_type == "trace_antenna":
+            model = bridge.generate_trace_antenna_model(
+                trace_length_mm=args.get("trace_length_mm", 50.0),
+                trace_width_mm=args.get("trace_width_mm", 0.2),
+                height_above_ground_mm=args.get("height_above_ground_mm", 0.2),
+                er=args.get("er", 4.3),
+                frequency_ghz=args.get("frequency_ghz", 1.0),
+            )
+        else:
+            raise ValidationError("INVALID_MODEL_TYPE", f"Unknown model_type '{model_type}'. Use: microstrip, stripline, via, trace_antenna")
+        return {
+            "model_type": model.model_type,
+            "description": model.description,
+            "geometry": model.geometry,
+            "frequency_range_hz": list(model.frequency_range_hz),
+            "mesh_resolution": model.mesh_resolution,
+            "boundary_conditions": model.boundary_conditions,
+            "script": model.script,
+        }
+
+    if name == "pcb_compare_simulation":
+        from .integrations.openems_bridge import OpenEMSBridge
+        bridge = OpenEMSBridge()
+        result = bridge.compare_results(
+            parameter=args["parameter"],
+            analytical_value=args["analytical_value"],
+            simulated_value=args["simulated_value"],
+            unit=args.get("unit", "ohms"),
+            tolerance_percent=args.get("tolerance_percent", 5.0),
+        )
+        return {
+            "parameter": result.parameter,
+            "analytical_value": result.analytical_value,
+            "analytical_unit": result.analytical_unit,
+            "simulated_value": result.simulated_value,
+            "simulated_unit": result.simulated_unit,
+            "difference_percent": result.difference_percent,
+            "status": result.status,
+            "notes": result.notes,
+        }
+
+    # === DESIGN COMPARISON ===
+    if name == "pcb_compare_designs":
+        from .analyzers.comparison import DesignComparator
+        design_a = _get_session(args["session_id_a"])
+        design_b = _get_session(args["session_id_b"])
+        comparator = DesignComparator()
+        comparison = comparator.compare(design_a, design_b)
+        return comparator.to_dict(comparison)
+
+    # === AUTOMOTIVE EMC ===
+    if name == "pcb_analyze_automotive_emc":
+        from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
+        analyzer = AutomotiveEMCAnalyzer()
+        analysis = analyzer.analyze_automotive_design(
+            clock_frequencies_mhz=args["clock_frequencies_mhz"],
+            cispr_class=args.get("cispr_class", 3),
+            iso_level=args.get("iso_level", 3),
+            has_shielding=args.get("has_shielding", False),
+            has_input_filter=args.get("has_input_filter", False),
+        )
+        return analyzer.to_dict(analysis)
+
+    if name == "pcb_get_cispr25_limit":
+        from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
+        analyzer = AutomotiveEMCAnalyzer()
+        result = analyzer.get_cispr25_limit(
+            frequency_mhz=args["frequency_mhz"],
+            cispr_class=args.get("cispr_class", 3),
+            category=args.get("category", "radiated"),
+        )
+        if result is None:
+            return {"success": False, "error": "No CISPR 25 limit found for the given frequency/class/category"}
+        return result
+
+    if name == "pcb_get_iso11452_level":
+        from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
+        analyzer = AutomotiveEMCAnalyzer()
+        result = analyzer.get_iso11452_level(level=args.get("level", 3))
+        if result is None:
+            return {"success": False, "error": "Invalid ISO 11452 level (must be 1-5)"}
+        return result
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":
