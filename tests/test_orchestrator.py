@@ -5,32 +5,39 @@ and end-to-end dispatch through server.py.
 """
 
 import json
-import sys
 import os
+import sys
 import time
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from mcp_pcb_emcopilot.classifiers import (
+    DesignClassifier,
+    InterfaceDetector,
+    NetClassifier,
+)
 from mcp_pcb_emcopilot.models.pcb_data import (
-    PCBDesignData, PCBLayer, PCBNet, PCBTrace, PCBVia, PCBZone, PCBComponent,
+    PCBComponent,
+    PCBDesignData,
+    PCBLayer,
+    PCBNet,
+    PCBTrace,
+    PCBVia,
+    PCBZone,
 )
 from mcp_pcb_emcopilot.orchestrator import (
-    set_review_context,
-    run_design_review,
-    generate_report,
-    _select_analyzers,
-    _estimate_voltage_from_name,
-    _build_risk_matrix,
-    _build_executive_summary,
-    ReviewFinding,
-    DomainResult,
     CrossCorrelation,
+    DomainResult,
+    ReviewFinding,
+    _build_executive_summary,
+    _build_risk_matrix,
+    _estimate_voltage_from_name,
+    _select_analyzers,
+    generate_report,
+    run_design_review,
+    set_review_context,
 )
-from mcp_pcb_emcopilot.classifiers import (
-    NetClassifier, InterfaceDetector, DesignClassifier,
-)
-
 
 # =============================================================================
 # Test fixtures
@@ -583,8 +590,8 @@ def test_estimate_voltage_from_name():
 
 def test_dispatch_set_review_context():
     """Test pcb_set_review_context through server dispatch."""
-    from mcp_pcb_emcopilot.server import _dispatch, sessions
     from mcp_pcb_emcopilot.parsers import parse_pcb_file
+    from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     # Create a session with mock design
     design = make_mock_design()
@@ -818,7 +825,7 @@ if __name__ == "__main__":
     print(f"\n{'='*60}")
     print(f"Results: {passed} passed, {failed} failed out of {len(tests)} tests")
     if errors:
-        print(f"\nFailures:")
+        print("\nFailures:")
         for name, err in errors:
             print(f"  {name}: {err}")
 

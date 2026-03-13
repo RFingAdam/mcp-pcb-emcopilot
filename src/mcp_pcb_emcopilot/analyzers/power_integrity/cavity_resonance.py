@@ -8,7 +8,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-
 # Physical constants
 _C0 = 299792458.0  # Speed of light (m/s)
 _MU0 = 4 * math.pi * 1e-7  # Permeability of free space (H/m)

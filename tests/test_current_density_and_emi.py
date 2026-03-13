@@ -9,8 +9,8 @@ Tests all 4 new MCP tools through their dispatch handlers.
 
 import json
 import math
-import sys
 import os
+import sys
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -451,6 +451,7 @@ def test_dispatch_smps_emi():
 def test_tool_registration():
     """Verify all 4 new tools appear in the tool list."""
     import asyncio
+
     from mcp_pcb_emcopilot.server import list_tools
 
     tools = asyncio.run(list_tools())
@@ -475,11 +476,13 @@ def test_tool_registration():
 
 def test_edge_cases():
     """Test edge cases: zero frequency, tiny plane, zero current, etc."""
-    from mcp_pcb_emcopilot.analyzers.emc.current_density import (
-        analyze_return_current_density, optimize_ground_stitching,
-    )
     from mcp_pcb_emcopilot.analyzers.emc.clock_emi_analyzer import (
-        analyze_clock_emi, analyze_smps_emi,
+        analyze_clock_emi,
+        analyze_smps_emi,
+    )
+    from mcp_pcb_emcopilot.analyzers.emc.current_density import (
+        analyze_return_current_density,
+        optimize_ground_stitching,
     )
 
     # Zero-length trace

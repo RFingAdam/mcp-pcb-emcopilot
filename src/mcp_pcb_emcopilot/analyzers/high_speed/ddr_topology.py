@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Optional, Dict, List, Any
-
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Physical constant

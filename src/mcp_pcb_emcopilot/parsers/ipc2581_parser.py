@@ -17,13 +17,13 @@ Reference: IPC-2581 Standard (www.ipc.org)
 
 from __future__ import annotations
 
+import gzip
 import logging
 import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
-import gzip
-import zipfile
 
 logger = logging.getLogger(__name__)
 

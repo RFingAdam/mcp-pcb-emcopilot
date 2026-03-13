@@ -7,17 +7,17 @@ Analyzers:
 
 from __future__ import annotations
 
+from .bom_validator import (
+    BOMIssue,
+    BOMValidationResult,
+    BOMValidator,
+    DatasheetRecommendation,
+)
 from .schematic_layout_validator import (
-    SchematicLayoutValidator,
-    SchematicLayoutValidationResult,
     ComponentMismatch,
     NetMismatch,
-)
-from .bom_validator import (
-    BOMValidator,
-    BOMValidationResult,
-    BOMIssue,
-    DatasheetRecommendation,
+    SchematicLayoutValidationResult,
+    SchematicLayoutValidator,
 )
 
 __all__ = [

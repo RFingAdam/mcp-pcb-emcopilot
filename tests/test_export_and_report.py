@@ -2,11 +2,11 @@
 
 import os
 import tempfile
+
 import pytest
 
 from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
-from mcp_pcb_emcopilot.visualization.exporter import svg_to_png, svg_to_file, batch_export
-
+from mcp_pcb_emcopilot.visualization.exporter import batch_export, svg_to_file, svg_to_png
 
 # ---------------------------------------------------------------------------
 # Fixtures

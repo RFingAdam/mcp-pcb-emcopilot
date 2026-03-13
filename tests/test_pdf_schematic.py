@@ -16,20 +16,21 @@ import tempfile
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from mcp_pcb_emcopilot.parsers.pdf_schematic_parser import (
-    PDFSchematicParser,
-    PDFSchematicResult,
-    _REFDES_PATTERN,
-    _NET_LABEL_PATTERN,
-    _NET_BLACKLIST,
-)
-from mcp_pcb_emcopilot.models.pcb_data import (
-    PCBDesignData, PCBComponent, PCBNet,
-)
 from mcp_pcb_emcopilot.analyzers.validation.schematic_layout_validator import (
     SchematicLayoutValidator,
 )
-
+from mcp_pcb_emcopilot.models.pcb_data import (
+    PCBComponent,
+    PCBDesignData,
+    PCBNet,
+)
+from mcp_pcb_emcopilot.parsers.pdf_schematic_parser import (
+    _NET_BLACKLIST,
+    _NET_LABEL_PATTERN,
+    _REFDES_PATTERN,
+    PDFSchematicParser,
+    PDFSchematicResult,
+)
 
 # =========================================================================
 # 1. Regex unit tests
@@ -811,7 +812,7 @@ def run_tests():
     print(f"\n{'='*60}")
     print(f"Results: {passed}/{total} passed, {failed} failed")
     if errors:
-        print(f"\nFailed tests:")
+        print("\nFailed tests:")
         for cls_name, method_name, err in errors:
             print(f"  - {cls_name}.{method_name}: {err}")
     print(f"{'='*60}")

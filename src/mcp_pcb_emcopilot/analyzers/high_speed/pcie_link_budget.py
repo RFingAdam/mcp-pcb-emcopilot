@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 from typing import Optional
 
-
 # PCIe generation specifications
 # Each entry: (data_rate_gts, nyquist_freq_ghz, insertion_loss_limit_db, max_lane_skew_ps)
 _PCIE_SPECS: dict[int, dict] = {

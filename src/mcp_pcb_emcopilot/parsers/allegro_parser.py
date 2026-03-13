@@ -32,7 +32,7 @@ import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,7 @@ class AllegroParser:
 
         logger.info(f"Parsing Allegro file: {path.name}")
 
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             content = f.read()
 
         return self.parse_content(content, str(path))

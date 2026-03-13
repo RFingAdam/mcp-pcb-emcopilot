@@ -1,7 +1,7 @@
 """Data models for PCB design representation."""
 
-from .common import TraceType, ViaType, LayerType
-from .pcb_data import PCBDesignData, PCBComponent, PCBNet, PCBTrace, PCBVia, PCBLayer, PCBZone
+from .common import LayerType, TraceType, ViaType
+from .pcb_data import PCBComponent, PCBDesignData, PCBLayer, PCBNet, PCBTrace, PCBVia, PCBZone
 
 __all__ = [
     "TraceType",

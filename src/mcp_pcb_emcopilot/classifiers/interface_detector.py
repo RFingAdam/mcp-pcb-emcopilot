@@ -10,8 +10,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..models.pcb_data import PCBDesignData
-from .net_classifier import NetClassifier, NetClassificationResult, NetClassification
-
+from .net_classifier import NetClassification, NetClassificationResult, NetClassifier
 
 # =============================================================================
 # Data structures
@@ -214,7 +213,7 @@ class InterfaceDetector:
         if strobe_nets:
             parts.append(f"{len(strobe_nets)//2} DQS")
         if address_nets:
-            parts.append(f"addr/cmd")
+            parts.append("addr/cmd")
         desc = f"{ddr_gen} {width_str} ({' + '.join(parts)})" if parts else f"{ddr_gen}"
 
         notes = []
@@ -356,7 +355,7 @@ class InterfaceDetector:
 
             interfaces.append(DetectedInterface(
                 interface_type="USB 2.0",
-                description=f"USB 2.0 (D+/D-)",
+                description="USB 2.0 (D+/D-)",
                 confidence=0.85,
                 signal_groups=groups,
                 total_pins=total_pins,

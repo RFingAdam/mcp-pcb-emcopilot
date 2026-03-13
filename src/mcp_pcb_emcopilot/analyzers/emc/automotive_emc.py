@@ -1,9 +1,9 @@
 """Automotive EMC standards analysis — CISPR 25 and ISO 11452."""
 from __future__ import annotations
+
+import math
 from dataclasses import dataclass, field
 from typing import Optional
-import math
-
 
 # CISPR 25 radiated emission limits (dBuV/m @ 1m, peak detector, ALSE method)
 # Representative limits per class (simplified from CISPR 25:2021)

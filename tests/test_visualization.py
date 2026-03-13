@@ -5,16 +5,21 @@ through their dispatch handlers.
 """
 
 import json
-import sys
 import os
+import sys
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mcp_pcb_emcopilot.models.pcb_data import (
-    PCBDesignData, PCBLayer, PCBNet, PCBTrace, PCBVia, PCBZone, PCBComponent,
+    PCBComponent,
+    PCBDesignData,
+    PCBLayer,
+    PCBNet,
+    PCBTrace,
+    PCBVia,
+    PCBZone,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared mock design
@@ -490,7 +495,7 @@ class TestServerDispatch:
 
     def _create_session(self) -> tuple:
         """Create a session with mock design data."""
-        from mcp_pcb_emcopilot.server import sessions, _dispatch
+        from mcp_pcb_emcopilot.server import _dispatch, sessions
         design = make_mock_design()
         sid = sessions.create_session(design)
         return sid, _dispatch
@@ -561,8 +566,8 @@ class TestServerDispatch:
         assert 'id="annotations"' in svg
 
     def test_pcb_render_board_invalid_session(self):
-        from mcp_pcb_emcopilot.server import _dispatch
         from mcp_pcb_emcopilot.errors import SessionError
+        from mcp_pcb_emcopilot.server import _dispatch
         try:
             _dispatch("pcb_render_board", {"session_id": "nonexistent"})
             assert False, "Should have raised"

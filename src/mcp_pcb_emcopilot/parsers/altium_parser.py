@@ -30,7 +30,7 @@ import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import olefile
@@ -397,7 +397,7 @@ class AltiumPcbParser:
 
         return records
 
-    def _parse_board_info(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_board_info(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse board dimensions and layer info from Board6 stream.
 
         Note: SHEETWIDTH/SHEETHEIGHT are the page size, not board outline.
@@ -448,7 +448,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse board info: {e}")
 
-    def _parse_layer_stack(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_layer_stack(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse layer stack information from Layer6 or LayerStackManager streams."""
         try:
             # Try LayerStackManager6 first (newer format)
@@ -537,7 +537,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse layer stack: {e}")
 
-    def _parse_board_outline(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_board_outline(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse board outline from various sources.
 
         Board outline can be in:
@@ -602,7 +602,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse board outline: {e}")
 
-    def _parse_regions(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_regions(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse regions for board outline and other polygons."""
         try:
             if ole.exists(['Regions6', 'Data']):
@@ -892,7 +892,7 @@ class AltiumPcbParser:
                 except (ValueError, TypeError):
                     pass
 
-    def _parse_components(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_components(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse components from Components6 stream."""
         try:
             if ole.exists(['Components6', 'Data']):
@@ -922,7 +922,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse components: {e}")
 
-    def _parse_nets(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_nets(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse nets from Nets6 stream."""
         try:
             if ole.exists(['Nets6', 'Data']):
@@ -945,7 +945,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse nets: {e}")
 
-    def _parse_tracks(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_tracks(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse tracks from Tracks6 stream.
 
         Altium tracks can be in two formats:
@@ -1128,7 +1128,7 @@ class AltiumPcbParser:
             if len(found_tracks) > len(data.traces):
                 data.traces = found_tracks
 
-    def _parse_vias(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_vias(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse vias from Vias6 stream."""
         try:
             if ole.exists(['Vias6', 'Data']):
@@ -1159,7 +1159,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse vias: {e}")
 
-    def _parse_pads(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_pads(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse pads from Pads6 stream."""
         try:
             if ole.exists(['Pads6', 'Data']):
@@ -1189,7 +1189,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse pads: {e}")
 
-    def _parse_arcs(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_arcs(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse arcs from Arcs6 stream."""
         try:
             if ole.exists(['Arcs6', 'Data']):
@@ -1220,7 +1220,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse arcs: {e}")
 
-    def _parse_rules(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_rules(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse design rules from Rules6 stream."""
         try:
             if ole.exists(['Rules6', 'Data']):
@@ -1243,7 +1243,7 @@ class AltiumPcbParser:
         except Exception as e:
             data.warnings.append(f"Failed to parse rules: {e}")
 
-    def _parse_differential_pairs(self, ole: 'olefile.OleFileIO', data: AltiumBoardData) -> None:
+    def _parse_differential_pairs(self, ole: olefile.OleFileIO, data: AltiumBoardData) -> None:
         """Parse differential pairs from DifferentialPairs6 stream."""
         try:
             if ole.exists(['DifferentialPairs6', 'Data']):

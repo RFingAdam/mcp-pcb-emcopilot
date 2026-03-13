@@ -1,86 +1,80 @@
 """Analysis engines for RF/SI, EMC, DFM, Power Integrity, High-Speed, Thermal, and Antenna analysis."""
 
-from .rf_si import (
-    ImpedanceCalculator,
-    ImpedanceResult,
-    CrosstalkAnalyzer,
-    CrosstalkResult,
-    ViaModeler,
-    ViaModel,
-    DifferentialPairAnalyzer,
-    DiffPairResult,
+from .antenna import (
+    CableCouplingAnalyzer,
+    CableCouplingResult,
+    CommonModeAnalyzer,
+    CommonModeResult,
+    SlotAntennaAnalyzer,
+    SlotAntennaResult,
+    TraceAntennaAnalyzer,
+    TraceAntennaResult,
 )
-
-from .emc import (
-    CurrentLoopAnalyzer,
-    LoopAnalysisResult,
-    ShieldingAnalyzer,
-    ShieldingResult,
-    EmissionsAnalyzer,
-    EmissionsResult,
-    GroundingAnalyzer,
-    GroundingResult,
-    ESDAnalyzer,
-    ESDResult,
-)
-
 from .dfm import (
+    AssemblyAnalyzer,
+    AssemblyResult,
+    PlacementAnalyzer,
+    PlacementResult,
     SolderPasteAnalyzer,
     SolderPasteResult,
     ThermalReliefAnalyzer,
     ThermalReliefResult,
-    PlacementAnalyzer,
-    PlacementResult,
-    AssemblyAnalyzer,
-    AssemblyResult,
     ToleranceAnalyzer,
     ToleranceResult,
 )
-
-from .power_integrity import (
-    PDNAnalyzer,
-    PDNResult,
-    DecapAnalyzer,
-    DecapResult,
-    VRMAnalyzer,
-    VRMResult,
-    PowerPlaneAnalyzer,
-    PowerPlaneResult,
+from .emc import (
+    CurrentLoopAnalyzer,
+    EmissionsAnalyzer,
+    EmissionsResult,
+    ESDAnalyzer,
+    ESDResult,
+    GroundingAnalyzer,
+    GroundingResult,
+    LoopAnalysisResult,
+    ShieldingAnalyzer,
+    ShieldingResult,
 )
-
 from .high_speed import (
     DDRAnalyzer,
     DDRResult,
-    PCIeAnalyzer,
-    PCIeResult,
-    USBAnalyzer,
-    USBResult,
     EthernetAnalyzer,
     EthernetResult,
     LengthMatcher,
     LengthMatchResult,
+    PCIeAnalyzer,
+    PCIeResult,
+    USBAnalyzer,
+    USBResult,
 )
-
+from .power_integrity import (
+    DecapAnalyzer,
+    DecapResult,
+    PDNAnalyzer,
+    PDNResult,
+    PowerPlaneAnalyzer,
+    PowerPlaneResult,
+    VRMAnalyzer,
+    VRMResult,
+)
+from .rf_si import (
+    CrosstalkAnalyzer,
+    CrosstalkResult,
+    DifferentialPairAnalyzer,
+    DiffPairResult,
+    ImpedanceCalculator,
+    ImpedanceResult,
+    ViaModel,
+    ViaModeler,
+)
 from .thermal import (
+    CopperSpreadingAnalyzer,
+    CopperSpreadingResult,
+    HotspotDetector,
+    HotspotResult,
     PowerDissipationAnalyzer,
     PowerDissipationResult,
     ThermalViaAnalyzer,
     ThermalViaResult,
-    HotspotDetector,
-    HotspotResult,
-    CopperSpreadingAnalyzer,
-    CopperSpreadingResult,
-)
-
-from .antenna import (
-    TraceAntennaAnalyzer,
-    TraceAntennaResult,
-    SlotAntennaAnalyzer,
-    SlotAntennaResult,
-    CommonModeAnalyzer,
-    CommonModeResult,
-    CableCouplingAnalyzer,
-    CableCouplingResult,
 )
 
 __all__ = [

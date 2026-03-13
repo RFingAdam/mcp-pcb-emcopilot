@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple, Iterator
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class KiCadComponent:
     rotation: float = 0.0
     uuid: Optional[str] = None
     path: Optional[str] = None  # Hierarchical path
-    pads: List["KiCadPad"] = field(default_factory=list)
+    pads: List[KiCadPad] = field(default_factory=list)
     dnp: bool = False  # Do Not Populate
     locked: bool = False
 
@@ -330,7 +331,7 @@ class KiCadPcbParser:
 
         logger.info(f"Parsing KiCad PCB file: {path.name}")
 
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             content = f.read()
 
         return self.parse_content(content, str(path))
