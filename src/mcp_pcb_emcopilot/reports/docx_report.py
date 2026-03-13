@@ -70,7 +70,7 @@ def _set_cell_shading(cell, color_hex: str):
     cell._tc.get_or_add_tcPr().append(shading)
 
 
-def _add_styled_table(doc, headers, rows, col_widths=None, header_color="1F4E79"):
+def add_styled_table(doc, headers, rows, col_widths=None, header_color="1F4E79"):
     """Add a professionally styled table to the document."""
     from docx.enum.table import WD_TABLE_ALIGNMENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -112,7 +112,7 @@ def _add_styled_table(doc, headers, rows, col_widths=None, header_color="1F4E79"
     return table
 
 
-def _add_finding_box(doc, severity, title, detail, recommendation=""):
+def add_finding_box(doc, severity, title, detail, recommendation=""):
     """Add a colour-coded finding box."""
     from docx.shared import Inches, Pt, RGBColor
 
@@ -155,7 +155,7 @@ def _add_finding_box(doc, severity, title, detail, recommendation=""):
         run.font.size = Pt(9)
 
 
-def _add_image_with_caption(doc, path, caption, width_inches=6.0):
+def add_image_with_caption(doc, path, caption, width_inches=6.0):
     """Add an image with a centred caption."""
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import Inches, Pt, RGBColor
@@ -470,7 +470,7 @@ def generate_docx_report(
 
     # ---- Board overview ----
     doc.add_heading("Board Overview & Layout", level=1)
-    _add_styled_table(doc,
+    add_styled_table(doc,
         ["Parameter", "Value"],
         [
             ("Board Size", f"{board_w:.1f} x {board_h:.1f} mm ({board_w * board_h:.0f} mm²)"),
@@ -487,7 +487,7 @@ def generate_docx_report(
     # Board render
     for key in ("board_annotated", "board_full"):
         if key in img:
-            _add_image_with_caption(doc, img[key],
+            add_image_with_caption(doc, img[key],
                 f"Board layout — {board_w:.0f} x {board_h:.0f} mm, {layers} layers, "
                 f"{len(design.components)} components, {len(design.traces)} traces.",
                 width_inches=6.2)
@@ -498,7 +498,7 @@ def generate_docx_report(
     # ---- Stackup ----
     doc.add_heading("Layer Stackup", level=1)
     if "stackup" in img:
-        _add_image_with_caption(doc, img["stackup"],
+        add_image_with_caption(doc, img["stackup"],
             "Layer stackup cross-section showing all copper and dielectric layers.",
             width_inches=5.5)
 
@@ -509,7 +509,7 @@ def generate_docx_report(
             ltype = ly.get("type", "") if isinstance(ly, dict) else getattr(ly, "type", "")
             layer_rows.append((lname, ltype))
         if layer_rows:
-            _add_styled_table(doc, ["Layer", "Type"], layer_rows, col_widths=[3.0, 3.5])
+            add_styled_table(doc, ["Layer", "Type"], layer_rows, col_widths=[3.0, 3.5])
 
     doc.add_page_break()
 
@@ -538,7 +538,7 @@ def generate_docx_report(
             ("Warnings", str(summary.get("total_warnings", 0))),
             ("Domains Analyzed", str(summary.get("domains_analyzed", 0))),
         ]
-        _add_styled_table(doc, ["Metric", "Value"], summary_rows, col_widths=[3.0, 3.5])
+        add_styled_table(doc, ["Metric", "Value"], summary_rows, col_widths=[3.0, 3.5])
         doc.add_page_break()
 
     # ---- Domain results ----
@@ -559,14 +559,14 @@ def generate_docx_report(
             ftitle = finding.get("title", finding.get("description", ""))
             detail = finding.get("detail", finding.get("description", ""))
             rec = finding.get("recommendation", "")
-            _add_finding_box(doc, sev, ftitle, detail, rec)
+            add_finding_box(doc, sev, ftitle, detail, rec)
 
         # Try to add relevant image
         domain_lower = domain.lower().replace(" ", "_")
         for img_key in (f"nets_{domain_lower}", domain_lower, f"board_{domain_lower}"):
             if img_key in img:
                 figure_num += 1
-                _add_image_with_caption(doc, img[img_key],
+                add_image_with_caption(doc, img[img_key],
                     f"Figure {figure_num}: {domain} — highlighted traces and components.",
                     width_inches=5.5)
                 break
@@ -584,7 +584,7 @@ def generate_docx_report(
         for label, path in sorted(net_imgs.items()):
             net_name = label.replace("net_", "").replace("_", " ").upper()
             figure_num += 1
-            _add_image_with_caption(doc, path,
+            add_image_with_caption(doc, path,
                 f"Figure {figure_num}: Net '{net_name}' — traces and vias highlighted.",
                 width_inches=5.0)
 
@@ -600,7 +600,7 @@ def generate_docx_report(
         if drill_counts:
             drill_rows = [(f"{sz:.3f}", str(cnt)) for sz, cnt in sorted(drill_counts.items())]
             drill_rows.append(("Total", str(sum(drill_counts.values()))))
-            _add_styled_table(doc, ["Drill Size (mm)", "Count"], drill_rows,
+            add_styled_table(doc, ["Drill Size (mm)", "Count"], drill_rows,
                             col_widths=[3.0, 3.5])
 
     # ---- Footer ----
