@@ -1,8 +1,8 @@
 """PCB file format parsers with auto-detection.
 
 Supports: KiCad (.kicad_pcb), ODB++ (.tgz/.tar.gz), Gerber (.gbr/.ger),
-Altium (.PcbDoc), IPC-2581 (.xml/.cvg), BOM (.csv/.xlsx), Schematic (.kicad_sch),
-STEP (.step/.stp), Schematic PDF (.pdf)
+Altium (.PcbDoc), Allegro (.brd, ASCII export), IPC-2581 (.xml/.cvg),
+BOM (.csv/.xlsx), Schematic (.kicad_sch), STEP (.step/.stp), Schematic PDF (.pdf)
 """
 
 from __future__ import annotations
@@ -38,6 +38,20 @@ def detect_format(file_path: str) -> str:
         return "gerber"
     elif ext in (".pcbdoc",):
         return "altium"
+    elif ext == ".brd":
+        return "allegro"
+    elif ext in (".exp",):
+        # Allegro extraction file — verify content if possible
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                header = f.read(2000)
+                if "$HEADER" in header or "$NETS" in header or "$COMPONENTS" in header:
+                    return "allegro"
+                if "ALLEGRO" in header.upper() or "ORCAD" in header.upper():
+                    return "allegro"
+        except Exception:
+            pass
+        return "allegro"
     elif ext in (".xml", ".cvg"):
         # Could be IPC-2581 or other XML — check content
         try:
@@ -56,6 +70,18 @@ def detect_format(file_path: str) -> str:
         return "schematic"
     elif ext == ".pdf":
         return "schematic_pdf"
+    elif ext == ".txt":
+        # Content-based detection for Allegro ASCII exports
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                header = f.read(2000)
+                if "$HEADER" in header or "$NETS" in header or "$COMPONENTS" in header:
+                    return "allegro"
+                if "ALLEGRO" in header.upper() or "ORCAD" in header.upper():
+                    return "allegro"
+        except Exception:
+            pass
+        return "unknown"
     else:
         return "unknown"
 
@@ -107,6 +133,8 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
         return _parse_format("gerber", file_path, _parse_gerber)
     elif file_format == "altium":
         return _parse_format("altium", file_path, _parse_altium)
+    elif file_format == "allegro":
+        return _parse_format("allegro", file_path, _parse_allegro)
     elif file_format == "ipc2581":
         return _parse_format("ipc2581", file_path, _parse_ipc2581)
     elif file_format == "step":
@@ -433,6 +461,102 @@ def _parse_altium(file_path: str) -> PCBDesignData:
             drill_mm=getattr(av, 'drill_mm', 0.3),
             pad_diameter_mm=getattr(av, 'pad_diameter_mm', 0.6),
         ))
+
+    return data
+
+
+def _parse_allegro(file_path: str) -> PCBDesignData:
+    """Parse Allegro ASCII export into PCBDesignData."""
+    from .allegro_parser import AllegroParser
+
+    parser = AllegroParser()
+    board = parser.parse_file(file_path)
+
+    data = PCBDesignData(
+        source_file=file_path,
+        source_format="allegro",
+        board_width_mm=board.width_mm,
+        board_height_mm=board.height_mm,
+        board_outline=board.board_outline,
+        layer_count=board.layer_count,
+        title=board.title,
+        warnings=board.warnings,
+    )
+
+    # Convert stackup layers
+    for sl in board.stackup:
+        data.layers.append(PCBLayer(
+            name=sl.name, number=len(data.layers),
+            layer_type=sl.layer_type, thickness_mm=sl.thickness_mm,
+            material=sl.material, dielectric_constant=sl.dielectric_constant,
+            loss_tangent=sl.loss_tangent,
+            copper_weight_oz=sl.copper_weight_oz,
+        ))
+
+    # Convert components
+    for ac in board.components:
+        layer = "F.Cu" if ac.side.upper() == "TOP" else "B.Cu"
+        data.components.append(PCBComponent(
+            reference=ac.reference,
+            value=ac.value,
+            footprint=ac.footprint,
+            package=ac.footprint,
+            part_number=ac.part_number,
+            layer=layer,
+            x_mm=ac.x_mm,
+            y_mm=ac.y_mm,
+            rotation=ac.rotation,
+        ))
+
+    # Convert nets
+    net_name_to_index = {}
+    for an in board.nets:
+        net_name_to_index[an.name] = an.index
+        data.nets.append(PCBNet(
+            name=an.name,
+            index=an.index,
+            pin_count=len(an.pins),
+        ))
+
+    # Convert traces
+    total_trace_length = 0.0
+    for at in board.traces:
+        net_idx = net_name_to_index.get(at.net_name, 0) if at.net_name else 0
+        trace = PCBTrace(
+            layer=at.layer,
+            width_mm=at.width_mm,
+            x1_mm=at.x1_mm,
+            y1_mm=at.y1_mm,
+            x2_mm=at.x2_mm,
+            y2_mm=at.y2_mm,
+            net_name=at.net_name,
+            net_index=net_idx,
+            length_mm=at.length_mm,
+        )
+        data.traces.append(trace)
+        total_trace_length += at.length_mm
+
+    data.total_trace_length_mm = total_trace_length
+
+    # Convert vias
+    for av in board.vias:
+        net_idx = net_name_to_index.get(av.net_name, 0) if av.net_name else 0
+        data.vias.append(PCBVia(
+            x_mm=av.x_mm,
+            y_mm=av.y_mm,
+            drill_mm=av.drill_mm,
+            pad_diameter_mm=av.pad_diameter_mm,
+            start_layer=av.start_layer,
+            end_layer=av.end_layer,
+            net_name=av.net_name,
+            net_index=net_idx,
+        ))
+
+    # Convert design rules
+    if board.design_rules:
+        data.min_trace_width_mm = board.design_rules.min_trace_width_mm
+        data.min_clearance_mm = board.design_rules.min_clearance_mm
+        data.min_via_drill_mm = board.design_rules.min_via_drill_mm
 
     return data
 
