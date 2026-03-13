@@ -1145,7 +1145,31 @@ async def list_tools() -> list[Tool]:
         }, ["session_id_a", "session_id_b"]),
 
         # =====================================================================
-        # AUTOMOTIVE EMC (3 tools)
+        # CONDUCTED EMISSIONS (1 tool)
+        # =====================================================================
+        _make_tool("pcb_analyze_conducted_emissions", "Predict conducted emissions from an SMPS through a 50µH/50Ω LISN model and check compliance against CISPR 25 conducted limits and FCC Part 15 Subpart B. Models trapezoidal switching waveform harmonics in the 150 kHz – 30 MHz range.", {
+            "switching_freq_khz": {"type": "number", "description": "SMPS switching frequency (kHz)"},
+            "input_voltage": {"type": "number", "description": "DC input voltage (V)"},
+            "duty_cycle": {"type": "number", "description": "Switch duty cycle 0-1"},
+            "rise_time_ns": {"type": "number", "description": "Current rise/fall time (ns)"},
+            "cispr_class": {"type": "integer", "description": "CISPR 25 class 1-5 (default 3)"},
+            "fcc_class": {"type": "string", "enum": ["A", "B"], "description": "FCC Part 15 class (default B)"},
+            "num_harmonics": {"type": "integer", "description": "Number of harmonics to analyze (default 50)"},
+            "input_filter_db": {"type": "number", "description": "Input EMI filter attenuation in dB (default 0)"},
+        }, ["switching_freq_khz", "input_voltage", "duty_cycle", "rise_time_ns"]),
+
+        # =====================================================================
+        # EMI FILTER DESIGN (1 tool)
+        # =====================================================================
+        _make_tool("pcb_design_emi_filter", "Design an EMI filter (Pi, LC, CMC, or ferrite bead) for given failure frequencies and required attenuation. Returns filter component values, insertion loss curve, and compliance assessment.", {
+            "failure_frequencies_mhz": {"type": "array", "items": {"type": "number"}, "description": "List of frequencies (MHz) where emissions exceed the limit"},
+            "required_attenuation_db": {"type": "array", "items": {"type": "number"}, "description": "Required attenuation (positive dB) at each failure frequency"},
+            "source_impedance_ohm": {"type": "number", "description": "Source impedance in ohms (default 50, LISN standard)"},
+            "filter_type": {"type": "string", "enum": ["auto", "pi", "lc", "cmc", "ferrite"], "description": "Filter topology: auto (recommended), pi, lc, cmc, or ferrite"},
+        }, ["failure_frequencies_mhz", "required_attenuation_db"]),
+
+        # =====================================================================
+        # AUTOMOTIVE EMC (4 tools)
         # =====================================================================
         _make_tool("pcb_analyze_automotive_emc", "Automotive EMC compliance analysis — predicts CISPR 25 radiated emission compliance for clock harmonics and generates ISO 11452 immunity recommendations.", {
             "clock_frequencies_mhz": {"type": "array", "items": {"type": "number"}, "description": "List of clock frequencies in MHz to analyze"},
@@ -1162,6 +1186,32 @@ async def list_tools() -> list[Tool]:
         _make_tool("pcb_get_iso11452_level", "Get ISO 11452 immunity test level parameters (field strength, BCI current).", {
             "level": {"type": "integer", "description": "Test level (1-5, default 3)"},
         }, []),
+        _make_tool("pcb_analyze_immunity_margin", "Immunity margin analysis with coupling path model. Calculates induced voltage at IC pins from electric-field coupling and BCI (bulk current injection), compares to IC upset/damage thresholds, and returns per-interface margins in dB.", {
+            "interfaces": {"type": "array", "items": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "Interface label (e.g. 'USB', 'CAN')"},
+                "cable_length_mm": {"type": "number", "description": "Cable/harness length in mm"},
+                "shielding": {"type": "string", "description": "Shielding type: none, unshielded, shielded"},
+                "ic_type": {"type": "string", "description": "IC type: cmos_logic, lpddr4, usb2_phy, ethernet_phy, gnss_receiver"},
+                "trace_length_mm": {"type": "number", "description": "On-board trace length to IC pin (mm)"},
+            }}, "description": "List of interfaces to analyze"},
+            "field_strength_vm": {"type": "number", "description": "Incident field strength in V/m (default 10)"},
+            "iso_level": {"type": "integer", "description": "ISO 11452 test level 1-5 (default 3). Overrides field_strength_vm."},
+        }, ["interfaces"]),
+
+        # =====================================================================
+        # NEAR-FIELD EMI (1 tool)
+        # =====================================================================
+        _make_tool("pcb_analyze_near_field", "Near-field probe and current loop EMI modeling — computes H-field (magnetic dipole) and E-field (electric dipole) at various distances from PCB sources. Identifies dominant emitters and near-field/far-field transition.", {
+            "sources": {"type": "array", "items": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "Descriptive name for this source"},
+                "type": {"type": "string", "description": "Source type: current_loop, smps_inductor, motor_driver, power_trace, transformer, clock_trace, high_impedance_trace, crystal_oscillator, reset_line, unshielded_cable"},
+                "frequency_mhz": {"type": "number", "description": "Operating frequency in MHz"},
+                "current_a": {"type": "number", "description": "Loop current in amps (magnetic sources)"},
+                "area_mm2": {"type": "number", "description": "Loop area in mm^2 (magnetic sources)"},
+                "voltage_v": {"type": "number", "description": "Signal voltage in volts (electric sources)"},
+                "length_mm": {"type": "number", "description": "Trace/element length in mm (electric sources)"},
+            }}, "description": "List of near-field EMI sources to analyze"},
+        }, ["sources"]),
 
         # =====================================================================
         # SESSION MANAGEMENT (2 tools)
@@ -2427,6 +2477,34 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         comparison = comparator.compare(design_a, design_b)
         return comparator.to_dict(comparison)
 
+    # === CONDUCTED EMISSIONS ===
+    if name == "pcb_analyze_conducted_emissions":
+        from .analyzers.emc.conducted_emissions import ConductedEmissionAnalyzer
+        analyzer = ConductedEmissionAnalyzer()
+        analysis = analyzer.predict_conducted_compliance(
+            switching_freq_khz=args["switching_freq_khz"],
+            input_voltage=args["input_voltage"],
+            duty_cycle=args["duty_cycle"],
+            rise_time_ns=args["rise_time_ns"],
+            cispr_class=args.get("cispr_class", 3),
+            fcc_class=args.get("fcc_class", "B"),
+            num_harmonics=args.get("num_harmonics", 50),
+            input_filter_db=args.get("input_filter_db", 0.0),
+        )
+        return analyzer.to_dict(analysis)
+
+    # === EMI FILTER DESIGN ===
+    if name == "pcb_design_emi_filter":
+        from .analyzers.emc.filter_design import FilterDesigner
+        source_z = args.get("source_impedance_ohm", 50.0)
+        designer = FilterDesigner(source_impedance_ohm=source_z, load_impedance_ohm=source_z)
+        result = designer.auto_design_filter(
+            failure_frequencies_mhz=args["failure_frequencies_mhz"],
+            required_attenuation_db=args["required_attenuation_db"],
+            filter_type=args.get("filter_type", "auto"),
+        )
+        return designer.to_dict(result)
+
     # === AUTOMOTIVE EMC ===
     if name == "pcb_analyze_automotive_emc":
         from .analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
@@ -2459,6 +2537,23 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         if result is None:
             return {"success": False, "error": "Invalid ISO 11452 level (must be 1-5)"}
         return result
+
+    if name == "pcb_analyze_immunity_margin":
+        from .analyzers.emc.immunity import ImmunityAnalyzer
+        analyzer = ImmunityAnalyzer()
+        analysis = analyzer.analyze_immunity(
+            interfaces=args["interfaces"],
+            field_strength_vm=args.get("field_strength_vm", 10.0),
+            iso_level=args.get("iso_level", 3),
+        )
+        return analyzer.to_dict(analysis)
+
+    # === NEAR-FIELD EMI ===
+    if name == "pcb_analyze_near_field":
+        from .analyzers.emc.near_field import NearFieldAnalyzer
+        analyzer = NearFieldAnalyzer()
+        analysis = analyzer.analyze_sources(args["sources"])
+        return analyzer.to_dict(analysis)
 
     # === SESSION MANAGEMENT ===
     if name == "pcb_list_sessions":
