@@ -204,6 +204,258 @@ def estimate_rise_time_bandwidth(rise_time_ps):
     return {"rise_time_ps": rise_time_ps, "bandwidth_3db_ghz": round(bw_3db_ghz, 2), "knee_frequency_ghz": round(f_knee_ghz, 2), "fifth_harmonic_ghz": round(f_5th_ghz, 2), "notes": [f"PCB traces should be treated as transmission lines above {bw_3db_ghz/10:.2f} GHz", f"EMC concerns extend up to {f_knee_ghz:.2f} GHz"]}
 
 
+# --- New RF engineering calculators (added from review) ---
+
+def calc_cpw_impedance(trace_width_mm, gap_mm, dielectric_height_mm, trace_thickness_mm, dielectric_constant, has_ground_plane=True):
+    """Coplanar waveguide impedance (grounded CPW by default, ungrounded if has_ground_plane=False).
+
+    Uses Wen's conformal mapping method with Hilberg's approximation for K(k)/K'(k).
+    """
+    w = trace_width_mm
+    s = gap_mm
+    a = w / 2
+    b = w / 2 + s
+    t = trace_thickness_mm
+
+    # Effective width accounting for trace thickness
+    if t > 0:
+        delta = (1.25 * t / math.pi) * (1 + math.log(4 * math.pi * w / t))
+        a_eff = a + delta / 2
+        b_eff = b - delta / 2
+    else:
+        a_eff = a
+        b_eff = b
+
+    k0 = a_eff / b_eff
+    k0_prime = math.sqrt(1 - k0 ** 2)
+
+    # Hilberg approximation for K(k)/K'(k) ratio
+    def _kk_ratio(k):
+        if k < 1e-10:
+            return 0.0
+        kp = math.sqrt(1 - k ** 2)
+        if k <= 1 / math.sqrt(2):
+            return math.pi / math.log(2 * (1 + math.sqrt(kp)) / (1 - math.sqrt(kp)))
+        else:
+            return math.log(2 * (1 + math.sqrt(k)) / (1 - math.sqrt(k))) / math.pi
+
+    if has_ground_plane:
+        # Grounded CPW: includes ground plane effect
+        h = dielectric_height_mm
+        k1 = math.tanh(math.pi * a_eff / (4 * h)) / math.tanh(math.pi * b_eff / (4 * h))
+        k1_prime = math.sqrt(1 - k1 ** 2)
+
+        kk0 = _kk_ratio(k0)
+        kk1 = _kk_ratio(k1)
+
+        er_eff = 1 + (dielectric_constant - 1) / 2 * kk1 / kk0 if kk0 > 0 else dielectric_constant
+        z0 = (60 * math.pi / math.sqrt(er_eff)) / (kk0 + kk1) if (kk0 + kk1) > 0 else 50.0
+        cpw_type = "grounded_cpw"
+    else:
+        # Ungrounded CPW
+        kk0 = _kk_ratio(k0)
+        er_eff = (1 + dielectric_constant) / 2
+        z0 = (30 * math.pi / math.sqrt(er_eff)) / kk0 if kk0 > 0 else 50.0
+        cpw_type = "cpw"
+
+    prop_delay = 1000 / C0 * math.sqrt(er_eff) * 1e12 * 25.4  # ps/inch
+
+    return {
+        "impedance_ohms": round(z0, 2),
+        "effective_er": round(er_eff, 3),
+        "propagation_delay_ps_per_inch": round(prop_delay, 1),
+        "cpw_type": cpw_type,
+        "parameters": {
+            "trace_width_mm": w, "gap_mm": gap_mm,
+            "dielectric_height_mm": dielectric_height_mm,
+            "trace_thickness_mm": trace_thickness_mm,
+            "dielectric_constant": dielectric_constant,
+        },
+    }
+
+
+def calc_skin_effect(frequency_mhz, copper_thickness_oz=1.0, surface_roughness_um=0.5):
+    """Calculate skin depth, AC resistance factor, and conductor loss.
+
+    Includes Hammerstad-Bekkadal surface roughness correction.
+    """
+    f = frequency_mhz * 1e6
+    mu0 = 4 * math.pi * 1e-7
+    sigma_cu = 5.8e7  # S/m for annealed copper
+    rho_cu = 1 / sigma_cu
+
+    # Skin depth
+    if f > 0:
+        delta = math.sqrt(rho_cu / (math.pi * f * mu0))
+    else:
+        return {"skin_depth_um": float("inf"), "ac_resistance_factor": 1.0, "notes": ["DC: no skin effect"]}
+
+    delta_um = delta * 1e6
+    copper_thickness_um = copper_thickness_oz * 35.0  # 1oz = 35um
+
+    # AC resistance factor (ratio of AC to DC resistance)
+    if delta_um < copper_thickness_um:
+        ac_factor = copper_thickness_um / delta_um
+    else:
+        ac_factor = 1.0
+
+    # Hammerstad-Bekkadal surface roughness correction
+    rq = surface_roughness_um * 1e-6
+    roughness_factor = 1.0
+    if delta > 0:
+        x = (2 * rq / delta) ** 2
+        roughness_factor = 1 + (2 / math.pi) * math.atan(1.4 * x)
+
+    total_ac_factor = ac_factor * roughness_factor
+
+    # Conductor loss per unit length (dB/inch) for a 50-ohm line
+    loss_per_inch = 0.0
+    if delta_um < copper_thickness_um:
+        rs = math.sqrt(math.pi * f * mu0 * rho_cu) * roughness_factor
+        loss_per_inch = (rs / (2 * 50)) * 25.4e-3 * 8.686  # Np/m to dB/inch
+
+    notes = []
+    if delta_um < copper_thickness_um / 2:
+        notes.append(f"Skin depth ({delta_um:.1f} um) << copper ({copper_thickness_um:.0f} um): significant AC loss")
+    elif delta_um < copper_thickness_um:
+        notes.append(f"Skin depth ({delta_um:.1f} um) < copper ({copper_thickness_um:.0f} um): moderate AC loss")
+    else:
+        notes.append(f"Skin depth ({delta_um:.1f} um) > copper ({copper_thickness_um:.0f} um): minimal skin effect")
+    if surface_roughness_um > 1.0:
+        notes.append(f"Surface roughness {surface_roughness_um} um adds {(roughness_factor - 1) * 100:.0f}% additional loss")
+
+    return {
+        "skin_depth_um": round(delta_um, 2),
+        "ac_resistance_factor": round(total_ac_factor, 2),
+        "roughness_correction_factor": round(roughness_factor, 3),
+        "conductor_loss_db_per_inch": round(loss_per_inch, 4),
+        "frequency_mhz": frequency_mhz,
+        "copper_thickness_um": copper_thickness_um,
+        "notes": notes,
+    }
+
+
+def calc_dielectric_loss(frequency_mhz, dielectric_constant, loss_tangent, trace_length_mm):
+    """Calculate dielectric loss for a given trace at frequency.
+
+    Uses: alpha_d = (pi * f * sqrt(er_eff) * tan_delta) / c
+    """
+    f = frequency_mhz * 1e6
+    er = dielectric_constant
+    tan_d = loss_tangent
+
+    # Dielectric attenuation constant (Np/m)
+    if f > 0 and tan_d > 0:
+        alpha_d = (math.pi * f * math.sqrt(er) * tan_d) / C0
+        loss_db_per_m = alpha_d * 8.686
+        loss_db_per_inch = loss_db_per_m * 0.0254
+        total_loss_db = loss_db_per_m * (trace_length_mm / 1000)
+    else:
+        loss_db_per_m = 0.0
+        loss_db_per_inch = 0.0
+        total_loss_db = 0.0
+
+    notes = []
+    if total_loss_db > 3:
+        notes.append(f"CRITICAL: {total_loss_db:.1f} dB loss — consider lower-loss laminate")
+    elif total_loss_db > 1:
+        notes.append(f"Significant dielectric loss ({total_loss_db:.1f} dB) — verify link budget")
+    if loss_tangent > 0.02:
+        notes.append(f"High loss tangent ({loss_tangent}) — FR4 typical; use Rogers/Megtron for >5 GHz")
+
+    return {
+        "dielectric_loss_db_per_inch": round(loss_db_per_inch, 4),
+        "dielectric_loss_db_per_m": round(loss_db_per_m, 3),
+        "total_loss_db": round(total_loss_db, 3),
+        "frequency_mhz": frequency_mhz,
+        "trace_length_mm": trace_length_mm,
+        "material": {"dielectric_constant": er, "loss_tangent": tan_d},
+        "notes": notes,
+    }
+
+
+def calc_plane_resonance(plane_width_mm, plane_length_mm, dielectric_constant, dielectric_height_mm):
+    """Calculate PCB power/ground plane cavity resonance frequencies.
+
+    Cavity model: f_mn = c / (2 * sqrt(er)) * sqrt((m/L)^2 + (n/W)^2)
+    """
+    er = dielectric_constant
+    L = plane_length_mm / 1000  # meters
+    W = plane_width_mm / 1000
+
+    resonances = []
+    for m in range(0, 4):
+        for n in range(0, 4):
+            if m == 0 and n == 0:
+                continue
+            f = (C0 / (2 * math.sqrt(er))) * math.sqrt((m / L) ** 2 + (n / W) ** 2)
+            f_mhz = f / 1e6
+            if f_mhz < 10000:  # up to 10 GHz
+                resonances.append({
+                    "mode": f"TM{m}{n}",
+                    "frequency_mhz": round(f_mhz, 1),
+                    "wavelength_mm": round(C0 / f * 1000, 1),
+                })
+
+    resonances.sort(key=lambda r: r["frequency_mhz"])
+
+    # Mitigation suggestions
+    notes = []
+    if resonances:
+        f1 = resonances[0]["frequency_mhz"]
+        # Via stitching: spacing < lambda/20 at highest frequency of concern
+        max_via_spacing = resonances[0]["wavelength_mm"] / 20
+        notes.append(f"First resonance at {f1:.0f} MHz (mode {resonances[0]['mode']})")
+        notes.append(f"Place decoupling vias at < {max_via_spacing:.1f} mm spacing to suppress")
+        if f1 < 500:
+            notes.append("WARNING: Low-frequency resonance — add distributed decoupling capacitors")
+
+    return {
+        "resonances": resonances[:10],
+        "first_resonance_mhz": resonances[0]["frequency_mhz"] if resonances else None,
+        "plane_dimensions_mm": {"width": plane_width_mm, "length": plane_length_mm},
+        "dielectric_constant": er,
+        "dielectric_height_mm": dielectric_height_mm,
+        "notes": notes,
+    }
+
+
+def calc_via_stitching_requirements(max_frequency_mhz, dielectric_constant):
+    """Calculate required via stitching density and spacing for EMI containment.
+
+    Rule: via spacing < lambda/20 at max frequency to prevent cavity resonance leakage.
+    """
+    f = max_frequency_mhz * 1e6
+    wavelength = C0 / (f * math.sqrt(dielectric_constant))
+    wavelength_mm = wavelength * 1000
+
+    max_spacing_mm = wavelength_mm / 20  # lambda/20 rule
+    vias_per_cm = 10 / max_spacing_mm  # along one edge
+    vias_per_cm2 = vias_per_cm ** 2  # area density
+
+    notes = []
+    if max_spacing_mm < 1.0:
+        notes.append(f"Very tight spacing ({max_spacing_mm:.2f} mm) — may require HDI process")
+    elif max_spacing_mm < 2.5:
+        notes.append(f"Moderate spacing ({max_spacing_mm:.2f} mm) — standard PCB feasible")
+    else:
+        notes.append(f"Relaxed spacing ({max_spacing_mm:.1f} mm) — easy to implement")
+
+    # Also calculate lambda/10 for critical areas
+    critical_spacing = wavelength_mm / 10
+
+    return {
+        "max_via_spacing_mm": round(max_spacing_mm, 2),
+        "critical_area_spacing_mm": round(critical_spacing, 2),
+        "vias_per_cm_edge": round(vias_per_cm, 1),
+        "vias_per_cm2_area": round(vias_per_cm2, 1),
+        "wavelength_mm": round(wavelength_mm, 1),
+        "frequency_mhz": max_frequency_mhz,
+        "dielectric_constant": dielectric_constant,
+        "notes": notes,
+    }
+
+
 # Reference data
 STACKUP_TEMPLATES = [
     {"name": "2-layer FR4", "layers": ["Signal/GND", "Signal/Power"], "thickness_mm": 1.6, "typical_z0": "50-60 ohms microstrip"},
@@ -333,6 +585,38 @@ async def list_tools() -> list[Tool]:
         }, ["current_amps", "temp_rise_c", "copper_thickness_oz"]),
 
         # =====================================================================
+        # ADVANCED RF CALCULATORS (5 tools)
+        # =====================================================================
+        _make_tool("pcb_calc_cpw_impedance", "Calculate coplanar waveguide (CPW/GCPW) impedance using conformal mapping. Supports grounded and ungrounded CPW.", {
+            "trace_width_mm": {"type": "number", "description": "Center conductor width"},
+            "gap_mm": {"type": "number", "description": "Gap between conductor and coplanar ground"},
+            "dielectric_height_mm": {"type": "number", "description": "Height to ground plane below"},
+            "trace_thickness_mm": {"type": "number", "description": "Copper thickness (1oz = 0.035mm)"},
+            "dielectric_constant": {"type": "number"},
+            "has_ground_plane": {"type": "boolean", "description": "True for grounded CPW (default), false for ungrounded"},
+        }, ["trace_width_mm", "gap_mm", "dielectric_height_mm", "trace_thickness_mm", "dielectric_constant"]),
+        _make_tool("pcb_calc_skin_effect", "Calculate skin depth, AC resistance factor, and conductor loss including Hammerstad surface roughness correction.", {
+            "frequency_mhz": {"type": "number"},
+            "copper_thickness_oz": {"type": "number", "description": "Copper weight (default 1.0 oz)"},
+            "surface_roughness_um": {"type": "number", "description": "RMS surface roughness in microns (standard: 0.5, HVLP: 0.3, RTF: 1.5)"},
+        }, ["frequency_mhz"]),
+        _make_tool("pcb_calc_dielectric_loss", "Calculate dielectric loss (dB/inch, total dB) for a trace at frequency. Accounts for material loss tangent.", {
+            "frequency_mhz": {"type": "number"},
+            "dielectric_constant": {"type": "number"},
+            "loss_tangent": {"type": "number", "description": "Material Df (FR4: 0.02, Megtron6: 0.002, Rogers 4350B: 0.0037)"},
+            "trace_length_mm": {"type": "number"},
+        }, ["frequency_mhz", "dielectric_constant", "loss_tangent", "trace_length_mm"]),
+        _make_tool("pcb_calc_plane_resonance", "Calculate power/ground plane cavity resonance frequencies. Identifies modes that can amplify noise and cause EMI.", {
+            "plane_width_mm": {"type": "number"}, "plane_length_mm": {"type": "number"},
+            "dielectric_constant": {"type": "number"},
+            "dielectric_height_mm": {"type": "number", "description": "Dielectric thickness between planes"},
+        }, ["plane_width_mm", "plane_length_mm", "dielectric_constant", "dielectric_height_mm"]),
+        _make_tool("pcb_calc_via_stitching", "Calculate required via stitching density and spacing for EMI containment at a given frequency. Uses lambda/20 rule.", {
+            "max_frequency_mhz": {"type": "number", "description": "Highest frequency of concern"},
+            "dielectric_constant": {"type": "number"},
+        }, ["max_frequency_mhz", "dielectric_constant"]),
+
+        # =====================================================================
         # SIGNAL INTEGRITY (5 tools)
         # =====================================================================
         _make_tool("pcb_analyze_timing", "Analyze timing margins for high-speed signals.", {
@@ -353,6 +637,7 @@ async def list_tools() -> list[Tool]:
         _make_tool("pcb_analyze_differential_pair", "Analyze differential pair routing quality.", {
             "trace_width_mm": {"type": "number"}, "trace_spacing_mm": {"type": "number"},
             "dielectric_height_mm": {"type": "number"}, "dielectric_constant": {"type": "number"},
+            "trace_thickness_mm": {"type": "number", "description": "Copper thickness in mm (1oz = 0.035mm, default 0.035)"},
             "data_rate_gbps": {"type": "number"}, "target_impedance_ohm": {"type": "number", "description": "Target diff impedance (e.g. 90, 100)"},
         }, ["trace_width_mm", "trace_spacing_mm", "dielectric_height_mm", "dielectric_constant", "data_rate_gbps", "target_impedance_ohm"]),
         _make_tool("pcb_analyze_length_matching", "Analyze trace length matching for a group of signals.", {
@@ -431,6 +716,7 @@ async def list_tools() -> list[Tool]:
         }, ["ic_power_pins", "max_frequency_mhz"]),
         _make_tool("pcb_analyze_vrm", "Analyze VRM placement and routing.", {
             "output_voltage_v": {"type": "number"}, "output_current_a": {"type": "number"},
+            "input_voltage_v": {"type": "number", "description": "VRM input voltage (default: 12V)"},
             "switching_frequency_khz": {"type": "number"},
             "distance_to_load_mm": {"type": "number"},
         }, ["output_voltage_v", "output_current_a"]),
@@ -804,6 +1090,18 @@ def _dispatch(name: str, args: dict) -> dict:
     if name == "pcb_calc_trace_width":
         return _result(calc_trace_width_for_current(args["current_amps"], args["temp_rise_c"], args["copper_thickness_oz"], args.get("layer_type", "external")))
 
+    # === ADVANCED RF CALCULATORS ===
+    if name == "pcb_calc_cpw_impedance":
+        return _result(calc_cpw_impedance(args["trace_width_mm"], args["gap_mm"], args["dielectric_height_mm"], args["trace_thickness_mm"], args["dielectric_constant"], args.get("has_ground_plane", True)))
+    if name == "pcb_calc_skin_effect":
+        return _result(calc_skin_effect(args["frequency_mhz"], args.get("copper_thickness_oz", 1.0), args.get("surface_roughness_um", 0.5)))
+    if name == "pcb_calc_dielectric_loss":
+        return _result(calc_dielectric_loss(args["frequency_mhz"], args["dielectric_constant"], args["loss_tangent"], args["trace_length_mm"]))
+    if name == "pcb_calc_plane_resonance":
+        return _result(calc_plane_resonance(args["plane_width_mm"], args["plane_length_mm"], args["dielectric_constant"], args["dielectric_height_mm"]))
+    if name == "pcb_calc_via_stitching":
+        return _result(calc_via_stitching_requirements(args["max_frequency_mhz"], args["dielectric_constant"]))
+
     # === SIGNAL INTEGRITY ===
     if name == "pcb_analyze_timing":
         return _result(analyze_trace_timing(args["trace_length_mm"], args["effective_er"], args["data_rate_gbps"], args["rise_time_ps"], args["setup_time_ps"], args["hold_time_ps"]))
@@ -813,7 +1111,7 @@ def _dispatch(name: str, args: dict) -> dict:
         return _result(analyze_via(args["via_diameter_mm"], args["via_length_mm"], args["pad_diameter_mm"], args["antipad_diameter_mm"], args["dielectric_constant"], args["frequency_ghz"]))
 
     if name == "pcb_analyze_differential_pair":
-        res = calc_differential_impedance(args["trace_width_mm"], args["trace_spacing_mm"], args["dielectric_height_mm"], 0.035, args["dielectric_constant"])
+        res = calc_differential_impedance(args["trace_width_mm"], args["trace_spacing_mm"], args["dielectric_height_mm"], args.get("trace_thickness_mm", 0.035), args["dielectric_constant"])
         z_diff = res["differential_impedance_ohms"]
         target = args["target_impedance_ohm"]
         deviation = abs(z_diff - target) / target * 100
@@ -1027,7 +1325,7 @@ def _dispatch(name: str, args: dict) -> dict:
         res = analyzer.analyze_vrm(
             vrm_ref="U_VRM", vrm_position=(0, 0), output_rail="VOUT",
             output_voltage=args["output_voltage_v"], output_current=args["output_current_a"],
-            input_voltage=args["output_voltage_v"] * 3, components=[],
+            input_voltage=args.get("input_voltage_v", 12.0), components=[],
             load_positions=[(dist, 0)],
         )
         return _serialize(res)
@@ -1420,7 +1718,7 @@ def _dispatch(name: str, args: dict) -> dict:
         closed = sessions.close_session(args["session_id"])
         return {"closed": closed, "session_id": args["session_id"]}
 
-    return {"success": False, "error": f"Unknown tool: {name}"}
+    raise ValueError(f"Unknown tool: {name}")
 
 
 def _get_session(session_id: str):
