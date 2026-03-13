@@ -562,10 +562,11 @@ class TestServerDispatch:
 
     def test_pcb_render_board_invalid_session(self):
         from mcp_pcb_emcopilot.server import _dispatch
+        from mcp_pcb_emcopilot.errors import SessionError
         try:
             _dispatch("pcb_render_board", {"session_id": "nonexistent"})
             assert False, "Should have raised"
-        except ValueError:
+        except (ValueError, SessionError):
             pass
 
 
