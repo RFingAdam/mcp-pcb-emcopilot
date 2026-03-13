@@ -375,41 +375,37 @@ def test_smps_emi_loop_area_impact():
 # =============================================================================
 
 def test_dispatch_return_current_density():
-    """Test pcb_analyze_return_current_density through dispatch."""
+    """Test pcb_analyze_return_current through dispatch."""
     from mcp_pcb_emcopilot.server import _dispatch
 
-    result = _dispatch("pcb_analyze_return_current_density", {
-        "trace_x_start": 10, "trace_y_start": 25,
-        "trace_x_end": 40, "trace_y_end": 25,
-        "plane_width_mm": 50, "plane_height_mm": 50,
-        "frequency_mhz": 500,
+    result = _dispatch("pcb_analyze_return_current", {
+        "trace_height_mm": 0.1,
+        "signal_current_ma": 100,
+        "analysis_width_mm": 5.0,
+        "num_points": 20,
     })
 
-    assert result["success"] is True
-    assert "current_distribution" in result
-    assert "crowding_locations" in result
-    assert result["frequency_regime"] in ("resistive", "transition", "inductive")
+    assert result["peak_density_ma_per_mm"] > 0
+    assert "density_ma_per_mm" in result
+    assert len(result["density_ma_per_mm"]) == 20
 
-    print(f"  Dispatch OK: regime={result['frequency_regime']}, spreading={result['current_spreading_mm']}mm")
-    print("  PASS: pcb_analyze_return_current_density dispatch works")
+    print(f"  Dispatch OK: peak={result['peak_density_ma_per_mm']:.1f} mA/mm")
+    print("  PASS: pcb_analyze_return_current dispatch works")
 
 
 def test_dispatch_ground_stitching():
-    """Test pcb_optimize_ground_stitching through dispatch."""
+    """Test pcb_analyze_ground_stitch through dispatch."""
     from mcp_pcb_emcopilot.server import _dispatch
 
-    result = _dispatch("pcb_optimize_ground_stitching", {
-        "plane_width_mm": 60, "plane_height_mm": 40,
-        "max_frequency_mhz": 1000, "dielectric_constant": 4.3,
+    result = _dispatch("pcb_analyze_ground_stitch", {
+        "max_frequency_hz": 1e9,
+        "dielectric_constant": 4.3,
     })
 
-    assert result["success"] is True
-    assert result["total_new_vias"] > 0
-    assert result["spacing_mm"] > 0
-    assert result["density_per_cm2"] > 0
+    assert result["recommended_spacing_mm"] > 0
 
-    print(f"  Dispatch OK: {result['total_new_vias']} vias, spacing={result['spacing_mm']}mm")
-    print("  PASS: pcb_optimize_ground_stitching dispatch works")
+    print(f"  Dispatch OK: spacing={result['recommended_spacing_mm']:.2f}mm")
+    print("  PASS: pcb_analyze_ground_stitch dispatch works")
 
 
 def test_dispatch_clock_emi():
@@ -417,18 +413,15 @@ def test_dispatch_clock_emi():
     from mcp_pcb_emcopilot.server import _dispatch
 
     result = _dispatch("pcb_analyze_clock_emi", {
-        "frequency_mhz": 100,
-        "rise_time_ps": 500,
-        "current_ma": 10,
-        "loop_area_mm2": 10,
+        "clock_frequency_mhz": 100,
+        "rise_time_ns": 0.5,
     })
 
-    assert result["success"] is True
     assert "harmonics" in result
-    assert result["fundamental_frequency_mhz"] == 100
-    assert result["risk_level"] in ("pass", "marginal", "fail")
+    assert result["pass_fail"] in ("PASS", "FAIL")
+    assert result["worst_frequency_mhz"] > 0
 
-    print(f"  Dispatch OK: {len(result['harmonics'])} harmonics, risk={result['risk_level']}")
+    print(f"  Dispatch OK: {len(result['harmonics'])} harmonics, pass_fail={result['pass_fail']}")
     print("  PASS: pcb_analyze_clock_emi dispatch works")
 
 
@@ -437,21 +430,17 @@ def test_dispatch_smps_emi():
     from mcp_pcb_emcopilot.server import _dispatch
 
     result = _dispatch("pcb_analyze_smps_emi", {
-        "switching_freq_khz": 500,
+        "switching_frequency_khz": 500,
         "input_voltage_v": 12,
         "output_voltage_v": 3.3,
         "output_current_a": 2,
-        "topology": "buck",
     })
 
-    assert result["success"] is True
     assert "harmonics" in result
-    assert result["switching_frequency_khz"] == 500
-    assert result["topology"] == "buck"
-    assert result["risk_level"] in ("pass", "marginal", "fail")
-    assert "filter_recommendations" in result
+    assert result["pass_fail"] in ("PASS", "FAIL")
+    assert "power_stage" in result
 
-    print(f"  Dispatch OK: D={result['duty_cycle']}, risk={result['risk_level']}")
+    print(f"  Dispatch OK: pass_fail={result['pass_fail']}")
     print("  PASS: pcb_analyze_smps_emi dispatch works")
 
 
@@ -468,8 +457,8 @@ def test_tool_registration():
     tool_names = {t.name for t in tools}
 
     expected = {
-        "pcb_analyze_return_current_density",
-        "pcb_optimize_ground_stitching",
+        "pcb_analyze_return_current",
+        "pcb_analyze_ground_stitch",
         "pcb_analyze_clock_emi",
         "pcb_analyze_smps_emi",
     }
