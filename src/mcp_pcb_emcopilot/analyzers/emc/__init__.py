@@ -7,6 +7,7 @@ from .shielding import ShieldingAnalyzer, ShieldingResult
 from .radiated_emissions import EmissionsAnalyzer, EmissionsResult
 from .grounding import GroundingAnalyzer, GroundingResult
 from .esd_assessment import ESDAnalyzer, ESDResult
+from .filter_design import FilterDesigner, FilterDesignResult
 
 __all__ = [
     "CurrentLoopAnalyzer",
@@ -19,4 +20,6 @@ __all__ = [
     "GroundingResult",
     "ESDAnalyzer",
     "ESDResult",
+    "FilterDesigner",
+    "FilterDesignResult",
 ]
