@@ -1,7 +1,8 @@
 """PCB file format parsers with auto-detection.
 
 Supports: KiCad (.kicad_pcb), ODB++ (.tgz/.tar.gz), Gerber (.gbr/.ger),
-Altium (.PcbDoc), IPC-2581 (.xml/.cvg), BOM (.csv/.xlsx), Schematic (.kicad_sch)
+Altium (.PcbDoc), IPC-2581 (.xml/.cvg), BOM (.csv/.xlsx), Schematic (.kicad_sch),
+STEP (.step/.stp), Schematic PDF (.pdf)
 """
 
 import logging
@@ -40,10 +41,14 @@ def detect_format(file_path: str) -> str:
         except Exception:
             pass
         return "ipc2581"
+    elif ext in (".step", ".stp"):
+        return "step"
     elif ext in (".csv", ".xlsx", ".xls"):
         return "bom"
     elif ext == ".kicad_sch":
         return "schematic"
+    elif ext == ".pdf":
+        return "schematic_pdf"
     else:
         return "unknown"
 
@@ -71,6 +76,8 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
         return _parse_altium(file_path)
     elif file_format == "ipc2581":
         return _parse_ipc2581(file_path)
+    elif file_format == "step":
+        return _parse_step(file_path)
     else:
         raise ValueError(f"Unsupported format: {file_format} for {file_path}")
 
@@ -426,3 +433,51 @@ def _parse_ipc2581(file_path: str) -> PCBDesignData:
         ))
 
     return data
+
+
+def _parse_step(file_path: str) -> PCBDesignData:
+    """Parse STEP (.step/.stp) file into PCBDesignData with 3D data."""
+    from .step_parser import STEPParser
+
+    parser = STEPParser()
+    result = parser.parse_file(file_path)
+
+    board_3d = result.get("board_3d", {})
+    step_components = result.get("step_components", [])
+
+    data = PCBDesignData(
+        source_file=file_path,
+        source_format="step",
+        board_width_mm=board_3d.get("width", 0),
+        board_height_mm=board_3d.get("depth", 0),
+        board_thickness_mm=board_3d.get("thickness", 1.6),
+        warnings=result.get("warnings", []),
+        step_components=step_components,
+        board_3d=board_3d,
+    )
+
+    # Populate standard components from STEP component data
+    for sc in step_components:
+        data.components.append(PCBComponent(
+            reference=sc.get("reference", "?"),
+            value=sc.get("description", None),
+            x_mm=sc.get("x", 0),
+            y_mm=sc.get("y", 0),
+        ))
+
+    return data
+
+
+def parse_schematic_pdf(file_path: str):
+    """Parse a PDF schematic file and return extraction results.
+
+    Args:
+        file_path: Path to the PDF schematic file.
+
+    Returns:
+        PDFSchematicResult with pages, components, and nets.
+    """
+    from .pdf_schematic_parser import PDFSchematicParser
+
+    parser = PDFSchematicParser()
+    return parser.parse(file_path)
