@@ -1,0 +1,130 @@
+[IBIS Ver]      5.0
+[Comment Char]  |
+[File Name]     sample_io.ibs
+[File Rev]      1.0
+[Date]          March 12, 2026
+
+[Component]     SAMPLE_IC_3V3
+[Manufacturer]  TestSemiconductor Inc.
+
+[Package]
+| variable       typ         min         max
+R_pkg           0.10        0.05        0.15
+L_pkg           1.0nH       0.5nH       1.5nH
+C_pkg           0.5pF       0.2pF       0.8pF
+
+[Pin]  signal_name  model_name  R_pin  L_pin  C_pin
+1      VCC          POWER       0      0      0
+2      GND          GND         0      0      0
+3      DATA0        IO_3V3      0.1    1nH    0.5pF
+4      DATA1        IO_3V3      0.1    1nH    0.5pF
+5      CLK_OUT      IO_1V8      0.05   0.8nH  0.3pF
+6      RESET_N      IO_1V8      0.05   0.8nH  0.3pF
+
+[Model]         IO_3V3
+Model_type      I/O
+Vinl = 0.8V
+Vinh = 2.0V
+Vmeas = 1.5V
+C_comp          3.0pF       2.0pF       4.0pF
+
+[Pullup]
+| Voltage       I(typ)      I(min)      I(max)
+-3.3V          100.0mA     80.0mA      120.0mA
+-1.65V         50.0mA      40.0mA      60.0mA
+0.0V           0.0A        0.0A        0.0A
+1.65V          -50.0mA     -40.0mA     -60.0mA
+3.3V           -100.0mA    -80.0mA     -120.0mA
+6.6V           -100.0mA    -80.0mA     -120.0mA
+
+[Pulldown]
+| Voltage       I(typ)      I(min)      I(max)
+-3.3V          -100.0mA    -80.0mA     -120.0mA
+-1.65V         -50.0mA     -40.0mA     -60.0mA
+0.0V           0.0A        0.0A        0.0A
+1.65V          50.0mA      40.0mA      60.0mA
+3.3V           100.0mA     80.0mA      120.0mA
+6.6V           100.0mA     80.0mA      120.0mA
+
+[Rising Waveform]
+R_fixture = 50
+V_fixture = 3.3
+| Time          V(typ)      V(min)      V(max)
+0.0             0.0         0.0         0.0
+0.1n            0.15        0.10        0.20
+0.2n            0.50        0.40        0.60
+0.3n            1.00        0.85        1.15
+0.5n            1.65        1.40        1.90
+0.7n            2.30        2.00        2.60
+0.8n            2.80        2.50        3.10
+1.0n            3.30        3.00        3.30
+2.0n            3.30        3.00        3.30
+
+[Falling Waveform]
+R_fixture = 50
+V_fixture = 0
+| Time          V(typ)      V(min)      V(max)
+0.0             3.30        3.00        3.30
+0.1n            3.15        2.90        3.20
+0.2n            2.80        2.50        3.00
+0.3n            2.30        2.00        2.60
+0.5n            1.65        1.40        1.90
+0.7n            1.00        0.80        1.20
+0.8n            0.50        0.35        0.70
+1.0n            0.0         0.0         0.0
+2.0n            0.0         0.0         0.0
+
+[Model]         IO_1V8
+Model_type      Output
+Vinl = 0.5V
+Vinh = 1.17V
+Vmeas = 0.9V
+C_comp          2.0pF       1.5pF       2.5pF
+
+[Pullup]
+| Voltage       I(typ)      I(min)      I(max)
+-1.8V          50.0mA      40.0mA      60.0mA
+-0.9V          25.0mA      20.0mA      30.0mA
+0.0V           0.0A        0.0A        0.0A
+0.9V           -25.0mA     -20.0mA     -30.0mA
+1.8V           -50.0mA     -40.0mA     -60.0mA
+3.6V           -50.0mA     -40.0mA     -60.0mA
+
+[Pulldown]
+| Voltage       I(typ)      I(min)      I(max)
+-1.8V          -50.0mA     -40.0mA     -60.0mA
+-0.9V          -25.0mA     -20.0mA     -30.0mA
+0.0V           0.0A        0.0A        0.0A
+0.9V           25.0mA      20.0mA      30.0mA
+1.8V           50.0mA      40.0mA      60.0mA
+3.6V           50.0mA      40.0mA      60.0mA
+
+[Rising Waveform]
+R_fixture = 50
+V_fixture = 1.8
+| Time          V(typ)      V(min)      V(max)
+0.0             0.0         0.0         0.0
+0.1n            0.09        0.07        0.12
+0.2n            0.30        0.25        0.35
+0.3n            0.60        0.50        0.70
+0.5n            0.90        0.75        1.05
+0.7n            1.26        1.10        1.40
+0.8n            1.53        1.35        1.65
+1.0n            1.80        1.65        1.80
+1.5n            1.80        1.65        1.80
+
+[Falling Waveform]
+R_fixture = 50
+V_fixture = 0
+| Time          V(typ)      V(min)      V(max)
+0.0             1.80        1.65        1.80
+0.1n            1.71        1.58        1.75
+0.2n            1.50        1.35        1.60
+0.3n            1.20        1.05        1.35
+0.5n            0.90        0.75        1.05
+0.7n            0.54        0.40        0.70
+0.8n            0.27        0.18        0.40
+1.0n            0.0         0.0         0.0
+1.5n            0.0         0.0         0.0
+
+[End]
