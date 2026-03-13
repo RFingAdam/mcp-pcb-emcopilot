@@ -1312,6 +1312,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = {"success": True, "result": _serialize(result)}
         elif "success" not in result:
             result["success"] = True
+
+        # Cache analysis results for report builder harvesting
+        if name.startswith("pcb_analyze_") or name.startswith("pcb_calc_") or name in (
+            "pcb_classify_nets", "pcb_detect_interfaces", "pcb_predict_emissions",
+            "pcb_get_emi_hotspots", "pcb_find_split_crossings", "pcb_validate_ddr_topology",
+            "pcb_validate_pcie_lanes", "pcb_get_design_rules", "pcb_get_stackup",
+        ):
+            sid = arguments.get("session_id")
+            if sid:
+                try:
+                    data = sessions.get_session(sid)
+                    data.analysis_cache[name] = result
+                except Exception:
+                    pass
+
         return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
     except PCBError as e:
         return [TextContent(type="text", text=json.dumps(e.to_dict(), indent=2, default=str))]
