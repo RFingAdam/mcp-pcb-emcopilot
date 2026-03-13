@@ -35,7 +35,7 @@ ISO11452_BCI_LEVELS_MA: dict[int, float] = {
 # ---------------------------------------------------------------------------
 # IC upset / damage threshold database
 # ---------------------------------------------------------------------------
-IC_THRESHOLDS: dict[str, dict[str, float]] = {
+IC_THRESHOLDS: dict[str, dict[str, float | str]] = {
     "cmos_logic": {
         "upset_v": 0.3,
         "damage_v": 2.0,
@@ -189,7 +189,7 @@ def bci_pin_voltage(
     return bci_current_a * z_transfer_ohm * coupling_factor
 
 
-def get_ic_threshold(ic_type: str) -> dict[str, float]:
+def get_ic_threshold(ic_type: str) -> dict[str, float | str]:
     """Look up IC upset / damage thresholds.
 
     Returns a copy of the threshold dict, or a conservative default.
@@ -313,8 +313,8 @@ class ImmunityAnalyzer:
             cable_length_m = cable_length_mm / 1000.0
 
             thresholds = get_ic_threshold(ic_type)
-            upset_v = thresholds["upset_v"]
-            damage_v = thresholds["damage_v"]
+            upset_v = float(thresholds["upset_v"])
+            damage_v = float(thresholds["damage_v"])
 
             # --- Electric field coupling ---
             v_e = voltage_from_field(field_strength_vm, trace_length_mm, frequency_hz)

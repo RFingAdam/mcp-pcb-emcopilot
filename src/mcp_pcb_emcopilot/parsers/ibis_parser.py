@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-
 # Engineering notation suffixes
 _ENG_SUFFIXES: dict[str, float] = {
     "T": 1e12, "t": 1e12,
@@ -56,7 +55,7 @@ def parse_eng_notation(value_str: str) -> float:
     """
     s = value_str.strip()
     if not s:
-        raise ValueError(f"Empty value string")
+        raise ValueError("Empty value string")
 
     match = _ENG_RE.match(s)
     if match:
@@ -434,35 +433,35 @@ class IBISParser:
 
         # Model_type
         if lower.startswith("model_type"):
-            val = line.split(None, 1)
-            if len(val) > 1:
-                mtype = val[1].strip().lower()
+            parts_mt = line.split(None, 1)
+            if len(parts_mt) > 1:
+                mtype = parts_mt[1].strip().lower()
                 model_dict["model_type"] = mtype
 
         # Vinl
         elif lower.startswith("vinl"):
-            val = line.split("=")[-1].strip() if "=" in line else ""
-            if val:
+            vinl_s = line.split("=")[-1].strip() if "=" in line else ""
+            if vinl_s:
                 try:
-                    model_dict["vinl"] = parse_eng_notation(val)
+                    model_dict["vinl"] = parse_eng_notation(vinl_s)
                 except ValueError:
                     pass
 
         # Vinh
         elif lower.startswith("vinh"):
-            val = line.split("=")[-1].strip() if "=" in line else ""
-            if val:
+            vinh_s = line.split("=")[-1].strip() if "=" in line else ""
+            if vinh_s:
                 try:
-                    model_dict["vinh"] = parse_eng_notation(val)
+                    model_dict["vinh"] = parse_eng_notation(vinh_s)
                 except ValueError:
                     pass
 
         # Vmeas
         elif lower.startswith("vmeas"):
-            val = line.split("=")[-1].strip() if "=" in line else ""
-            if val:
+            vmeas_s = line.split("=")[-1].strip() if "=" in line else ""
+            if vmeas_s:
                 try:
-                    model_dict["vmeas"] = parse_eng_notation(val)
+                    model_dict["vmeas"] = parse_eng_notation(vmeas_s)
                 except ValueError:
                     pass
 
@@ -473,6 +472,24 @@ class IBISParser:
                 try:
                     triplet = _parse_triplet(parts[1:4])
                     model_dict["c_comp"] = triplet
+                except ValueError:
+                    pass
+
+    def _parse_ramp_line(self, line: str, model_dict: dict) -> None:
+        """Parse a [Ramp] section data line (dV/dt rise/fall)."""
+        lower = line.lower()
+        for prefix in ("dv/dt_r", "dv/dt_f"):
+            if lower.startswith(prefix):
+                rest = line.split(None, 1)
+                if len(rest) > 1:
+                    model_dict.setdefault("ramp", {})[prefix.replace("/", "_")] = rest[1].strip()
+                return
+        # R_load
+        if lower.startswith("r_load"):
+            rest = line.split(None, 1)
+            if len(rest) > 1:
+                try:
+                    model_dict.setdefault("ramp", {})["r_load"] = parse_eng_notation(rest[1].strip())
                 except ValueError:
                     pass
 
@@ -626,8 +643,8 @@ def _extract_transition_time(waveforms: list[dict]) -> float:
     if len(voltages) < 2 or len(times) < 2:
         return 0.0
 
-    v_min = min(voltages)
-    v_max = max(voltages)
+    v_min = float(min(voltages))
+    v_max = float(max(voltages))
     v_range = v_max - v_min
 
     if v_range <= 0:
@@ -645,7 +662,7 @@ def _extract_transition_time(waveforms: list[dict]) -> float:
         return transition_time_s * 1e12  # Convert to ps
 
     # Fallback: use total time span
-    total_time = abs(times[-1] - times[0])
+    total_time = abs(float(times[-1]) - float(times[0]))
     return total_time * 1e12 * 0.6  # Approximate 20-80% as 60% of total
 
 
@@ -660,10 +677,10 @@ def _interpolate_time(data_points: list[dict], target_voltage: float) -> Optiona
         Interpolated time, or None if crossing not found.
     """
     for i in range(len(data_points) - 1):
-        v1 = data_points[i].get("typ", 0.0)
-        v2 = data_points[i + 1].get("typ", 0.0)
-        t1 = data_points[i].get("time", 0.0)
-        t2 = data_points[i + 1].get("time", 0.0)
+        v1 = float(data_points[i].get("typ", 0.0))
+        v2 = float(data_points[i + 1].get("typ", 0.0))
+        t1 = float(data_points[i].get("time", 0.0))
+        t2 = float(data_points[i + 1].get("time", 0.0))
 
         # Check if target voltage is between these two points
         if (v1 <= target_voltage <= v2) or (v2 <= target_voltage <= v1):
