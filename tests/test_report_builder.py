@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
-from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData, PCBLayer, PCBComponent, PCBNet, PCBTrace
+from mcp_pcb_emcopilot.models.pcb_data import PCBComponent, PCBDesignData, PCBLayer, PCBNet, PCBTrace
 from mcp_pcb_emcopilot.reports.report_builder import ReportBuilder
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
