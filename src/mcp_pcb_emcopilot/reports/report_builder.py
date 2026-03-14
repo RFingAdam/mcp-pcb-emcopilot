@@ -439,8 +439,12 @@ class ReportBuilder:
         Handles two sources:
         1. Orchestrator domain_results (list of dicts with 'domain' and 'findings' keys)
         2. analysis_cache entries (tool_name -> result dict with optional 'findings')
+
+        Findings with identical titles within a domain are collapsed into a
+        single representative finding with a count annotation so the report
+        reads like a curated review rather than a raw data dump.
         """
-        findings: list[TrackedFinding] = []
+        raw_findings: list[TrackedFinding] = []
         domain_counters: dict[str, int] = {}
         seen_domains: set[str] = set()
 
@@ -456,22 +460,71 @@ class ReportBuilder:
             prefix = _prefix_for(section_key)
             for raw in dr.get("findings", []):
                 finding = self._raw_to_finding(raw, section_key, prefix, domain_counters)
-                findings.append(finding)
+                raw_findings.append(finding)
 
         # Walk analysis_cache entries (supplement -- skip domains already covered)
         for tool_name, tool_data in (self.design.analysis_cache or {}).items():
             if not isinstance(tool_data, dict):
                 continue
-            # Derive domain key from tool name
             domain_key = tool_name.replace("pcb_analyze_", "").replace("pcb_calc_", "").replace("pcb_", "")
             if domain_key in seen_domains:
-                continue  # orchestrator already covered this domain
+                continue
             prefix = _prefix_for(domain_key)
             for raw in tool_data.get("findings", []):
                 finding = self._raw_to_finding(raw, domain_key, prefix, domain_counters)
-                findings.append(finding)
+                raw_findings.append(finding)
 
-        return findings
+        # ---- Deduplicate ----
+        # Collapse findings with identical (domain, title, severity) into one
+        # representative, annotating count in the title.
+        return self._deduplicate_findings(raw_findings)
+
+    @staticmethod
+    def _deduplicate_findings(
+        findings: list[TrackedFinding],
+    ) -> list[TrackedFinding]:
+        """Collapse findings with identical domain+title+severity into one."""
+        from collections import OrderedDict
+
+        groups: OrderedDict[tuple, list[TrackedFinding]] = OrderedDict()
+        for f in findings:
+            key = (f.domain, f.title, f.severity)
+            groups.setdefault(key, []).append(f)
+
+        deduped: list[TrackedFinding] = []
+        domain_counters: dict[str, int] = {}
+        for (_domain, _title, _severity), group in groups.items():
+            rep = group[0]  # representative finding
+            prefix = _prefix_for(_domain)
+            count = domain_counters.get(prefix, 0) + 1
+            domain_counters[prefix] = count
+            finding_id = f"{prefix}-{count:03d}"
+
+            # Annotate title if duplicates were collapsed
+            title = rep.title
+            if len(group) > 1:
+                title = f"{title} ({len(group)} occurrences)"
+
+            deduped.append(TrackedFinding(
+                finding_id=finding_id,
+                severity=rep.severity,
+                domain=rep.domain,
+                title=title,
+                what_it_means=rep.what_it_means,
+                how_calculated=rep.how_calculated,
+                physical_mechanism=rep.physical_mechanism,
+                measured_value=rep.measured_value,
+                limit_value=rep.limit_value,
+                margin=rep.margin,
+                recommendation=rep.recommendation,
+                reference_standard=rep.reference_standard,
+                nets=rep.nets,
+                layers=rep.layers,
+                components=rep.components,
+                coordinates_mm=rep.coordinates_mm,
+            ))
+
+        return deduped
 
     @staticmethod
     def _normalise_severity(sev: str) -> str:
@@ -1894,20 +1947,21 @@ class ReportBuilder:
         # ------ Appendix C: Complete Finding Catalogue ------
         doc.add_heading("C. Complete Finding Catalogue", level=2)
         if all_findings:
+            catalogue_rows = []
             for tf in all_findings:
-                detail = tf.what_it_means
-                if tf.measured_value:
-                    detail += f"\nMeasured: {tf.measured_value}"
-                if tf.limit_value:
-                    detail += f" | Limit: {tf.limit_value}"
-                if tf.margin:
-                    detail += f" | Margin: {tf.margin}"
-                add_finding_box(
-                    doc, tf.severity,
-                    f"[{tf.finding_id}] {tf.title}",
-                    detail,
-                    tf.recommendation,
-                )
+                catalogue_rows.append((
+                    tf.finding_id,
+                    tf.severity,
+                    tf.domain,
+                    tf.title[:60],
+                    (tf.recommendation or "\u2014")[:60],
+                ))
+            add_styled_table(
+                doc,
+                ["ID", "Severity", "Domain", "Finding", "Recommendation"],
+                catalogue_rows,
+                col_widths=[0.7, 0.7, 1.0, 2.2, 2.0],
+            )
         else:
             p = doc.add_paragraph("No findings recorded.")
             p.runs[0].font.size = Pt(9)
@@ -1998,10 +2052,18 @@ class ReportBuilder:
                 if isinstance(r, dict) and sect.key in str(r.get("domain", ""))
             ]
             if relevant_recs:
-                doc.add_heading("Orchestrator Recommendations", level=2)
-                for r in relevant_recs[:3]:
+                doc.add_heading("Recommendations", level=2)
+                for r in relevant_recs[:5]:
+                    rec_text = r.get("recommendation", r.get("text", ""))
+                    if not rec_text:
+                        continue
+                    priority = r.get("priority", "").upper()
                     p = doc.add_paragraph()
-                    run = p.add_run(r.get("text", str(r)))
+                    if priority:
+                        run = p.add_run(f"[{priority}] ")
+                        run.bold = True
+                        run.font.size = Pt(9)
+                    run = p.add_run(rec_text)
                     run.font.size = Pt(9)
 
         # Gather tool data for this section
@@ -2053,7 +2115,7 @@ class ReportBuilder:
             ]
             if findings_with_data:
                 data_rows = []
-                for tf in findings_with_data:
+                for tf in findings_with_data[:15]:
                     data_rows.append((
                         tf.finding_id,
                         tf.severity,
@@ -2070,14 +2132,24 @@ class ReportBuilder:
                 )
                 doc.add_paragraph()
 
-            # Finding detail boxes
-            for tf in domain_findings:
+            # Finding detail boxes (capped to avoid flooding the report)
+            max_findings = 10
+            for tf in domain_findings[:max_findings]:
                 add_finding_box(
                     doc, tf.severity,
                     f"[{tf.finding_id}] {tf.title}",
                     tf.what_it_means,
                     tf.recommendation,
                 )
+            if len(domain_findings) > max_findings:
+                p = doc.add_paragraph()
+                run = p.add_run(
+                    f"({len(domain_findings) - max_findings} additional findings "
+                    f"omitted \u2014 see Appendix A for complete catalogue.)"
+                )
+                run.font.size = Pt(9)
+                run.italic = True
+                run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 
         # Embed relevant simulation plots
         plot_key_map = {
