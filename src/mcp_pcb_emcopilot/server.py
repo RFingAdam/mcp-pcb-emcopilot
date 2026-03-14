@@ -1323,7 +1323,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if sid:
                 try:
                     data = sessions.get_session(sid)
-                    data.analysis_cache[name] = result
+                    if data is not None:
+                        data.analysis_cache[name] = result
                 except Exception:
                     pass
 

@@ -393,9 +393,9 @@ class ReportBuilder:
         for dr in rr.get("domain_results", []):
             if not isinstance(dr, dict):
                 continue
-            raw_domain = dr.get("domain", "unknown")
+            raw_domain: str = str(dr.get("domain", "unknown"))
             # Normalise orchestrator domain to section key
-            section_key = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
+            section_key: str = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
 
             if section_key in harvested:
                 # Merge findings into existing entry (e.g. multiple high_speed_* -> high_speed)
@@ -453,8 +453,8 @@ class ReportBuilder:
         for dr in rr.get("domain_results", []):
             if not isinstance(dr, dict):
                 continue
-            raw_domain = dr.get("domain", "unknown")
-            section_key = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
+            raw_domain: str = str(dr.get("domain", "unknown"))
+            section_key: str = _ORCHESTRATOR_DOMAIN_TO_SECTION.get(raw_domain, raw_domain)
             seen_domains.add(section_key)
             seen_domains.add(raw_domain)
             prefix = _prefix_for(section_key)
@@ -639,14 +639,15 @@ class ReportBuilder:
             """Return the domain status string (PASS/WARNING/FAIL) from results."""
             data = results.get(key, {})
             if isinstance(data, dict):
-                return data.get("status", "PASS").upper()
+                return str(data.get("status", "PASS")).upper()
             return "PASS"
 
         def _has_domain(key: str) -> bool:
             return key in results and isinstance(results.get(key), dict)
 
-        def _cache(tool: str) -> dict:
-            return (self.design.analysis_cache or {}).get(tool, {})
+        def _cache(tool: str) -> dict[str, Any]:
+            val = (self.design.analysis_cache or {}).get(tool, {})
+            return val if isinstance(val, dict) else {}
 
         # Extract power rails from findings for PDN plots
         power_findings = [f for f in all_findings if f.domain == "power_integrity"]
@@ -869,8 +870,11 @@ class ReportBuilder:
     ) -> tuple[str, int, int]:
         """Assemble DOCX report. Returns (path, sections_generated, sections_skipped)."""
         from .docx_report import (
-            _check_docx, _set_cell_shading, add_finding_box,
-            add_image_with_caption, add_styled_table,
+            _check_docx,
+            _set_cell_shading,
+            add_finding_box,
+            add_image_with_caption,
+            add_styled_table,
         )
         _check_docx()
         from docx import Document
@@ -1438,7 +1442,7 @@ class ReportBuilder:
     def _build_executive_summary(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from docx.enum.table import WD_TABLE_ALIGNMENT
         from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -1685,8 +1689,8 @@ class ReportBuilder:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         # List gating findings
-        gating = [f for f in all_findings if f.severity in ("CRITICAL", "HIGH")]
-        if gating:
+        gating_findings = [fd for fd in all_findings if fd.severity in ("CRITICAL", "HIGH")]
+        if gating_findings:
             p2 = go_cell.add_paragraph()
             p2.paragraph_format.space_before = Pt(6)
             run = p2.add_run("Gating Criteria:")
@@ -1694,7 +1698,7 @@ class ReportBuilder:
             run.font.size = Pt(10)
             run.font.color.rgb = text_rgb
 
-            for tf in gating[:6]:
+            for tf in gating_findings[:6]:
                 p3 = go_cell.add_paragraph()
                 p3.paragraph_format.space_before = Pt(1)
                 p3.paragraph_format.space_after = Pt(1)
@@ -1735,7 +1739,7 @@ class ReportBuilder:
 
         # Show top 10 critical/high findings
         critical_high = [
-            f for f in all_findings if f.severity in ("CRITICAL", "HIGH")
+            fd for fd in all_findings if fd.severity in ("CRITICAL", "HIGH")
         ]
         if critical_high:
             for tf in critical_high[:10]:
@@ -1747,7 +1751,7 @@ class ReportBuilder:
                 )
         else:
             # Show top warnings if no critical/high
-            warnings = [f for f in all_findings if f.severity == "WARNING"]
+            warnings = [fd for fd in all_findings if fd.severity == "WARNING"]
             for tf in warnings[:5]:
                 add_finding_box(
                     doc, tf.severity,
@@ -1765,7 +1769,7 @@ class ReportBuilder:
     def _build_board_overview(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from .docx_report import add_styled_table
 
@@ -1814,7 +1818,7 @@ class ReportBuilder:
     def _build_action_items(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from docx.shared import Pt
 
@@ -1883,7 +1887,7 @@ class ReportBuilder:
     def _build_tool_coverage(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from .docx_report import add_styled_table
 
@@ -1921,7 +1925,7 @@ class ReportBuilder:
     def _build_glossary(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from .docx_report import add_styled_table
 
@@ -1936,7 +1940,7 @@ class ReportBuilder:
     def _build_references(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from docx.shared import Pt
 
@@ -2027,7 +2031,7 @@ class ReportBuilder:
     def _build_appendices(
         self, doc: Any, sect: SectionDef, results: dict,
         all_findings: list[TrackedFinding], verdict: str,
-        sim_plots: dict[str, str] = None,
+        sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
         from docx.shared import Pt, RGBColor
 
