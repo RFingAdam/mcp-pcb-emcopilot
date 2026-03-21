@@ -423,7 +423,7 @@ def _parse_altium(file_path: str) -> PCBDesignData:
         raise ImportError("Altium parser requires 'olefile' package: pip install olefile")
 
     parser = AltiumPcbParser()  # type: ignore[attr-defined]
-    board = parser.parse_file(file_path)  # type: ignore[attr-defined]
+    board = parser.parse(file_path)  # type: ignore[attr-defined]
 
     data = PCBDesignData(
         source_file=file_path,
@@ -572,7 +572,7 @@ def _parse_ipc2581(file_path: str) -> PCBDesignData:
     from .ipc2581_parser import IPC2581Parser
 
     parser = IPC2581Parser()  # type: ignore[attr-defined]
-    ipc = parser.parse_file(file_path)  # type: ignore[attr-defined]
+    ipc = parser.parse(file_path)  # type: ignore[attr-defined]
 
     data = PCBDesignData(
         source_file=file_path,
