@@ -394,7 +394,11 @@ class IPC2581Parser:
             if prefix:
                 ns_path = "/".join(f"{{{uri}}}{p}" for p in path.split("/"))
             else:
-                ns_path = "/".join(f"{{{uri}}}{p}" for p in path.split("/"))
+                # Empty prefix: try bare path without namespace
+                result = element.find(path)
+                if result is not None:
+                    return result
+                continue
             result = element.find(ns_path)
             if result is not None:
                 return result
@@ -497,7 +501,6 @@ class IPC2581Parser:
                 side = "TOP"
             elif layer_type in ("SIGNAL", "PLANE"):
                 side = "INTERNAL"
-                copper_layers += 1
             else:
                 side = "INTERNAL"
 

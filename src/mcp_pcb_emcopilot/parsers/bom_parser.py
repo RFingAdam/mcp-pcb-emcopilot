@@ -79,6 +79,9 @@ class BOMParser:
         Raises:
             ValueError: If file format is invalid or unsupported
         """
+        self.items = []
+        self.warnings = []
+
         logger.info(f"Parsing BOM file: {file_path}")
 
         path = Path(file_path)

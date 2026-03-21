@@ -1,6 +1,7 @@
 """Flask web UI for PCB EMCopilot design review."""
 from __future__ import annotations
 
+import html
 import os
 import tempfile
 import uuid
@@ -147,7 +148,7 @@ def _render_index() -> str:
     <h2>Recent Sessions</h2>
     <div id="sessions">
       {"".join(
-          f'<a href="/session/{sid}" class="session-link">{s["filename"]} ({sid})</a>'
+          f'<a href="/session/{sid}" class="session-link">{html.escape(s["filename"])} ({sid})</a>'
           for sid, s in _sessions.items()
       ) or '<p class="muted">No sessions yet. Upload a file to get started.</p>'}
     </div>
@@ -191,28 +192,28 @@ def _render_session(session_id: str, session: dict) -> str:
         val = getattr(c, 'value', '') or ''
         pkg = getattr(c, 'package', '') or getattr(c, 'footprint', '') or ''
         layer = getattr(c, 'layer', '') or ''
-        comp_rows += f"<tr><td>{ref}</td><td>{val}</td><td>{pkg}</td><td>{layer}</td></tr>"
+        comp_rows += f"<tr><td>{html.escape(ref)}</td><td>{html.escape(val)}</td><td>{html.escape(pkg)}</td><td>{html.escape(layer)}</td></tr>"
 
     # Build net list
     net_items = ""
     for n in data.nets[:50]:
         name = getattr(n, 'name', '') or getattr(n, 'net_name', '') or ''
         pin_count = len(getattr(n, 'pins', [])) if hasattr(n, 'pins') else 0
-        net_items += f"<div class='net-item'><span class='net-name'>{name}</span> <span class='muted'>({pin_count} pins)</span></div>"
+        net_items += f"<div class='net-item'><span class='net-name'>{html.escape(name)}</span> <span class='muted'>({pin_count} pins)</span></div>"
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Review: {session["filename"]}</title>
+<title>Review: {html.escape(session["filename"])}</title>
 <style>{_CSS}</style>
 </head>
 <body>
 <header>
   <div class="container">
     <h1>Design Review</h1>
-    <div class="subtitle">{session["filename"]} | Session: {session_id}</div>
+    <div class="subtitle">{html.escape(session["filename"])} | Session: {session_id}</div>
   </div>
 </header>
 <main class="container">
@@ -268,9 +269,9 @@ def _render_session(session_id: str, session: dict) -> str:
     <h2>Format Info</h2>
     <table class="data-table">
       <tbody>
-        <tr><td>Source Format</td><td>{data.source_format}</td></tr>
-        <tr><td>Source File</td><td>{data.source_file}</td></tr>
-        <tr><td>Title</td><td>{data.title or 'N/A'}</td></tr>
+        <tr><td>Source Format</td><td>{html.escape(str(data.source_format))}</td></tr>
+        <tr><td>Source File</td><td>{html.escape(str(data.source_file))}</td></tr>
+        <tr><td>Title</td><td>{html.escape(data.title) if data.title else 'N/A'}</td></tr>
       </tbody>
     </table>
   </div>

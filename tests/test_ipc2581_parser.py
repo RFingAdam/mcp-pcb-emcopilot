@@ -29,12 +29,8 @@ class TestIPC2581Parsing:
         assert self.data.properties.get("units") == "MM"
 
     def test_layer_count(self):
-        # Parser double-counts internal signal/plane layers in _parse_stackup,
-        # so layer_count may exceed the actual number of copper layers.
-        # The stackup has 4 copper layers (TOP, GND, PWR, BOTTOM) but
-        # the parser reports more due to the double-increment bug.
-        assert self.data.layer_count >= 4
-        assert self.data.layer_count == 7  # actual parser behavior
+        # Stackup has 4 copper layers: TOP, GND, PWR, BOTTOM
+        assert self.data.layer_count == 4
 
     def test_stackup_layers(self):
         assert len(self.data.stackup) == 7  # 4 copper + 3 dielectric

@@ -280,19 +280,22 @@ class SExpressionParser:
     def _parse_string(self) -> str:
         """Parse a quoted string."""
         self.pos += 1  # Skip opening quote
-        start = self.pos
+        result_chars: list[str] = []
 
         while self.pos < self.length:
-            if self.text[self.pos] == '"':
-                result = self.text[start:self.pos]
+            ch = self.text[self.pos]
+            if ch == '"':
                 self.pos += 1
-                return result
-            elif self.text[self.pos] == '\\' and self.pos + 1 < self.length:
-                self.pos += 2  # Skip escape sequence
+                return ''.join(result_chars)
+            elif ch == '\\' and self.pos + 1 < self.length:
+                self.pos += 1
+                result_chars.append(self.text[self.pos])
+                self.pos += 1
             else:
+                result_chars.append(ch)
                 self.pos += 1
 
-        return self.text[start:]
+        return ''.join(result_chars)
 
     def _parse_atom(self) -> str:
         """Parse an unquoted atom."""

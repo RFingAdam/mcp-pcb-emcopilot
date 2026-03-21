@@ -6,10 +6,16 @@ Sessions persist for the lifetime of the MCP server process.
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 
 from .models.pcb_data import PCBDesignData
+
+logger = logging.getLogger(__name__)
+
+MAX_SESSIONS = 50
+SESSION_TTL_S = 3600
 
 
 class DesignSessionManager:
@@ -21,7 +27,15 @@ class DesignSessionManager:
 
     def create_session(self, design_data: PCBDesignData) -> str:
         """Store a parsed design and return a new session ID."""
-        session_id = str(uuid.uuid4())[:8]
+        self._evict_stale()
+        if len(self._sessions) >= MAX_SESSIONS:
+            oldest = min(self._timestamps, key=self._timestamps.get)  # type: ignore[arg-type]
+            self.close_session(oldest)
+            logger.warning("Evicted oldest session %s (max %d reached)", oldest, MAX_SESSIONS)
+        while True:
+            session_id = str(uuid.uuid4())[:8]
+            if session_id not in self._sessions:
+                break
         self._sessions[session_id] = design_data
         self._timestamps[session_id] = time.time()
         return session_id
@@ -51,6 +65,13 @@ class DesignSessionManager:
                 "created": self._timestamps.get(sid, 0),
             })
         return result
+
+    def _evict_stale(self) -> None:
+        now = time.time()
+        stale = [sid for sid, ts in self._timestamps.items() if now - ts > SESSION_TTL_S]
+        for sid in stale:
+            self.close_session(sid)
+            logger.info("Evicted stale session %s", sid)
 
     @property
     def session_count(self) -> int:
