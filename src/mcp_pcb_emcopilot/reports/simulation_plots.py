@@ -162,7 +162,8 @@ class SimulationPlotter:
         rng = np.random.default_rng(42)
         for _ in range(n_traces):
             jitter_offset = rng.normal(0, jitter_ps / ui_ps * 0.5)
-            noise = rng.normal(0, (voltage_swing_mv - height_mv) / 6)
+            noise_sigma = max((voltage_swing_mv - height_mv) / 6, 0.0)
+            noise = rng.normal(0, noise_sigma) if noise_sigma > 0 else 0.0
             bit = rng.choice([-1, 1])
             rise = rise_time_ps / ui_ps
 
@@ -616,7 +617,7 @@ class SimulationPlotter:
         )
         ax.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"],
                   loc="lower right", ncol=2)
-        ax.set_xlim(500, max(m[1] for m in modes) * 1.1)
+        ax.set_xlim(500, max(m[1] for m in modes) * 1.1 if modes else 5000)
 
         _add_status_badge(ax, status, t)
         _add_methodology_box(

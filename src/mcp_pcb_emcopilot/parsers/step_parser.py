@@ -179,10 +179,21 @@ class STEPParser:
                 i += 1
                 continue
             elif ch == "'":
-                # String literal
-                end = raw.index("'", i + 1)
-                params.append(raw[i + 1:end])
-                i = end + 1
+                # String literal (ISO 10303-21: '' is escape for literal ')
+                j = i + 1
+                chars: list[str] = []
+                while j < len(raw):
+                    if raw[j] == "'":
+                        if j + 1 < len(raw) and raw[j + 1] == "'":
+                            chars.append("'")
+                            j += 2
+                        else:
+                            break
+                    else:
+                        chars.append(raw[j])
+                        j += 1
+                params.append(''.join(chars))
+                i = j + 1 if j < len(raw) else j
             elif ch == '#':
                 # Entity reference
                 j = i + 1

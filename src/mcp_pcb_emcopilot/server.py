@@ -236,6 +236,8 @@ def calc_cpw_impedance(trace_width_mm: float, gap_mm: float, dielectric_height_m
         delta = (1.25 * t / math.pi) * (1 + math.log(4 * math.pi * w / t))
         a_eff = a + delta / 2
         b_eff = b - delta / 2
+        if b_eff <= a_eff:
+            return {"error": "Trace thickness too large relative to gap width. Reduce trace_thickness_mm or increase gap_mm.", "success": False}
     else:
         a_eff = a
         b_eff = b
@@ -1332,7 +1334,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     except PCBError as e:
         return [TextContent(type="text", text=json.dumps(e.to_dict(), indent=2, default=str))]
     except Exception as e:
-        return [TextContent(type="text", text=json.dumps({"success": False, "error": str(e)}))]
+        import traceback
+        tb = traceback.format_exc()
+        import sys
+        print(f"Tool error: {e}\n{tb}", file=sys.stderr)
+        return [TextContent(type="text", text=json.dumps({"success": False, "error": str(e), "traceback": tb}))]
 
 
 def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
@@ -1639,6 +1645,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         validate_positive(args.get("max_skew_ps", 0), "max_skew_ps")
         validate_range(args.get("effective_er", 0), 1.0, 100.0, "effective_er")
         lengths = args["trace_lengths_mm"]
+        if not lengths:
+            return {"error": "trace_lengths_mm must contain at least one entry", "success": False}
         max_skew_ps = args["max_skew_ps"]
         er = args["effective_er"]
         prop_delay_ps_per_mm = (1000 / C0) * math.sqrt(er) * 1e12
@@ -2415,6 +2423,9 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return {"success": True, "session_id": args["session_id"], "review_context": ctx}
 
     if name == "pcb_run_design_review":
+        # NOTE: This runs synchronously and blocks the event loop.
+        # Known limitation: _dispatch is sync, so run_in_executor cannot be
+        # used here without refactoring the dispatch architecture.
         from .orchestrator import run_design_review
         data = _get_session(args["session_id"])
         result = run_design_review(data, args["session_id"])

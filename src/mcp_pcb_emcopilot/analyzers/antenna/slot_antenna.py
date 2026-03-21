@@ -154,7 +154,8 @@ class SlotAntennaAnalyzer:
             Resonant frequency in MHz
         """
         length_m = length_mm / 1000
-        er_eff = (self.er + 1) / 2  # Effective dielectric
+        # Hammerstad approximation assuming typical w/h ≈ 1
+        er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * 0.277
 
         freq_hz = self.C / (2 * length_m * math.sqrt(er_eff))
         return freq_hz / 1e6

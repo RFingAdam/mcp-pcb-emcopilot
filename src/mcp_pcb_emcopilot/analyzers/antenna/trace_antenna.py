@@ -141,8 +141,9 @@ class TraceAntennaAnalyzer:
         """
         length_m = length_mm / 1000
 
-        # Effective dielectric for microstrip (approximate)
-        er_eff = (self.er + 1) / 2
+        # Hammerstad approximation assuming typical w/h ≈ 1
+        # εr_eff = (εr+1)/2 + (εr-1)/2 * 1/sqrt(1+12h/w); for w/h=1: F≈0.277
+        er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * 0.277
 
         # Velocity factor
         vf = 1 / math.sqrt(er_eff)

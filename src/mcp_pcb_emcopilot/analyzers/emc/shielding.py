@@ -330,8 +330,8 @@ class ShieldingAnalyzer:
             count = ap.get("count", 1)
 
             # Aperture coupling is additive in power
-            leakage_linear = 10 ** (-se_reduction / 20) * count
-            total_leakage_linear += leakage_linear ** 2
+            single_leakage = 10 ** (-se_reduction / 20)
+            total_leakage_linear += count * single_leakage ** 2
 
         # Convert back to dB reduction
         if total_leakage_linear > 0:

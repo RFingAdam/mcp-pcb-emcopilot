@@ -349,10 +349,11 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
         # Build ground planes from design zones
         planes = []
         gnd_zones = [z for z in design.zones if z.net_name and "gnd" in z.net_name.lower()]
+        layer_num_map = {l.name: idx for idx, l in enumerate(design.layers)} if design.layers else {}
         if gnd_zones:
             for i, zone in enumerate(gnd_zones):
                 planes.append(GroundPlane(
-                    layer_number=i,
+                    layer_number=layer_num_map.get(zone.layer, i),
                     name=zone.layer,
                     coverage_percent=80.0,
                     width_mm=design.board_width_mm or 100,
@@ -863,8 +864,12 @@ def _run_pcie_analysis(
                             lane[key] = length
             lanes.append(lane)
 
+        gen_map = {"pcie_gen1": PCIeGeneration.GEN1, "pcie_gen2": PCIeGeneration.GEN2, "pcie_gen3": PCIeGeneration.GEN3, "pcie_gen4": PCIeGeneration.GEN4, "pcie_gen5": PCIeGeneration.GEN5, "pcie_gen6": PCIeGeneration.GEN6}
+        itype = pcie_iface.interface_type.lower() if hasattr(pcie_iface, 'interface_type') else ""
+        pcie_gen = next((v for k, v in gen_map.items() if k in itype), PCIeGeneration.GEN3)
+
         pcie_result = analyzer.analyze(
-            generation=PCIeGeneration.GEN3,
+            generation=pcie_gen,
             lanes=lanes,
         )
 
@@ -1187,20 +1192,25 @@ def _build_recommendations(
     recs = []
     seen = set()
 
+    # Pre-build finding index by title for O(1) lookup
+    finding_by_title: dict[str, Any] = {}
+    for dr in domain_results:
+        for f in dr.findings:
+            if f.title not in finding_by_title and f.recommendation:
+                finding_by_title[f.title] = f
+
     # From risk matrix (highest risk first)
     for risk in risk_matrix:
         if risk.risk_score >= 4:
-            # Find the matching finding
-            for dr in domain_results:
-                for f in dr.findings:
-                    if f.title == risk.finding_title and f.recommendation and f.recommendation not in seen:
-                        seen.add(f.recommendation)
-                        recs.append({
-                            "priority": "high" if risk.risk_score >= 6 else "medium",
-                            "domain": f.domain,
-                            "recommendation": f.recommendation,
-                            "risk_score": risk.risk_score,
-                        })
+            matched = finding_by_title.get(risk.finding_title)
+            if matched and matched.recommendation not in seen:
+                seen.add(matched.recommendation)
+                recs.append({
+                    "priority": "high" if risk.risk_score >= 6 else "medium",
+                    "domain": matched.domain,
+                    "recommendation": matched.recommendation,
+                    "risk_score": risk.risk_score,
+                })
 
     # From cross-correlations
     for cc in cross_correlations:

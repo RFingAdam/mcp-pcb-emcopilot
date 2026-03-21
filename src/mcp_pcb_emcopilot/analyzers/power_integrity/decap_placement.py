@@ -280,8 +280,8 @@ class DecapAnalyzer:
         # Via ESL
         via_esl = via_count * self.via_inductance
 
-        # Trace ESL (approximately 1 nH/mm for typical width)
-        trace_esl = trace_length_mm * 1.0
+        # Trace ESL over ground plane (~0.03 nH/mm for 0.2mm trace at 0.1mm height)
+        trace_esl = trace_length_mm * 0.03
 
         return pkg_esl + via_esl + trace_esl
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -466,6 +467,29 @@ def _escape_html(text: str) -> str:
     )
 
 
+def _sanitize_svg(svg: str) -> str:
+    """Strip dangerous elements and attributes from inline SVG content.
+
+    Removes ``<script>`` blocks, ``on*`` event-handler attributes, and
+    ``javascript:`` URIs to prevent SVG-based XSS when embedding
+    user-supplied images in the report.
+    """
+    # Remove <script>...</script> (including nested / multiline)
+    cleaned = re.sub(r"<script[\s>].*?</script>", "", svg, flags=re.DOTALL | re.IGNORECASE)
+    # Remove standalone <script .../> self-closing tags
+    cleaned = re.sub(r"<script\b[^>]*/\s*>", "", cleaned, flags=re.IGNORECASE)
+    # Remove on* event-handler attributes (onclick, onload, onerror, etc.)
+    cleaned = re.sub(r"""\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)""", "", cleaned, flags=re.IGNORECASE)
+    # Remove javascript: URIs in href/xlink:href/src attributes
+    cleaned = re.sub(
+        r"""(href|xlink:href|src)\s*=\s*["']?\s*javascript:""",
+        r"\1=\"\"",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned
+
+
 def _severity_class(severity: str) -> str:
     """Normalize severity to CSS class name."""
     s = severity.upper().strip()
@@ -505,14 +529,15 @@ def _build_finding_card(finding: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def _build_section(title: str, body_html: str, collapsed: bool = False) -> str:
+def _build_section(title: str, body_html: str, collapsed: bool = False, title_is_html: bool = False) -> str:
     """Build a collapsible section."""
     hdr_cls = " collapsed" if collapsed else ""
     body_cls = " collapsed" if collapsed else ""
+    display_title = title if title_is_html else _escape_html(title)
     return f"""
 <div class="section">
   <div class="section-header{hdr_cls}">
-    <h2>{_escape_html(title)}</h2>
+    <h2>{display_title}</h2>
     <span class="toggle">&#9660;</span>
   </div>
   <div class="section-body{body_cls}">
@@ -608,15 +633,16 @@ def _generate_html_from_data(data: HTMLReportData) -> str:
         )
         header_extra = f' <span class="{score_cls}" style="font-size:14px;">({score_pct:.0f}%)</span>'
         body = "\n".join(cards) if cards else "<p>No findings.</p>"
-        sections_html.append(_build_section(f"{domain.name}{header_extra}", body))
+        sections_html.append(_build_section(f"{_escape_html(domain.name)}{header_extra}", body, title_is_html=True))
 
     # Embed images (inline SVG or base64)
     if data.images:
         img_parts: list[str] = []
         for label, content in data.images.items():
             if content.strip().startswith("<svg") or content.strip().startswith("<?xml"):
+                safe_svg = _sanitize_svg(content)
                 img_parts.append(
-                    f'<div class="render-container">{content}'
+                    f'<div class="render-container">{safe_svg}'
                     f'<div class="render-caption">{_escape_html(label)}</div></div>'
                 )
             else:

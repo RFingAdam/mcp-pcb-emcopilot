@@ -320,25 +320,25 @@ class PDFSchematicParser:
 
         fitz = self._fitz
         doc = fitz.open(file_path)  # type: ignore[union-attr]
+        try:
+            if page_number < 1 or page_number > len(doc):
+                raise ValueError(
+                    f"Page {page_number} out of range (1-{len(doc)})"
+                )
 
-        if page_number < 1 or page_number > len(doc):
+            page = doc[page_number - 1]
+            zoom = dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)  # type: ignore[union-attr]
+            pix = page.get_pixmap(matrix=mat)
+
+            os.makedirs(output_dir, exist_ok=True)
+            stem = Path(file_path).stem
+            out_path = os.path.join(output_dir, f"{stem}_page{page_number}.png")
+            pix.save(out_path)
+
+            return out_path
+        finally:
             doc.close()
-            raise ValueError(
-                f"Page {page_number} out of range (1-{len(doc)})"
-            )
-
-        page = doc[page_number - 1]
-        zoom = dpi / 72.0
-        mat = fitz.Matrix(zoom, zoom)  # type: ignore[union-attr]
-        pix = page.get_pixmap(matrix=mat)
-
-        os.makedirs(output_dir, exist_ok=True)
-        stem = Path(file_path).stem
-        out_path = os.path.join(output_dir, f"{stem}_page{page_number}.png")
-        pix.save(out_path)
-
-        doc.close()
-        return out_path
 
     # ------------------------------------------------------------------
     # Text-analysis helpers
