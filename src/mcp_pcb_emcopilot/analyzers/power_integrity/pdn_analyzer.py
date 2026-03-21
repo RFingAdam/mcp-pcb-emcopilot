@@ -349,10 +349,10 @@ class PDNAnalyzer:
             is_resonance = False
             is_anti_resonance = False
             if prev_phase is not None:
-                # Resonance: phase crosses from negative to positive
+                # Anti-resonance (impedance peak): phase crosses negative to positive
                 if prev_phase < 0 and z_phase > 0:
                     is_anti_resonance = True
-                # Anti-resonance: phase crosses from positive to negative
+                # Series resonance (impedance minimum): phase crosses positive to negative
                 elif prev_phase > 0 and z_phase < 0:
                     is_resonance = True
 

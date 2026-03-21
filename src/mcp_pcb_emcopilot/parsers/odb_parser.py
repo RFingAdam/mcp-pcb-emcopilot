@@ -8,6 +8,7 @@ import re
 import shutil
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
@@ -170,19 +171,59 @@ class ODBParser:
             self._temp_dir = Path(tempfile.mkdtemp(prefix="odb_"))
             return self._temp_dir
 
+    @staticmethod
+    def _validate_tar_members(
+        tar: tarfile.TarFile, extract_dir: Path
+    ) -> list[tarfile.TarInfo]:
+        """Return tar members whose paths resolve within *extract_dir*.
+
+        Raises ``ValueError`` on any path-traversal attempt (Zip-Slip).
+        """
+        safe: list[tarfile.TarInfo] = []
+        resolved = extract_dir.resolve()
+        for member in tar.getmembers():
+            target = (resolved / member.name).resolve()
+            if not str(target).startswith(str(resolved) + os.sep) and target != resolved:
+                raise ValueError(
+                    f"Blocked path-traversal in tar member: {member.name}"
+                )
+            safe.append(member)
+        return safe
+
+    @staticmethod
+    def _validate_zip_members(
+        zip_ref: zipfile.ZipFile, extract_dir: Path
+    ) -> list[str]:
+        """Return zip member names whose paths resolve within *extract_dir*.
+
+        Raises ``ValueError`` on any path-traversal attempt (Zip-Slip).
+        """
+        safe: list[str] = []
+        resolved = extract_dir.resolve()
+        for name in zip_ref.namelist():
+            target = (resolved / name).resolve()
+            if not str(target).startswith(str(resolved) + os.sep) and target != resolved:
+                raise ValueError(
+                    f"Blocked path-traversal in zip member: {name}"
+                )
+            safe.append(name)
+        return safe
+
     def _extract_archive(self, archive_path: Path, extract_dir: Path) -> None:
-        """Extract ODB++ archive (tgz or zip)"""
+        """Extract ODB++ archive (tgz or zip) with path-traversal protection."""
         archive_str = str(archive_path).lower()
 
         if archive_str.endswith(('.tgz', '.tar.gz')):
             with tarfile.open(archive_path, 'r:gz') as tar:
-                tar.extractall(extract_dir)
+                safe_members = self._validate_tar_members(tar, extract_dir)
+                tar.extractall(extract_dir, members=safe_members)
         elif archive_str.endswith('.tar'):
             with tarfile.open(archive_path, 'r') as tar:
-                tar.extractall(extract_dir)
+                safe_members = self._validate_tar_members(tar, extract_dir)
+                tar.extractall(extract_dir, members=safe_members)
         elif archive_str.endswith('.zip'):
-            import zipfile
             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                self._validate_zip_members(zip_ref, extract_dir)
                 zip_ref.extractall(extract_dir)
         else:
             raise ValueError(f"Unsupported archive format: {archive_path.suffix}")
@@ -245,7 +286,9 @@ class ODBParser:
 
                     current_layer = {}
 
-                elif line.startswith('END_LAYER') or line == '':
+                elif line == '':
+                    continue
+                elif line.startswith('END_LAYER'):
                     if current_layer:
                         data.layers.append(self._create_layer(current_layer))
                         current_layer = None

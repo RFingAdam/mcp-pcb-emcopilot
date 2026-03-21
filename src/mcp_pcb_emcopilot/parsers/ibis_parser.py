@@ -594,7 +594,8 @@ def analyze_ibis_timing(
 
     # C_comp loading effect
     c_comp = model_data.get("c_comp", {})
-    c_comp_pf = c_comp.get("typ", 0.0) * 1e12 if isinstance(c_comp.get("typ"), float) and c_comp.get("typ", 0) < 1e-6 else c_comp.get("typ", 0.0)
+    # parse_eng_notation stores in Farads; convert to pF
+    c_comp_pf = c_comp.get("typ", 0.0) * 1e12
 
     # Timing margin
     timing_margin_ps = eye_width_ps - (ui_ps * 0.3)  # 30% UI minimum opening

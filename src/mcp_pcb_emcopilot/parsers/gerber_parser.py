@@ -649,6 +649,11 @@ class GerberParser:
         if sr.x_repeats <= 1 and sr.y_repeats <= 1:
             return
 
+        # Count features by type from the SR block
+        sr_trace_count = sum(1 for ftype, _ in sr.features if ftype == 'trace')
+        sr_pad_count = sum(1 for ftype, _ in sr.features if ftype == 'pad')
+        sr_arc_count = sum(1 for ftype, _ in sr.features if ftype == 'arc')
+
         original_traces = len(data.traces)
         original_pads = len(data.pads)
         original_arcs = len(data.arcs)
@@ -663,7 +668,7 @@ class GerberParser:
                 dy = yi * sr.y_step
 
                 # Replicate traces
-                for i in range(original_traces - len(sr.features), original_traces):
+                for i in range(original_traces - sr_trace_count, original_traces):
                     if i >= 0 and i < len(data.traces):
                         t = data.traces[i]
                         data.traces.append(GerberTrace(
@@ -676,7 +681,7 @@ class GerberParser:
                         ))
 
                 # Replicate pads
-                for i in range(original_pads - len(sr.features), original_pads):
+                for i in range(original_pads - sr_pad_count, original_pads):
                     if i >= 0 and i < len(data.pads):
                         p = data.pads[i]
                         data.pads.append(GerberPad(
