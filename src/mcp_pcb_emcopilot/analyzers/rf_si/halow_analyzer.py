@@ -276,11 +276,18 @@ class HaLowAnalyzer:
                 "severity": "warning",
                 "category": "halow_filter",
                 "description": (
-                    "No SAW/BAW/BPF filter detected in HaLow RF path"
+                    "No SAW/BAW/BPF filter detected in HaLow RF path — "
+                    "both TX and RX paths require filtering"
                 ),
                 "recommendation": (
-                    "A band-pass or SAW filter at ~900MHz is recommended to "
-                    "suppress out-of-band harmonics and meet regulatory emissions limits."
+                    "Sub-1GHz ISM TX path MUST have a bandpass filter to suppress "
+                    "harmonics: 2nd harmonic (1.8GHz) falls in cellular bands, "
+                    "3rd harmonic (2.7GHz) near WiFi 5GHz. Without TX filtering, "
+                    "FCC Part 15.247 / ETSI EN 300 220 spurious emission limits "
+                    "will likely fail. RX-only filtering protects receiver "
+                    "sensitivity but does NOT address radiated TX emissions. "
+                    "Add a SAW/BAW bandpass filter centered at 900MHz with "
+                    "<2dB insertion loss on both TX and RX paths."
                 ),
                 "details": {"filters_detected": {}},
             })
