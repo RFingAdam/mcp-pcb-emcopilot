@@ -295,7 +295,7 @@ def _parse_odb(file_path: str) -> PCBDesignData:
             properties=oc.properties,
         ))
 
-    # Convert nets
+    # Convert nets (Fix 1.6: propagate pin count)
     for on in odb.nets:
         data.nets.append(PCBNet(
             name=on.name, index=on.net_number, net_class=on.net_class,
@@ -304,6 +304,7 @@ def _parse_odb(file_path: str) -> PCBDesignData:
             routed_length_mm=on.routed_length_mm or 0,
             via_count=on.via_count,
             impedance_target_ohm=on.impedance_target_ohm,
+            pin_count=len(on.pins),
         ))
 
     # Convert vias
@@ -316,17 +317,24 @@ def _parse_odb(file_path: str) -> PCBDesignData:
             net_name=ov.net_name,
         ))
 
-    # Convert traces
+    # Convert traces (Fix 1.8: compute segment length, propagate net)
+    import math as _math
     for layer_name, traces in odb.traces.items():
         for ot in traces:
             pts = ot.points
             if len(pts) >= 2:
                 for i in range(len(pts) - 1):
+                    seg_len = _math.sqrt(
+                        (pts[i + 1][0] - pts[i][0]) ** 2 +
+                        (pts[i + 1][1] - pts[i][1]) ** 2
+                    )
                     data.traces.append(PCBTrace(
                         layer=layer_name, width_mm=ot.width_mm,
                         x1_mm=pts[i][0], y1_mm=pts[i][1],
                         x2_mm=pts[i + 1][0], y2_mm=pts[i + 1][1],
                         net_name=ot.net_name,
+                        net_index=ot.net_number or 0,
+                        length_mm=seg_len,
                     ))
 
     # Convert zones
