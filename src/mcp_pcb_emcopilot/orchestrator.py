@@ -240,8 +240,31 @@ def _select_analyzers(
     if any(t in ("gbe", "100base-tx", "sgmii", "ethernet") for t in iface_types):
         analyzers.append("ethernet")
 
+    # eMMC/SDIO (Phase 4 integration)
+    if cat_counts.get("emmc", 0) > 0 or any("emmc" in t for t in iface_types):
+        analyzers.append("emmc")
+    if cat_counts.get("sdio", 0) > 0 or any("sdio" in t for t in iface_types):
+        analyzers.append("sdio")
+
+    # RF-specific analyzers
+    rf_subcats = set()
+    for nc in net_cls.classified_nets:
+        if nc.category == "rf" and nc.subcategory:
+            rf_subcats.add(nc.subcategory)
+
+    if "halow" in rf_subcats or any("halow" in t for t in iface_types):
+        analyzers.append("halow_rf")
+    if "gnss" in rf_subcats or "gps" in rf_subcats or any("gnss" in t for t in iface_types):
+        analyzers.append("gnss_rf")
+
+    # Coexistence: auto-trigger when 2+ RF interface types detected
+    rf_type_count = sum(1 for sub in ("wifi", "bluetooth", "cellular", "halow", "lora", "gnss", "gps")
+                        if sub in rf_subcats)
+    if rf_type_count >= 2:
+        analyzers.append("coexistence")
+
     # High-speed signal analysis
-    high_speed_cats = {"ddr", "usb", "pcie", "ethernet", "lvds", "rf"}
+    high_speed_cats = {"ddr", "usb", "pcie", "ethernet", "lvds", "rf", "emmc", "sdio"}
     has_high_speed = any(cat_counts.get(c, 0) > 0 for c in high_speed_cats)
     if has_high_speed or len(net_cls.differential_pairs) > 0:
         analyzers.append("return_path")
@@ -892,6 +915,55 @@ def _run_pcie_analysis(
     return result
 
 
+def _run_generic_analyzer(
+    design: PCBDesignData,
+    net_cls: NetClassificationResult,
+    domain_name: str,
+    module_path: str,
+    class_name: str,
+) -> DomainResult:
+    """Generic runner for new analyzers that follow the standard interface.
+
+    Dynamically imports and runs analyzers that have an
+    analyze(design, classified_nets, interfaces) method returning a list of finding dicts.
+    """
+    import importlib
+
+    result = DomainResult(domain=domain_name, analyzer_name=class_name)
+    try:
+        mod = importlib.import_module(module_path)
+        analyzer_cls = getattr(mod, class_name)
+        analyzer = analyzer_cls()
+        findings = analyzer.analyze(design, classified_nets=net_cls)
+
+        for f in findings:
+            severity = f.get("severity", "info")
+            result.findings.append(ReviewFinding(
+                domain=domain_name,
+                severity=severity,
+                title=f.get("category", domain_name),
+                description=f.get("description", ""),
+                recommendation=f.get("recommendation", ""),
+            ))
+
+        result.status = (
+            "fail" if result.critical_count > 0
+            else "warning" if result.warning_count > 0
+            else "pass"
+        )
+        result.raw_data = _safe_serialize(findings)
+    except Exception as e:
+        result.status = "error"
+        result.findings.append(ReviewFinding(
+            domain=domain_name,
+            severity="info",
+            title=f"{class_name} error",
+            description=str(e),
+            recommendation="Check analyzer configuration",
+        ))
+    return result
+
+
 def _run_ethernet_analysis(
     design: PCBDesignData,
     interfaces: InterfaceDetectionResult,
@@ -1306,6 +1378,31 @@ def run_design_review(
             domain_results.append(_run_pcie_analysis(design, interfaces, net_cls))
         elif key == "ethernet":
             domain_results.append(_run_ethernet_analysis(design, interfaces, net_cls))
+        elif key == "emmc":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "emmc",
+                "mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer", "EMMCAnalyzer"
+            ))
+        elif key == "sdio":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "sdio",
+                "mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer", "SDIOAnalyzer"
+            ))
+        elif key == "halow_rf":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "halow_rf",
+                "mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer", "HaLowAnalyzer"
+            ))
+        elif key == "gnss_rf":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "gnss_rf",
+                "mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer", "GNSSAnalyzer"
+            ))
+        elif key == "coexistence":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "coexistence",
+                "mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer"
+            ))
 
     # Phase 4: Cross-correlation
     cross_correlations = _cross_correlate(domain_results, design, classification)

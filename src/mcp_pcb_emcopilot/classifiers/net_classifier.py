@@ -118,9 +118,10 @@ _p(r'^VREF_?DQ', 'ddr', 'reference', 0.90)
 _p(r'^ZQ$', 'ddr', 'calibration', 0.90)
 _p(r'^RESET[_#]?$', 'ddr', 'control', 0.50)  # low - very generic
 
-# --- USB ---
+# --- USB --- (Fix 2.1: handle USB{N}_D_{P|N} format)
 _p(r'^USB[_]?D[PM]$', 'usb', 'usb2_data', 0.95)
 _p(r'^USB[_]?D[+-]$', 'usb', 'usb2_data', 0.95)
+_p(r'^USB\d?[_]D[_][PN]$', 'usb', 'usb2_data', 0.95)  # USB0_D_P, USB1_D_N
 _p(r'^USB\d?[_]DP$', 'usb', 'usb2_data', 0.95)
 _p(r'^USB\d?[_]DN$', 'usb', 'usb2_data', 0.95)
 _p(r'^USB\d?[_]D[+-]$', 'usb', 'usb2_data', 0.95)
@@ -132,6 +133,7 @@ _p(r'^USB[_]?SS[_]?TX', 'usb', 'usb3_sstx', 0.95)
 _p(r'^USB[_]?SS[_]?RX', 'usb', 'usb3_ssrx', 0.95)
 _p(r'^VBUS$', 'usb', 'power', 0.90)
 _p(r'^USB[_]?VBUS', 'usb', 'power', 0.95)
+_p(r'^USB\d[_]', 'usb', None, 0.85)  # USB0_xxx, USB1_xxx (numbered)
 _p(r'^USB[_]', 'usb', None, 0.85)
 _p(r'^CC[12]$', 'usb', 'usbc_cc', 0.80)
 _p(r'^SBU[12]$', 'usb', 'usbc_sbu', 0.85)
@@ -162,25 +164,62 @@ _p(r'^RGMII[_]', 'ethernet', 'rgmii', 0.95)
 _p(r'^RMII[_]', 'ethernet', 'rmii', 0.95)
 _p(r'^MII[_]', 'ethernet', 'mii', 0.90)
 _p(r'^SGMII[_]', 'ethernet', 'sgmii', 0.95)
+_p(r'ENET\d*[_]', 'ethernet', None, 0.85)  # non-anchored: PTF0_ENET0_RXD1
 
-# --- RF ---
+# --- RF --- (enhanced with WiFi/WLAN, HaLow, coexistence patterns)
 _p(r'^RF[_]', 'rf', None, 0.95)
 _p(r'^ANT\d*[_]?', 'rf', 'antenna', 0.90)
+_p(r'^NetANT\d+', 'rf', 'antenna', 0.85)  # NetANT1_1, NetANT2_1
 _p(r'^LNA[_]', 'rf', 'lna', 0.90)
 _p(r'^PA[_]', 'rf', 'pa', 0.80)
 _p(r'^RFIN\d?$', 'rf', 'input', 0.90)
 _p(r'^RFOUT\d?$', 'rf', 'output', 0.90)
 _p(r'^LO[_]', 'rf', 'local_oscillator', 0.90)
 _p(r'^IF[_]', 'rf', 'intermediate_freq', 0.75)
+# WiFi/WLAN (Fix 2.4)
 _p(r'^WIFI[_]', 'rf', 'wifi', 0.90)
+_p(r'^WiFi[_]', 'rf', 'wifi', 0.90)
+_p(r'^WL[_]', 'rf', 'wifi', 0.85)  # WL_IRQ, WL_WAKE_IN/OUT
+_p(r'^WLAN[_]', 'rf', 'wifi', 0.85)  # WLAN_GRANT, WLAN_PRIORITY, WLAN_REQUEST
+# Bluetooth/BLE
 _p(r'^BT[_]', 'rf', 'bluetooth', 0.85)
 _p(r'^BLE[_]', 'rf', 'bluetooth', 0.85)
+# HaLow (Fix 2.5) — sub-1GHz WiFi (802.11ah)
+_p(r'HALOW', 'rf', 'halow', 0.90)  # non-anchored: HALOW_3P3V, RF_Halow, RF_HaLow_Mux
+# GNSS (Fix 2.7)
 _p(r'^GPS[_]', 'rf', 'gps', 0.90)
 _p(r'^GNSS[_]', 'rf', 'gnss', 0.90)
+_p(r'^GNSS\d*PPS', 'rf', 'gnss', 0.90)  # GNSS_1pps
 _p(r'^LORA[_]', 'rf', 'lora', 0.90)
+# Cellular/LTE (Fix 2.6)
 _p(r'^GSM[_]', 'rf', 'cellular', 0.90)
 _p(r'^LTE[_]', 'rf', 'cellular', 0.90)
+_p(r'LTE[_]SHDN', 'rf', 'cellular', 0.85)  # non-anchored: 8ULP_LTE_SHDN
 _p(r'^NR[_]', 'rf', 'cellular', 0.80)
+# Coexistence (Fix 2.9) — multi-radio antenna sharing control
+_p(r'COEX[_]', 'rf', 'coexistence', 0.90)  # non-anchored
+_p(r'[_](GRANT|PRIORITY|REQUEST)$', 'rf', 'coexistence', 0.80)  # BLE_COEX_GRANT, WLAN_GRANT
+
+# --- eMMC (Fix 2.8) — before I2C to prevent SD/SDA collision ---
+_p(r'^EMMC[_]?CLK', 'emmc', 'clock', 0.95)
+_p(r'^EMMC[_]?CMD', 'emmc', 'command', 0.95)
+_p(r'^EMMC[_]?D\d+', 'emmc', 'data', 0.95)
+_p(r'^EMMC[_]?DAT\d+', 'emmc', 'data', 0.95)
+_p(r'^EMMC[_]?DS', 'emmc', 'data_strobe', 0.95)
+_p(r'^EMMC[_]?RST', 'emmc', 'reset', 0.90)
+_p(r'^EMMC[_]', 'emmc', None, 0.95)
+_p(r'^MMC\d?[_]', 'emmc', None, 0.90)
+
+# --- SDIO (Fix 2.8) — before I2C to prevent SD/SDA collision ---
+_p(r'^SDIO\d?[_]', 'sdio', None, 0.95)
+_p(r'^SD\d?[_]CLK', 'sdio', 'clock', 0.90)
+_p(r'^SD\d?[_]CMD', 'sdio', 'command', 0.90)
+_p(r'^SD\d?[_]D\d+', 'sdio', 'data', 0.90)
+_p(r'^SD\d?[_]DAT\d+', 'sdio', 'data', 0.90)
+_p(r'^SD\d?[_]CD', 'sdio', 'card_detect', 0.85)
+_p(r'^SD\d?[_]WP', 'sdio', 'write_protect', 0.85)
+_p(r'^SD\d[_]DATA\d+', 'sdio', 'data', 0.90)  # SD1_DATA0-7
+_p(r'SDHC\d*[_]', 'emmc', None, 0.85)  # non-anchored: PTD10_SDHC0_D0
 
 # --- I2C (before clock to prevent SDA/SCL false positives) ---
 _p(r'^SDA\d*$', 'i2c', 'data', 0.85)
@@ -188,6 +227,9 @@ _p(r'^SCL\d*$', 'i2c', 'clock', 0.85)
 _p(r'^I2C\d*[_]', 'i2c', None, 0.95)
 _p(r'^I2C[_]?SDA', 'i2c', 'data', 0.95)
 _p(r'^I2C[_]?SCL', 'i2c', 'clock', 0.95)
+# Non-anchored I2C for SOM nets (e.g., SF_I2C7_SCL)
+_p(r'I2C\d*[_]SDA', 'i2c', 'data', 0.85)
+_p(r'I2C\d*[_]SCL', 'i2c', 'clock', 0.85)
 
 # --- SPI (before clock to prevent SPI_CLK matching clock suffix) ---
 _p(r'^MOSI\d*$', 'spi', 'mosi', 0.90)
@@ -201,7 +243,7 @@ _p(r'^SPI[_]?CS', 'spi', 'chip_select', 0.95)
 _p(r'^SDI\d*$', 'spi', 'data_in', 0.70)
 _p(r'^SDO\d*$', 'spi', 'data_out', 0.70)
 
-# --- UART (before clock to prevent UART_CLK matching clock suffix) ---
+# --- UART (Fix 2.3: non-anchored for SOM pin names like PTA2_UART0_TX) ---
 _p(r'^UART\d*[_]', 'uart', None, 0.95)
 _p(r'^TXD\d*$', 'uart', 'tx', 0.85)
 _p(r'^RXD\d*$', 'uart', 'rx', 0.85)
@@ -209,6 +251,12 @@ _p(r'^UART[_]?TX', 'uart', 'tx', 0.95)
 _p(r'^UART[_]?RX', 'uart', 'rx', 0.95)
 _p(r'^CTS\d*$', 'uart', 'cts', 0.75)
 _p(r'^RTS\d*$', 'uart', 'rts', 0.75)
+# Non-anchored UART patterns for SOM nets (e.g., PTA2_UART0_TX)
+_p(r'UART\d*[_]TXD?', 'uart', 'tx', 0.85)
+_p(r'UART\d*[_]RXD?', 'uart', 'rx', 0.85)
+_p(r'UART\d*[_]CTS', 'uart', 'cts', 0.85)
+_p(r'UART\d*[_]RTS', 'uart', 'rts', 0.85)
+_p(r'HPM[_]UART', 'uart', None, 0.85)  # HPM_UART_TX, HPM_UART_RX
 
 # --- JTAG/SWD (before clock to prevent SWCLK matching clock suffix) ---
 _p(r'^TCK$', 'jtag', 'clock', 0.90)
@@ -231,6 +279,8 @@ _p(r'^OSC[_]', 'clock', 'oscillator', 0.90)
 _p(r'[_]CLK[_]?[PN]?$', 'clock', None, 0.80)
 _p(r'[_]CLK[_]\w+$', 'clock', None, 0.75)  # SYS_CLK_100M, etc.
 _p(r'[_]CK[_]?[PN]?$', 'clock', None, 0.70)
+_p(r'^EXTAL\d*$', 'clock', 'crystal', 0.90)  # EXTAL0, EXTAL32
+_p(r'^XTAL\d+$', 'clock', 'crystal', 0.90)
 _p(r'^MCLK$', 'clock', 'master_clock', 0.85)
 _p(r'^BCLK$', 'clock', 'bit_clock', 0.85)
 _p(r'^LRCLK$', 'clock', 'lr_clock', 0.85)
@@ -253,7 +303,23 @@ _p(r'^AVDD\w*$', 'power', 'analog', 0.95)
 _p(r'^DVDD\w*$', 'power', 'digital', 0.95)
 _p(r'^PVDD\w*$', 'power', 'pll', 0.90)
 _p(r'^VCCO\w*$', 'power', 'io', 0.90)
+_p(r'^NVCC\w*$', 'power', 'io', 0.90)  # NVCC_RTC_3V, NVCC_3P3
+_p(r'^VDDI\w*$', 'power', None, 0.90)  # VDDI, VDDI_O
 _p(r'^PWR[_]', 'power', None, 0.85)
+# PMIC regulator outputs (Fix 2.2)
+_p(r'^BUCK\d+[_]', 'power', 'buck', 0.90)  # BUCK1_1V8, BUCK2_FB
+_p(r'^LDO\d*[_]', 'power', 'ldo', 0.90)  # LDO1_OUT, LDO2_EN
+_p(r'^LDO\d+$', 'power', 'ldo', 0.85)  # LDO1, LDO2
+_p(r'^PMIC[_]', 'power', 'pmic', 0.90)  # PMIC_MODE0, PMIC_ON_REQ
+_p(r'PMIC\d*[_]', 'power', 'pmic', 0.80)  # non-anchored: PTB15_PMIC_IRQ
+_p(r'^SIM[_]VCC', 'power', 'sim', 0.85)  # SIM_VCC
+_p(r'^\d+P\d+V\w*$', 'power', None, 0.90)  # 3P3V, 1P8V — voltage nets
+_p(r'^\d+V\d+\w*$', 'power', None, 0.85)  # 3V3, 1V8
+_p(r'^LX\d+$', 'power', 'switching_node', 0.85)  # Buck converter switching nodes
+_p(r'^SW[_]?\d+$', 'power', 'switching_node', 0.70)
+_p(r'^LDO[_]EN', 'power', 'enable', 0.85)
+_p(r'[_]EN$', 'power', 'enable', 0.55)  # Low confidence catch-all for enable pins
+_p(r'^VCCIO\w*$', 'power', 'io', 0.90)
 
 # --- Ground ---
 _p(r'^GND\w*$', 'ground', None, 0.95)
@@ -448,11 +514,23 @@ class NetClassifier:
                 if net_name:
                     self._component_net_map.setdefault(net_name, []).append(comp.reference)
 
+    # Known SOM port-pin prefixes (NXP Kinetis, i.MX, etc.) for Fix 2.11
+    _SOM_PREFIX_RE = re.compile(r'^PT[A-Z]\d+[_]', re.IGNORECASE)
+
     def _classify_by_pattern(self, name: str) -> Optional[tuple[str, Optional[str], float]]:
         """Classify a net name by pattern. Returns (category, subcategory, confidence) or None."""
         for pattern, category, subcategory, confidence in _NET_PATTERNS:
             if pattern.search(name):
                 return (category, subcategory, confidence)
+
+        # Fix 2.11: Second pass — strip SOM port-pin prefix and retry
+        m = self._SOM_PREFIX_RE.match(name)
+        if m:
+            stripped = name[m.end():]
+            for pattern, category, subcategory, confidence in _NET_PATTERNS:
+                if pattern.search(stripped):
+                    return (category, subcategory, confidence * 0.9)  # reduced confidence
+
         return None
 
     def _classify_net(self, net: PCBNet, diff_pair_map: dict, design: PCBDesignData) -> NetClassification:
