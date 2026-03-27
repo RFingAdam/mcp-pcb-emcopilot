@@ -101,6 +101,7 @@ class GroundingAnalyzer:
         board_height_mm: float,
         board_id: str = "PCB1",
         max_frequency_mhz: float = 1000,
+        via_density: Optional[float] = None,
     ) -> GroundingResult:
         """
         Analyze board grounding.
@@ -139,7 +140,10 @@ class GroundingAnalyzer:
             total_islands += self._estimate_islands(plane)
 
         avg_coverage = total_coverage / len(planes) if planes else 0
-        via_density = total_vias / board_area_cm2 if board_area_cm2 > 0 else 0
+        # Use provided via density if available (from actual design data),
+        # otherwise fall back to counting via_locations on plane objects
+        if via_density is None:
+            via_density = total_vias / board_area_cm2 if board_area_cm2 > 0 else 0
 
         # Calculate plane impedance
         if planes:
