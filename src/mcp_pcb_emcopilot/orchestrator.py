@@ -392,11 +392,40 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
                 height_mm=design.board_height_mm or 100,
             ))
 
+        # Calculate actual GND via stitching density from design data
+        board_w = design.board_width_mm or 100
+        board_h = design.board_height_mm or 100
+        board_area_cm2 = (board_w * board_h) / 100
+
+        # Count GND stitching vias (exclude BGA escape vias by checking
+        # if they're near a component center — crude but better than raw count)
+        gnd_vias = [v for v in design.vias
+                    if v.net_name and v.net_name.upper() in ('GND', 'GND_IN', 'DGND', 'AGND', 'PGND')]
+
+        # Estimate true stitching vias: those NOT within 1mm of a component
+        comp_positions = [(c.x_mm, c.y_mm) for c in design.components]
+        stitching_vias = 0
+        for v in gnd_vias:
+            is_near_comp = any(
+                abs(v.x_mm - cx) < 1.5 and abs(v.y_mm - cy) < 1.5
+                for cx, cy in comp_positions
+            )
+            if not is_near_comp:
+                stitching_vias += 1
+
+        via_density = stitching_vias / board_area_cm2 if board_area_cm2 > 0 else 0
+
+        # Inject via density into the analyzer by pre-populating via_density
+        # in the GroundPlane structures
+        for p in planes:
+            p.via_stitching_density = via_density  # type: ignore[attr-defined]
+
         gnd_result = analyzer.analyze_grounding(
             planes=planes,
-            board_width_mm=design.board_width_mm or 100,
-            board_height_mm=design.board_height_mm or 100,
+            board_width_mm=board_w,
+            board_height_mm=board_h,
             max_frequency_mhz=1000.0,
+            via_density=via_density,
         )
 
         # Extract findings
