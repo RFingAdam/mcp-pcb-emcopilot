@@ -115,6 +115,9 @@ class ODBParser:
             # Parse matrix (layer stackup)
             self._parse_matrix(odb_root, data)
 
+            # Classify layer types using name heuristics (Fix 1.5)
+            self._classify_layer_types(data)
+
             # Parse symbols (pad definitions/dcodes)
             self._parse_symbols(odb_root, data)
 
@@ -130,14 +133,25 @@ class ODBParser:
                 # Parse netlist
                 self._parse_netlist(step_path, data)
 
+                # Build net_num -> name lookup for feature parsing (Fix 1.1)
+                net_num_to_name: Dict[int, str] = {
+                    n.net_number: n.name for n in data.nets
+                }
+
+                # Parse layer stackup from attrlists (Fix 1.4)
+                self._parse_layer_stackup_attrlists(step_path, data)
+
+                # Parse EDA data for net-feature mapping (Fix 1.6)
+                self._parse_eda_data(step_path, data)
+
                 # Parse components
                 self._parse_components(step_path, data)
 
-                # Parse layer features (traces, pours, vias)
-                self._parse_layer_features(step_path, data)
+                # Parse layer features (traces, pours, vias) with net mapping
+                self._parse_layer_features(step_path, data, net_num_to_name)
 
-                # Parse drills
-                self._parse_drills(step_path, data)
+                # Parse drills with net mapping and layer spans
+                self._parse_drills(step_path, data, net_num_to_name)
 
                 # Parse layer-level attributes (design rules per layer)
                 self._parse_layer_attributes(step_path, data)
@@ -391,6 +405,162 @@ class ODBParser:
             loss_tangent=df,
             material=material
         )
+
+    def _classify_layer_types(self, data: ODBData) -> None:
+        """Reclassify copper layer types based on naming conventions.
+
+        ODB++ exports all copper layers as TYPE=SIGNAL, even ground/power planes.
+        This heuristic reclassifies based on layer name patterns and polarity.
+        """
+        for layer in data.layers:
+            if layer.layer_type not in (LayerType.SIGNAL, LayerType.MIXED):
+                continue
+            name_upper = layer.name.upper()
+            # Ground plane detection
+            if any(kw in name_upper for kw in ['_GND', 'GROUND', '_VSS', '_DGND', '_AGND']):
+                layer.layer_type = LayerType.PLANE
+            # Power plane detection
+            elif any(kw in name_upper for kw in ['_PWR', 'POWER', '_VCC', '_VDD']):
+                layer.layer_type = LayerType.PLANE
+            # Negative polarity layers are typically planes
+            elif layer.polarity == Polarity.NEGATIVE:
+                layer.layer_type = LayerType.PLANE
+
+    def _parse_layer_stackup_attrlists(self, step_path: Path, data: ODBData) -> None:
+        """Parse per-layer attrlist files for stackup properties (Fix 1.4).
+
+        ODB++ stores layer physical properties in attrlist files:
+        - .layer_dielectric: layer thickness (in file units)
+        - .dielectric_constant: relative permittivity (Er)
+        - .loss_tangent: dissipation factor (Df)
+        - .copper_weight: copper weight in oz
+        """
+        layers_dir = step_path / "layers"
+        if not layers_dir.exists():
+            return
+
+        # Build case-insensitive directory lookup
+        dir_map: Dict[str, Path] = {}
+        for d in layers_dir.iterdir():
+            if d.is_dir():
+                dir_map[d.name.lower()] = d
+
+        for layer_info in data.layers:
+            layer_dir = dir_map.get(layer_info.name.lower())
+            if not layer_dir:
+                continue
+
+            attrlist_file = layer_dir / "attrlist"
+            if not attrlist_file.exists():
+                continue
+
+            try:
+                content = self._read_file(attrlist_file)
+                # Detect units for this file
+                file_units = self._units
+                for line in content.split('\n')[:5]:
+                    if line.strip().startswith('UNITS='):
+                        unit_val = line.split('=', 1)[1].strip().lower()
+                        if 'mm' in unit_val:
+                            file_units = 'mm'
+                        elif 'inch' in unit_val:
+                            file_units = 'inch'
+                        elif 'mil' in unit_val:
+                            file_units = 'mil'
+
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if not line.startswith('.') or '=' not in line:
+                        continue
+
+                    key, _, value = line.partition('=')
+                    attr_name = key.strip().lstrip('.').lower()
+                    value_str = value.strip().strip("'\"")
+
+                    try:
+                        num_str = re.sub(r'[a-zA-Z]+$', '', value_str).strip()
+                        if not num_str:
+                            continue
+                        num_val = float(num_str)
+                    except ValueError:
+                        continue
+
+                    # Layer thickness
+                    if attr_name == 'layer_dielectric' and num_val > 0:
+                        if file_units == 'inch':
+                            layer_info.thickness_mm = num_val * self.INCH_TO_MM
+                        elif file_units == 'mil':
+                            layer_info.thickness_mm = num_val * self.MIL_TO_MM
+                        else:
+                            layer_info.thickness_mm = num_val
+
+                    # Dielectric constant
+                    elif attr_name == 'dielectric_constant' and num_val > 1.0:
+                        layer_info.dielectric_constant = num_val
+
+                    # Loss tangent
+                    elif attr_name == 'loss_tangent' and num_val >= 0:
+                        layer_info.loss_tangent = num_val
+
+                    # Copper weight
+                    elif attr_name == 'copper_weight' and num_val > 0:
+                        layer_info.copper_weight_oz = num_val
+
+                    # Material name
+                    elif attr_name == 'dielectric_name':
+                        layer_info.material = value_str
+
+            except Exception as e:
+                data.parse_warnings.append(
+                    f"Error parsing stackup attrlist for {layer_info.name}: {e}"
+                )
+
+    def _parse_eda_data(self, step_path: Path, data: ODBData) -> None:
+        """Parse EDA data file for net-pin connectivity (Fix 1.6).
+
+        The EDA data contains authoritative net-to-feature and net-to-pin mappings:
+        - NET <net_name>: Net header
+        - SNT TOP B <comp_num> <pin_num>: Subnet connecting component pin
+        - FID C <layer_idx> <feature_idx>: Feature ID mapping
+        """
+        eda_file = step_path / "eda" / "data"
+        if not eda_file.exists():
+            return
+
+        try:
+            content = self._read_file(eda_file)
+            current_net_name: Optional[str] = None
+            pin_count_per_net: Dict[str, int] = {}
+
+            for line in content.split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+
+                if line.startswith('NET '):
+                    current_net_name = line[4:].strip()
+                    if current_net_name not in pin_count_per_net:
+                        pin_count_per_net[current_net_name] = 0
+
+                elif line.startswith('SNT TOP B') and current_net_name:
+                    # Subnet connecting to a component pin on top
+                    pin_count_per_net[current_net_name] = (
+                        pin_count_per_net.get(current_net_name, 0) + 1
+                    )
+                elif line.startswith('SNT BOT B') and current_net_name:
+                    pin_count_per_net[current_net_name] = (
+                        pin_count_per_net.get(current_net_name, 0) + 1
+                    )
+
+            # Update net objects with pin counts
+            for net in data.nets:
+                count = pin_count_per_net.get(net.name, 0)
+                if count > 0 and len(net.pins) < count:
+                    # Add placeholder pins to match EDA pin count
+                    net.pins = [f"pin_{i}" for i in range(count)]
+
+        except Exception as e:
+            data.parse_warnings.append(f"Error parsing EDA data: {e}")
 
     def _parse_symbols(self, odb_root: Path, data: ODBData) -> None:
         """Parse symbols directory to get pad/aperture definitions.
@@ -820,30 +990,41 @@ class ODBParser:
             pins=pins,
         )
 
-    def _parse_layer_features(self, step_path: Path, data: ODBData) -> None:
+    def _parse_layer_features(
+        self, step_path: Path, data: ODBData,
+        net_num_to_name: Optional[Dict[int, str]] = None,
+    ) -> None:
         """Parse features from signal/plane layers"""
         layers_dir = step_path / "layers"
 
         if not layers_dir.exists():
             return
 
+        # Build case-insensitive dir lookup once
+        dir_map: Dict[str, Path] = {}
+        for d in layers_dir.iterdir():
+            if d.is_dir():
+                dir_map[d.name.lower()] = d
+
         for layer_info in data.layers:
             if layer_info.layer_type not in (LayerType.SIGNAL, LayerType.PLANE, LayerType.MIXED):
                 continue
 
-            layer_dir = layers_dir / layer_info.name
-            if not layer_dir.exists():
-                # Try without case sensitivity
-                for d in layers_dir.iterdir():
-                    if d.name.lower() == layer_info.name.lower():
-                        layer_dir = d
-                        break
+            layer_dir = dir_map.get(layer_info.name.lower())
+            if layer_dir:
+                self._parse_features_file(
+                    layer_dir, layer_info.name, data, net_num_to_name
+                )
 
-            if layer_dir.exists():
-                self._parse_features_file(layer_dir, layer_info.name, data)
+    def _parse_features_file(
+        self, layer_dir: Path, layer_name: str, data: ODBData,
+        net_num_to_name: Optional[Dict[int, str]] = None,
+    ) -> None:
+        """Parse the features file for a layer.
 
-    def _parse_features_file(self, layer_dir: Path, layer_name: str, data: ODBData) -> None:
-        """Parse the features file for a layer"""
+        Extracts traces with net assignments (Fix 1.1), proper widths from
+        symbol definitions (Fix 1.3), and copper pours with net assignments.
+        """
         features_file = layer_dir / "features"
 
         if not features_file.exists():
@@ -864,61 +1045,132 @@ class ODBParser:
             content = self._read_file(features_file)
 
         self._detect_file_units(content)
-        traces = []
-        pours = []
+
+        # First pass: build symbol index → width map from $ definitions (Fix 1.3)
+        symbol_widths: Dict[str, float] = {}
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('$'):
+                sym_match = re.match(r'\$(\d+)\s+(\S+)', line)
+                if sym_match:
+                    sym_idx = sym_match.group(1)
+                    sym_name = sym_match.group(2)
+                    pad = self._parse_symbol_name(sym_name)
+                    if pad:
+                        # For round symbols (rN), width = diameter
+                        # For rect symbols, width = larger dimension
+                        symbol_widths[sym_idx] = pad.width_mm
+
+        net_map = net_num_to_name or {}
+        default_width = 0.1  # mm fallback
+        traces: list[ODBTrace] = []
+        pours: list[ODBCopperPour] = []
         current_points: list[tuple[float, float]] = []
-        current_width = 0.1  # Default width in mm
+        current_pour_net_num: Optional[int] = None
 
         for line in content.split('\n'):
             line = line.strip()
 
-            # Line/trace: L x1 y1 x2 y2
+            # Line/trace: L x1 y1 x2 y2 sym_num P net_num [;attrs]
             if line.startswith('L '):
-                parts = line.split()
+                # Strip attribute suffix
+                feat_part = line.split(';')[0]
+                parts = feat_part.split()
                 if len(parts) >= 5:
                     x1 = self._convert_coord(parts[1])
                     y1 = self._convert_coord(parts[2])
                     x2 = self._convert_coord(parts[3])
                     y2 = self._convert_coord(parts[4])
+
+                    # Get trace width from symbol reference (Fix 1.3)
+                    width = default_width
+                    if len(parts) >= 6:
+                        sym_idx = parts[5]
+                        width = symbol_widths.get(sym_idx, default_width)
+
+                    # Get net number (Fix 1.1)
+                    # Format: L x1 y1 x2 y2 sym_num P net_num
+                    # The net_num is typically the last numeric field
+                    net_name: Optional[str] = None
+                    net_num: Optional[int] = None
+                    if len(parts) >= 8:
+                        try:
+                            net_num = int(parts[7])
+                            net_name = net_map.get(net_num)
+                        except ValueError:
+                            pass
+                    elif len(parts) >= 7:
+                        # Some formats: L x1 y1 x2 y2 sym P (no net_num = net 0)
+                        try:
+                            candidate = int(parts[6])
+                            # If it's a number and not just 'P'/'N', treat as net
+                            net_num = candidate
+                            net_name = net_map.get(net_num)
+                        except ValueError:
+                            pass
 
                     length = math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
                     traces.append(ODBTrace(
                         layer=layer_name,
-                        width_mm=current_width,
+                        width_mm=width,
                         points=[(x1, y1), (x2, y2)],
                         length_mm=length,
+                        net_name=net_name,
+                        net_number=net_num,
                     ))
 
-            # Arc: A x1 y1 x2 y2 xc yc cw/ccw
+            # Arc: A x1 y1 x2 y2 [xc yc] sym_num P net_num
             elif line.startswith('A '):
-                # Simplified - treat as line between endpoints
-                parts = line.split()
+                feat_part = line.split(';')[0]
+                parts = feat_part.split()
                 if len(parts) >= 5:
                     x1 = self._convert_coord(parts[1])
                     y1 = self._convert_coord(parts[2])
                     x2 = self._convert_coord(parts[3])
                     y2 = self._convert_coord(parts[4])
 
+                    # Get width from symbol
+                    width = default_width
+                    # Arc has more fields (xc, yc, cw/ccw) so sym is further
+                    for i in range(5, min(len(parts), 10)):
+                        if parts[i] in symbol_widths:
+                            width = symbol_widths[parts[i]]
+                            break
+
+                    # Try to get net from last numeric field
+                    net_name_a: Optional[str] = None
+                    net_num_a: Optional[int] = None
+                    for i in range(len(parts) - 1, 4, -1):
+                        try:
+                            net_num_a = int(parts[i])
+                            net_name_a = net_map.get(net_num_a)
+                            break
+                        except ValueError:
+                            continue
+
                     traces.append(ODBTrace(
                         layer=layer_name,
-                        width_mm=current_width,
+                        width_mm=width,
                         points=[(x1, y1), (x2, y2)],
+                        net_name=net_name_a,
+                        net_number=net_num_a,
                     ))
 
-            # Pad: P x y dcode rotation mirror
-            elif line.startswith('P '):
-                # Pad - could be via pad
-                parts = line.split()
-                if len(parts) >= 3:
-                    x = self._convert_coord(parts[1])
-                    y = self._convert_coord(parts[2])
-                    # Store as potential via location
-                    # Full via detection would require cross-referencing with drill data
-
-            # Surface (copper pour) start: S P <polarity>
+            # Surface (copper pour) start: S P net_num
             elif line.startswith('S ') and 'P' in line:
                 current_points = []
+                # Extract net number from surface record
+                feat_part = line.split(';')[0]
+                sparts = feat_part.split()
+                current_pour_net_num = None
+                # Last numeric field is typically net number
+                for i in range(len(sparts) - 1, 0, -1):
+                    try:
+                        current_pour_net_num = int(sparts[i])
+                        break
+                    except ValueError:
+                        continue
 
             # Surface boundary: OB x y
             elif line.startswith('OB '):
@@ -930,9 +1182,12 @@ class ODBParser:
 
             # Surface end: SE
             elif line.startswith('SE') and current_points:
+                pour_net_name = net_map.get(current_pour_net_num) if current_pour_net_num is not None else None
                 pours.append(ODBCopperPour(
                     layer=layer_name,
                     boundary=current_points.copy(),
+                    net_name=pour_net_name,
+                    net_number=current_pour_net_num,
                 ))
                 current_points = []
 
@@ -942,7 +1197,10 @@ class ODBParser:
         if pours:
             data.copper_pours[layer_name] = pours
 
-    def _parse_drills(self, step_path: Path, data: ODBData) -> None:
+    def _parse_drills(
+        self, step_path: Path, data: ODBData,
+        net_num_to_name: Optional[Dict[int, str]] = None,
+    ) -> None:
         """Parse drill hits from drill layers"""
         layers_dir = step_path / "layers"
 
@@ -950,11 +1208,16 @@ class ODBParser:
             return
 
         # Build case-insensitive directory lookup
-        dir_map = {}
-        if layers_dir.exists():
-            for d in layers_dir.iterdir():
-                if d.is_dir():
-                    dir_map[d.name.lower()] = d
+        dir_map: Dict[str, Path] = {}
+        for d in layers_dir.iterdir():
+            if d.is_dir():
+                dir_map[d.name.lower()] = d
+
+        # Build ordered copper layer list for via type classification (Fix 1.7)
+        copper_layers = [
+            l.name.lower() for l in data.layers
+            if l.layer_type in (LayerType.SIGNAL, LayerType.PLANE, LayerType.MIXED)
+        ]
 
         # Find drill layers (case-insensitive)
         for layer_info in data.layers:
@@ -963,20 +1226,29 @@ class ODBParser:
 
             layer_dir = dir_map.get(layer_info.name.lower())
             if layer_dir and layer_dir.exists():
-                self._parse_drill_features(layer_dir, layer_info, data)
+                self._parse_drill_features(
+                    layer_dir, layer_info, data, net_num_to_name, copper_layers
+                )
 
         # Also check for common drill layer names
         for drill_name in ["drill", "drl", "pth", "npth"]:
             drill_dir = layers_dir / drill_name
             if drill_dir.exists():
-                self._parse_drill_features(drill_dir, None, data)
+                self._parse_drill_features(
+                    drill_dir, None, data, net_num_to_name, copper_layers
+                )
 
-    def _parse_drill_features(self, layer_dir: Path, layer_info: Optional[ODBLayer], data: ODBData) -> None:
+    def _parse_drill_features(
+        self, layer_dir: Path, layer_info: Optional[ODBLayer],
+        data: ODBData,
+        net_num_to_name: Optional[Dict[int, str]] = None,
+        copper_layers: Optional[List[str]] = None,
+    ) -> None:
         """Parse drill hits from a drill layer.
 
-        Extracts actual pad sizes from symbol definitions (dcodes) instead of
-        using hardcoded estimates. Falls back to industry-standard annular ring
-        calculations if symbol data is unavailable.
+        Extracts actual pad sizes from symbol definitions (dcodes),
+        net assignments from feature records (Fix 1.2), and via layer
+        spans from drill layer definitions (Fix 1.7).
         """
         features_file = layer_dir / "features"
 
@@ -998,56 +1270,109 @@ class ODBParser:
                     if sym_match:
                         sym_idx = sym_match.group(1)
                         sym_name = sym_match.group(2)
-                        # Symbol names use mil convention (r6 = 6 mil round)
                         pad = self._parse_symbol_name(sym_name)
                         if pad:
                             symbol_sizes[sym_idx] = max(pad.width_mm, pad.height_mm)
 
-                # Tool definition: T<dcode> <size> [type] (alternative format)
+                # Tool definition: T<dcode> <size> [type]
                 elif line.startswith('T') and not line.startswith('TOP'):
                     match = re.match(r'T(\d+)\s+(\d+(?:\.\d+)?)', line)
                     if match:
                         dcode = match.group(1)
-                        # Tool sizes in ODB++ use mil convention
                         size = float(match.group(2)) * self.MIL_TO_MM
                         symbol_sizes[dcode] = size
 
             default_drill = 0.3  # mm fallback
+            net_map = net_num_to_name or {}
 
-            # Second pass: parse drill hits
+            # Determine layer span from drill layer info (Fix 1.7)
+            start_layer = "top"
+            end_layer = "bottom"
+            via_type = ViaType.THROUGH
+
+            if layer_info:
+                if layer_info.start_name:
+                    start_layer = layer_info.start_name
+                if layer_info.end_name:
+                    end_layer = layer_info.end_name
+
+                # Classify via type from layer span
+                if copper_layers and start_layer != "top" and end_layer != "bottom":
+                    sl = start_layer.lower()
+                    el = end_layer.lower()
+                    is_start_outer = (
+                        sl in ("top",) or
+                        (copper_layers and sl == copper_layers[0])
+                    )
+                    is_end_outer = (
+                        el in ("bottom",) or
+                        (copper_layers and el == copper_layers[-1])
+                    )
+                    if is_start_outer or is_end_outer:
+                        via_type = ViaType.BLIND
+                    else:
+                        via_type = ViaType.BURIED
+                elif start_layer != "top" or end_layer != "bottom":
+                    # Has non-default layer names → likely blind
+                    via_type = ViaType.BLIND
+
+                # Detect plating from layer name
+                drill_plating = "plated"
+                if layer_info.name and "non" in layer_info.name.lower():
+                    drill_plating = "non_plated"
+
+            # Second pass: parse drill hits with net mapping (Fix 1.2)
             for line in content.split('\n'):
                 line = line.strip()
 
-                # Pad (drill hit): P x y symbol_index polarity rotation mirror ;attrs
+                # Pad (drill hit): P x y sym_idx P net_num [mirror] [;attrs]
                 if line.startswith('P '):
-                    parts = line.split(';')[0].split()  # strip attributes
+                    feat_part = line.split(';')[0]
+                    parts = feat_part.split()
                     if len(parts) >= 3:
                         x = self._convert_coord(parts[1])
                         y = self._convert_coord(parts[2])
 
-                        # Symbol index is the 4th field
+                        # Symbol index
                         sym_idx = parts[3] if len(parts) >= 4 else None
-
-                        # Get drill size from symbol definition
                         drill_size = symbol_sizes.get(sym_idx, default_drill) if sym_idx else default_drill
 
-                        # Get pad size from symbol templates
+                        # Net number (Fix 1.2) — find last numeric field after polarity
+                        net_name: Optional[str] = None
+                        net_num: Optional[int] = None
+                        # Format: P x y sym P net_num mirror
+                        # or:     P x y sym P net_num
+                        for i in range(min(len(parts) - 1, 7), 3, -1):
+                            try:
+                                net_num = int(parts[i])
+                                net_name = net_map.get(net_num)
+                                break
+                            except ValueError:
+                                continue
+
                         pad_size = self._get_via_pad_size(sym_idx, drill_size, data)
 
                         data.drills.append(ODBDrill(
                             x_mm=x,
                             y_mm=y,
                             diameter_mm=drill_size,
+                            drill_type=drill_plating if layer_info else "plated",
+                            start_layer=start_layer,
+                            end_layer=end_layer,
                         ))
 
-                        # Create via from drill if this is a plated hole
                         data.vias.append(ODBVia(
                             x_mm=x,
                             y_mm=y,
                             drill_diameter_mm=drill_size,
                             pad_top_mm=pad_size,
                             pad_bottom_mm=pad_size,
-                            pad_inner_mm=pad_size,  # Assume same for inner layers
+                            pad_inner_mm=pad_size,
+                            start_layer=start_layer,
+                            end_layer=end_layer,
+                            via_type=via_type,
+                            net_name=net_name,
+                            net_number=net_num,
                         ))
 
         except Exception as e:
