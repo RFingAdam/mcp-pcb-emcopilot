@@ -154,7 +154,17 @@ class GNSSAnalyzer:
         gnss_rf_nets = [n.name for n in design.nets if _net_matches(n.name, GNSS_RF_NET_PATTERNS)]
         pps_nets = [n.name for n in design.nets if _net_matches(n.name, PPS_NET_PATTERNS)]
 
-        if not gnss_receivers and not gnss_rf_nets:
+        # Also check classified_nets for GNSS-related signals
+        if classified_nets is not None:
+            for nc in getattr(classified_nets, "classified_nets", []):
+                if nc.category == "rf" and nc.subcategory in ("gnss", "gps"):
+                    if nc.net_name not in gnss_rf_nets and nc.net_name not in pps_nets:
+                        if "pps" in nc.net_name.lower() or "1pps" in nc.net_name.lower():
+                            pps_nets.append(nc.net_name)
+                        else:
+                            gnss_rf_nets.append(nc.net_name)
+
+        if not gnss_receivers and not gnss_rf_nets and not pps_nets:
             findings.append({
                 "severity": "info",
                 "category": "gnss",

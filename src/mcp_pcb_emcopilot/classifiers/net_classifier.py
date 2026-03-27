@@ -95,7 +95,14 @@ def _p(pattern: str, category: str, subcategory: Optional[str] = None, confidenc
     _NET_PATTERNS.append((re.compile(pattern, re.IGNORECASE), category, subcategory, confidence))
 
 
-# --- DDR ---
+# --- DDR --- (with proper subcategories for DDR_DQ, DDR_CA, DDR_CK naming)
+_p(r'^DDR\d?[_]DQ\d+', 'ddr', 'data', 0.95)  # DDR_DQ0, DDR_DQ15
+_p(r'^DDR\d?[_]DQS\d*', 'ddr', 'strobe', 0.95)  # DDR_DQS0_P
+_p(r'^DDR\d?[_]DMI?\d*', 'ddr', 'mask', 0.95)  # DDR_DMI0_A
+_p(r'^DDR\d?[_]CA\d+', 'ddr', 'address', 0.95)  # DDR_CA0_A
+_p(r'^DDR\d?[_]CK[E]?\d*', 'ddr', 'clock', 0.95)  # DDR_CK0_P, DDR_CKE0
+_p(r'^DDR\d?[_]CS\d*', 'ddr', 'chip_select', 0.95)
+_p(r'^DDR\d?[_]ODT', 'ddr', 'control', 0.95)
 _p(r'^DDR\d?_', 'ddr', None, 0.95)
 _p(r'^DQ\d+$', 'ddr', 'data', 0.90)
 _p(r'^DQ[SP]?\d*[_PN]?$', 'ddr', 'strobe', 0.90)
