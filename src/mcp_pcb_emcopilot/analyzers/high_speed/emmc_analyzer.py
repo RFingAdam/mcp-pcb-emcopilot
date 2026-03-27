@@ -54,11 +54,11 @@ EMMC_SPECS: Dict[str, Dict[str, Any]] = {
 
 # Signal name patterns for eMMC nets
 EMMC_PATTERNS = {
-    "clk": [r"(?i)emmc.*clk", r"(?i)mmc.*clk", r"(?i)sdio.*clk"],
-    "cmd": [r"(?i)emmc.*cmd", r"(?i)mmc.*cmd"],
-    "data": [r"(?i)emmc.*d(?:at)?[0-7]", r"(?i)mmc.*d(?:at)?[0-7]"],
-    "ds": [r"(?i)emmc.*ds", r"(?i)mmc.*ds", r"(?i)emmc.*strobe"],
-    "rst": [r"(?i)emmc.*rst", r"(?i)mmc.*rst"],
+    "clk": [r"(?i)emmc.*clk", r"(?i)mmc.*clk", r"(?i)sdhc\d*.*clk"],
+    "cmd": [r"(?i)emmc.*cmd", r"(?i)mmc.*cmd", r"(?i)sdhc\d*.*cmd"],
+    "data": [r"(?i)emmc.*d(?:at)?[0-7]", r"(?i)mmc.*d(?:at)?[0-7]", r"(?i)sdhc\d*.*d[0-7]"],
+    "ds": [r"(?i)emmc.*ds", r"(?i)mmc.*ds", r"(?i)emmc.*strobe", r"(?i)sdhc\d*.*dqs"],
+    "rst": [r"(?i)emmc.*rst", r"(?i)mmc.*rst", r"(?i)sdhc\d*.*reset"],
 }
 
 
@@ -148,14 +148,29 @@ class EMMCAnalyzer:
             elif _match_signal(name, "rst"):
                 rst_nets.append(name)
 
-        # Also check classified_nets if available
+        # Also check classified_nets if available — use category='emmc'
         if classified_nets is not None:
             for nc in getattr(classified_nets, "classified_nets", []):
-                if nc.subcategory and "emmc" in nc.subcategory.lower():
+                if nc.category == "emmc":
                     name = nc.net_name
-                    if _match_signal(name, "clk") and name not in clk_nets:
-                        clk_nets.append(name)
-                    elif _match_signal(name, "data") and name not in data_nets:
+                    sub = (nc.subcategory or "").lower()
+                    if sub == "clock" or _match_signal(name, "clk"):
+                        if name not in clk_nets:
+                            clk_nets.append(name)
+                    elif sub == "command" or _match_signal(name, "cmd"):
+                        if name not in cmd_nets:
+                            cmd_nets.append(name)
+                    elif sub == "data" or _match_signal(name, "data"):
+                        if name not in data_nets:
+                            data_nets.append(name)
+                    elif sub == "data_strobe" or _match_signal(name, "ds"):
+                        if name not in ds_nets:
+                            ds_nets.append(name)
+                    elif sub == "reset" or _match_signal(name, "rst"):
+                        if name not in rst_nets:
+                            rst_nets.append(name)
+                    elif name not in data_nets:
+                        # Default: treat unsubcategorized eMMC nets as data
                         data_nets.append(name)
 
         if not data_nets and not clk_nets:

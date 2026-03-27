@@ -216,6 +216,22 @@ class CoexistenceAnalyzer:
             if comps:
                 detected_radios[radio] = comps
 
+        # Also detect radios from classified nets (more reliable for SOM designs)
+        if classified_nets is not None:
+            subcategory_to_radio = {
+                "wifi": "wifi", "bluetooth": "ble", "halow": "halow",
+                "cellular": "cellular", "gnss": "gnss", "gps": "gnss",
+                "lora": "lora",
+            }
+            for nc in getattr(classified_nets, "classified_nets", []):
+                if nc.category == "rf" and nc.subcategory:
+                    radio_key = subcategory_to_radio.get(nc.subcategory)
+                    if radio_key and radio_key not in detected_radios:
+                        detected_radios[radio_key] = [f"net:{nc.net_name}"]
+                    elif radio_key and radio_key in detected_radios:
+                        if f"net:{nc.net_name}" not in detected_radios[radio_key]:
+                            detected_radios[radio_key].append(f"net:{nc.net_name}")
+
         if len(detected_radios) < 2:
             findings.append({
                 "severity": "info",
