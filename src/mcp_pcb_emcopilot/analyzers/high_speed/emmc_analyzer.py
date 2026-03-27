@@ -183,6 +183,31 @@ class EMMCAnalyzer:
             })
             return findings
 
+        # Group nets by controller/channel (e.g., SDHC0 vs SDHC1)
+        # to avoid comparing traces routed to different chips
+        channels: Dict[str, Dict[str, List[str]]] = {}
+        all_emmc_nets_flat = clk_nets + cmd_nets + data_nets + ds_nets + rst_nets
+        for name in all_emmc_nets_flat:
+            # Extract channel ID from net name
+            ch_match = re.search(r'(SDHC\d+|EMMC\d*|MMC\d+)', name, re.IGNORECASE)
+            ch_id = ch_match.group(1).upper() if ch_match else "DEFAULT"
+            if ch_id not in channels:
+                channels[ch_id] = {"clk": [], "cmd": [], "data": [], "ds": [], "rst": []}
+            if name in clk_nets:
+                channels[ch_id]["clk"].append(name)
+            elif name in cmd_nets:
+                channels[ch_id]["cmd"].append(name)
+            elif name in ds_nets:
+                channels[ch_id]["ds"].append(name)
+            elif name in rst_nets:
+                channels[ch_id]["rst"].append(name)
+            elif name in data_nets:
+                channels[ch_id]["data"].append(name)
+
+        # If only one channel, use original flat lists
+        if len(channels) <= 1:
+            channels = {"DEFAULT": {"clk": clk_nets, "cmd": cmd_nets, "data": data_nets, "ds": ds_nets, "rst": rst_nets}}
+
         # Determine mode: HS400 if data strobe present, else HS200
         mode = "HS400" if ds_nets else "HS200"
         spec = EMMC_SPECS[mode]
@@ -191,14 +216,12 @@ class EMMCAnalyzer:
             "severity": "info",
             "category": "emmc",
             "description": f"eMMC {mode} interface detected: {len(data_nets)} data, "
-                           f"{len(clk_nets)} CLK, {len(cmd_nets)} CMD, {len(ds_nets)} DS",
+                           f"{len(clk_nets)} CLK, {len(cmd_nets)} CMD, {len(ds_nets)} DS"
+                           f" ({len(channels)} channel(s): {', '.join(channels.keys())})",
             "recommendation": "",
             "details": {
                 "mode": mode,
-                "data_nets": data_nets,
-                "clk_nets": clk_nets,
-                "cmd_nets": cmd_nets,
-                "ds_nets": ds_nets,
+                "channels": {ch: {k: v for k, v in sigs.items() if v} for ch, sigs in channels.items()},
             },
         })
 
@@ -213,75 +236,86 @@ class EMMCAnalyzer:
                 "details": {"component": emmc_ref},
             })
 
-        # --- Check data line lengths and matching ---
-        data_lengths: Dict[str, float] = {}
-        for net_name in data_nets:
-            data_lengths[net_name] = _get_net_total_length(design, net_name)
+        # --- Per-channel analysis ---
+        for ch_id, ch_sigs in channels.items():
+            ch_prefix = f"{ch_id}: " if len(channels) > 1 else ""
+            ch_data = ch_sigs["data"]
+            ch_clk = ch_sigs["clk"]
+            ch_cmd = ch_sigs["cmd"]
+            ch_ds = ch_sigs["ds"]
 
-        if data_lengths:
-            lengths = list(data_lengths.values())
-            max_len = max(lengths) if lengths else 0.0
-            min_len = min(lengths) if lengths else 0.0
-            spread_mm = max_len - min_len
+            # Check data line lengths and matching within THIS channel
+            data_lengths: Dict[str, float] = {}
+            for net_name in ch_data:
+                data_lengths[net_name] = _get_net_total_length(design, net_name)
 
-            if spread_mm > spec["data_match_mm"]:
-                findings.append({
-                    "severity": "critical" if spread_mm > spec["data_match_mm"] * 2 else "warning",
-                    "category": "emmc_length_matching",
-                    "description": (
-                        f"eMMC data line length spread {spread_mm:.2f}mm exceeds "
-                        f"{mode} limit of {spec['data_match_mm']}mm"
-                    ),
-                    "recommendation": (
-                        f"Match all eMMC data lines within {spec['data_match_mm']}mm. "
-                        "Use serpentine routing on shorter traces."
-                    ),
-                    "details": {
-                        "spread_mm": round(spread_mm, 2),
-                        "limit_mm": spec["data_match_mm"],
-                        "lengths": {k: round(v, 2) for k, v in data_lengths.items()},
-                    },
-                })
+            if data_lengths:
+                lengths = list(data_lengths.values())
+                max_len = max(lengths) if lengths else 0.0
+                min_len = min(lengths) if lengths else 0.0
+                spread_mm = max_len - min_len
 
-        # --- Check max trace length ---
-        all_emmc_nets = clk_nets + cmd_nets + data_nets + ds_nets
-        for net_name in all_emmc_nets:
-            length = _get_net_total_length(design, net_name)
-            if length > spec["max_length_mm"]:
-                findings.append({
-                    "severity": "critical",
-                    "category": "emmc_trace_length",
-                    "description": (
-                        f"eMMC signal {net_name} length {length:.1f}mm exceeds "
-                        f"{mode} max of {spec['max_length_mm']}mm"
-                    ),
-                    "recommendation": (
-                        "Shorten trace routing. Place eMMC device closer to SoC. "
-                        "Consider using shorter via paths."
-                    ),
-                    "details": {
-                        "net": net_name,
-                        "length_mm": round(length, 2),
-                        "limit_mm": spec["max_length_mm"],
-                    },
-                })
-
-        # --- CLK to DATA skew ---
-        if clk_nets and data_lengths:
-            clk_length = _get_net_total_length(design, clk_nets[0])
-            for net_name, d_len in data_lengths.items():
-                skew_mm = abs(d_len - clk_length)
-                skew_ps = skew_mm * self.prop_delay
-                if skew_ps > spec["clk_data_skew_ps"]:
+                if spread_mm > spec["data_match_mm"]:
                     findings.append({
-                        "severity": "critical",
-                        "category": "emmc_clk_data_skew",
+                        "severity": "critical" if spread_mm > spec["data_match_mm"] * 2 else "warning",
+                        "category": "emmc_length_matching",
                         "description": (
-                            f"CLK-to-{net_name} skew {skew_ps:.0f}ps exceeds "
-                            f"{mode} limit of {spec['clk_data_skew_ps']}ps"
+                            f"{ch_prefix}eMMC data line length spread {spread_mm:.2f}mm exceeds "
+                            f"{mode} limit of {spec['data_match_mm']}mm "
+                            f"(min={min_len:.1f}mm, max={max_len:.1f}mm)"
                         ),
                         "recommendation": (
-                            f"Reduce CLK-to-DATA length mismatch. Target skew <{spec['clk_data_skew_ps']}ps."
+                            f"Match all {ch_id} data lines within {spec['data_match_mm']}mm. "
+                            "Use serpentine routing on shorter traces."
+                        ),
+                        "details": {
+                            "channel": ch_id,
+                            "spread_mm": round(spread_mm, 2),
+                            "limit_mm": spec["data_match_mm"],
+                            "lengths": {k: round(v, 2) for k, v in data_lengths.items()},
+                        },
+                    })
+
+            # Check max trace length per channel
+            all_ch_nets = ch_clk + ch_cmd + ch_data + ch_ds
+            for net_name in all_ch_nets:
+                length = _get_net_total_length(design, net_name)
+                if length > spec["max_length_mm"]:
+                    findings.append({
+                        "severity": "critical",
+                        "category": "emmc_trace_length",
+                        "description": (
+                            f"{ch_prefix}eMMC signal {net_name} length {length:.1f}mm exceeds "
+                            f"{mode} max of {spec['max_length_mm']}mm"
+                        ),
+                        "recommendation": (
+                            "Shorten trace routing. Place eMMC device closer to SoC. "
+                            "Consider using shorter via paths."
+                        ),
+                        "details": {
+                            "channel": ch_id,
+                            "net": net_name,
+                            "length_mm": round(length, 2),
+                            "limit_mm": spec["max_length_mm"],
+                        },
+                    })
+
+            # CLK to DATA skew per channel
+            if ch_clk and data_lengths:
+                clk_length = _get_net_total_length(design, ch_clk[0])
+                for net_name, d_len in data_lengths.items():
+                    skew_mm = abs(d_len - clk_length)
+                    skew_ps = skew_mm * self.prop_delay
+                    if skew_ps > spec["clk_data_skew_ps"]:
+                        findings.append({
+                            "severity": "critical",
+                            "category": "emmc_clk_data_skew",
+                            "description": (
+                                f"{ch_prefix}CLK-to-{net_name} skew {skew_ps:.0f}ps exceeds "
+                                f"{mode} limit of {spec['clk_data_skew_ps']}ps"
+                            ),
+                            "recommendation": (
+                                f"Reduce CLK-to-DATA length mismatch. Target skew <{spec['clk_data_skew_ps']}ps."
                         ),
                         "details": {
                             "net": net_name,
@@ -343,8 +377,8 @@ class EMMCAnalyzer:
                         },
                     })
 
-        # --- Via count check ---
-        for net_name in all_emmc_nets:
+        # --- Via count check (across all channels) ---
+        for net_name in all_emmc_nets_flat:
             via_count = _get_net_via_count(design, net_name)
             if via_count > spec["max_via_count"]:
                 findings.append({
@@ -370,7 +404,7 @@ class EMMCAnalyzer:
         tolerance = spec["impedance_tolerance_pct"] / 100.0
         for trace in design.traces:
             if trace.net_name and any(
-                trace.net_name.lower() == n.lower() for n in all_emmc_nets
+                trace.net_name.lower() == n.lower() for n in all_emmc_nets_flat
             ):
                 # Estimate impedance from trace width (simplified check)
                 # Flag very narrow or very wide traces that likely miss 50 Ohm
