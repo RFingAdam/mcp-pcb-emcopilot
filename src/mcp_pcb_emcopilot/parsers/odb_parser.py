@@ -516,12 +516,19 @@ class ODBParser:
                 )
 
     def _parse_eda_data(self, step_path: Path, data: ODBData) -> None:
-        """Parse EDA data file for net-pin connectivity (Fix 1.6).
+        """Parse EDA data file for net-feature mapping and pin connectivity.
 
-        The EDA data contains authoritative net-to-feature and net-to-pin mappings:
-        - NET <net_name>: Net header
-        - SNT TOP B <comp_num> <pin_num>: Subnet connecting component pin
-        - FID C <layer_idx> <feature_idx>: Feature ID mapping
+        Altium (and some other EDA tools) export ODB++ with net_num=0 on all
+        feature records. The authoritative net-to-feature mapping is in the
+        EDA data file via FID (Feature ID) records:
+
+        - LYR <layer1> <layer2> ...: Layer index mapping
+        - NET <net_name>: Current net scope
+        - SNT TRC: SubNet Trace
+        - SNT VIA: SubNet Via
+        - SNT TOP B <comp> <pin>: SubNet component pin
+        - FID C <layer_idx> <feature_idx>: Copper feature mapping
+        - FID H <layer_idx> <feature_idx>: Drill/hole feature mapping
         """
         eda_file = step_path / "eda" / "data"
         if not eda_file.exists():
@@ -529,10 +536,28 @@ class ODBParser:
 
         try:
             content = self._read_file(eda_file)
+            lines = content.split('\n')
+
+            # Parse LYR line for layer index → layer name mapping
+            eda_layer_map: Dict[int, str] = {}
+            for line in lines:
+                if line.startswith('LYR '):
+                    layer_names = line[4:].split()
+                    for i, name in enumerate(layer_names):
+                        eda_layer_map[i] = name.lower()
+                    break
+
+            # Build feature-to-net mapping: (layer_name, feature_idx) → net_name
+            # Also collect pin counts and via FIDs
             current_net_name: Optional[str] = None
             pin_count_per_net: Dict[str, int] = {}
+            subnet_type: Optional[str] = None  # 'TRC', 'VIA', 'TOP', 'BOT'
 
-            for line in content.split('\n'):
+            # Store mappings
+            self._eda_trace_map: Dict[str, Dict[int, str]] = {}  # layer_name → {feature_idx → net_name}
+            self._eda_via_map: Dict[str, Dict[int, str]] = {}  # layer_name → {feature_idx → net_name}
+
+            for line in lines:
                 line = line.strip()
                 if not line:
                     continue
@@ -541,26 +566,48 @@ class ODBParser:
                     current_net_name = line[4:].strip()
                     if current_net_name not in pin_count_per_net:
                         pin_count_per_net[current_net_name] = 0
+                    subnet_type = None
 
-                elif line.startswith('SNT TOP B') and current_net_name:
-                    # Subnet connecting to a component pin on top
-                    pin_count_per_net[current_net_name] = (
-                        pin_count_per_net.get(current_net_name, 0) + 1
-                    )
-                elif line.startswith('SNT BOT B') and current_net_name:
-                    pin_count_per_net[current_net_name] = (
-                        pin_count_per_net.get(current_net_name, 0) + 1
-                    )
+                elif line.startswith('SNT '):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        subnet_type = parts[1]  # TRC, VIA, TOP, BOT, PLN
+                    if subnet_type in ('TOP', 'BOT') and current_net_name:
+                        pin_count_per_net[current_net_name] = (
+                            pin_count_per_net.get(current_net_name, 0) + 1
+                        )
+
+                elif line.startswith('FID ') and current_net_name:
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        fid_type = parts[1]  # C=copper, H=drill/hole
+                        try:
+                            layer_idx = int(parts[2])
+                            feature_idx = int(parts[3])
+                        except (ValueError, IndexError):
+                            continue
+
+                        layer_name = eda_layer_map.get(layer_idx, f"layer_{layer_idx}")
+
+                        if fid_type == 'C':
+                            if layer_name not in self._eda_trace_map:
+                                self._eda_trace_map[layer_name] = {}
+                            self._eda_trace_map[layer_name][feature_idx] = current_net_name
+                        elif fid_type == 'H':
+                            if layer_name not in self._eda_via_map:
+                                self._eda_via_map[layer_name] = {}
+                            self._eda_via_map[layer_name][feature_idx] = current_net_name
 
             # Update net objects with pin counts
             for net in data.nets:
                 count = pin_count_per_net.get(net.name, 0)
                 if count > 0 and len(net.pins) < count:
-                    # Add placeholder pins to match EDA pin count
                     net.pins = [f"pin_{i}" for i in range(count)]
 
         except Exception as e:
             data.parse_warnings.append(f"Error parsing EDA data: {e}")
+            self._eda_trace_map = {}
+            self._eda_via_map = {}
 
     def _parse_symbols(self, odb_root: Path, data: ODBData) -> None:
         """Parse symbols directory to get pad/aperture definitions.
@@ -1068,6 +1115,12 @@ class ODBParser:
         current_points: list[tuple[float, float]] = []
         current_pour_net_num: Optional[int] = None
 
+        # Get EDA-based net mapping for this layer (authoritative for Altium exports)
+        eda_layer_map = getattr(self, '_eda_trace_map', {}).get(layer_name.lower(), {})
+
+        # Track feature index for EDA cross-reference
+        feature_idx = 0
+
         for line in content.split('\n'):
             line = line.strip()
 
@@ -1109,6 +1162,12 @@ class ODBParser:
                         except ValueError:
                             pass
 
+                    # EDA-based net lookup (authoritative for Altium exports)
+                    if (not net_name or net_name == '$NONE$') and eda_layer_map:
+                        eda_net = eda_layer_map.get(feature_idx)
+                        if eda_net and eda_net != '$NONE$':
+                            net_name = eda_net
+
                     length = math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
                     traces.append(ODBTrace(
@@ -1119,6 +1178,7 @@ class ODBParser:
                         net_name=net_name,
                         net_number=net_num,
                     ))
+                    feature_idx += 1
 
             # Arc: A x1 y1 x2 y2 [xc yc] sym_num P net_num
             elif line.startswith('A '):
@@ -1149,6 +1209,12 @@ class ODBParser:
                         except ValueError:
                             continue
 
+                    # EDA-based net lookup for arcs
+                    if (not net_name_a or net_name_a == '$NONE$') and eda_layer_map:
+                        eda_net = eda_layer_map.get(feature_idx)
+                        if eda_net and eda_net != '$NONE$':
+                            net_name_a = eda_net
+
                     traces.append(ODBTrace(
                         layer=layer_name,
                         width_mm=width,
@@ -1156,6 +1222,11 @@ class ODBParser:
                         net_name=net_name_a,
                         net_number=net_num_a,
                     ))
+                    feature_idx += 1
+
+            # Pad record — also a feature, increment index
+            elif line.startswith('P '):
+                feature_idx += 1
 
             # Surface (copper pour) start: S P net_num
             elif line.startswith('S ') and 'P' in line:
@@ -1285,6 +1356,11 @@ class ODBParser:
             default_drill = 0.3  # mm fallback
             net_map = net_num_to_name or {}
 
+            # EDA-based via mapping for this drill layer
+            drill_layer_name = layer_info.name.lower() if layer_info else ""
+            eda_via_map_layer = getattr(self, '_eda_via_map', {}).get(drill_layer_name, {})
+            drill_feature_idx = 0
+
             # Determine layer span from drill layer info (Fix 1.7)
             start_layer = "top"
             end_layer = "bottom"
@@ -1350,6 +1426,13 @@ class ODBParser:
                             except ValueError:
                                 continue
 
+                        # EDA-based net lookup for drill hits
+                        if (not net_name or net_name == '$NONE$') and eda_via_map_layer:
+                            eda_net = eda_via_map_layer.get(drill_feature_idx)
+                            if eda_net and eda_net != '$NONE$':
+                                net_name = eda_net
+
+                        drill_feature_idx += 1
                         pad_size = self._get_via_pad_size(sym_idx, drill_size, data)
 
                         data.drills.append(ODBDrill(

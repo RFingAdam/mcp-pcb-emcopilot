@@ -449,14 +449,34 @@ def _run_pdn_analysis(
                     plane_area_mm2=(design.board_width_mm or 100) * (design.board_height_mm or 100) * 0.5,
                 )
 
-                for issue in getattr(pdn_result, "issues", []):
+                # Deduplicate and cap PDN findings per rail to avoid noise
+                raw_issues = getattr(pdn_result, "issues", [])
+                seen_descs: set[str] = set()
+                rail_findings = 0
+                for issue in raw_issues:
+                    desc = getattr(issue, "description", str(issue))
+                    if desc in seen_descs:
+                        continue
+                    seen_descs.add(desc)
+                    rail_findings += 1
+                    if rail_findings > 5:  # Cap at 5 unique findings per rail
+                        break
                     severity = getattr(issue, "severity", "warning")
                     result.findings.append(ReviewFinding(
                         domain="power_integrity",
                         severity=severity,
                         title=f"PDN issue on {pn.net_name}",
-                        description=getattr(issue, "description", str(issue)),
+                        description=desc,
                         recommendation=getattr(issue, "recommendation", ""),
+                        signal_name=pn.net_name,
+                    ))
+                if len(raw_issues) > 5:
+                    result.findings.append(ReviewFinding(
+                        domain="power_integrity",
+                        severity="info",
+                        title=f"PDN summary for {pn.net_name}",
+                        description=f"{len(raw_issues)} impedance violations found across frequency sweep — review full PDN profile",
+                        recommendation="Run pcb_calc_pdn_impedance for detailed frequency-domain analysis",
                         signal_name=pn.net_name,
                     ))
             except Exception:
