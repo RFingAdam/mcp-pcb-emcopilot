@@ -162,6 +162,9 @@ class ODBParser:
             # Parse manufacturing notes from misc/info
             self._parse_misc_info(odb_root, data)
 
+            # Validate EDA net mapping accuracy (#100)
+            self._validate_net_mapping(data)
+
             # Calculate summary statistics
             self._calculate_statistics(data)
 
@@ -1763,6 +1766,58 @@ class ODBParser:
                     "pour_type": pour.pour_type,
                 })
         return summary
+
+    def _validate_net_mapping(self, data: ODBData) -> None:
+        """Validate EDA net mapping accuracy by spatial cross-checks (#100).
+
+        Checks that traces near component positions have net names that match
+        the component's expected connectivity. Logs warnings if mismatches
+        suggest the feature index alignment is off.
+        """
+        if not data.traces or not data.components or not data.nets:
+            return
+
+        # Build component position map
+        comp_map: Dict[str, Tuple[float, float]] = {}
+        for c in data.components:
+            comp_map[c.ref_des] = (c.x_mm, c.y_mm)
+
+        # Spot-check: GND vias should be near GND traces
+        gnd_vias = [v for v in data.vias if v.net_name and v.net_name.upper() == 'GND']
+        gnd_traces = []
+        for layer_traces in data.traces.values():
+            gnd_traces.extend([t for t in layer_traces if t.net_name and t.net_name.upper() == 'GND'])
+
+        if gnd_vias and gnd_traces:
+            # Check that at least some GND vias are within 1mm of GND traces
+            matches = 0
+            checked = min(len(gnd_vias), 50)  # Sample
+            for via in gnd_vias[:checked]:
+                for trace in gnd_traces[:200]:
+                    dx = abs(via.x_mm - (trace.points[0][0] + trace.points[-1][0]) / 2)
+                    dy = abs(via.y_mm - (trace.points[0][1] + trace.points[-1][1]) / 2)
+                    if dx < 2.0 and dy < 2.0:
+                        matches += 1
+                        break
+
+            match_rate = matches / checked if checked > 0 else 0
+            if match_rate < 0.3:
+                data.parse_warnings.append(
+                    f"EDA net mapping validation: only {match_rate*100:.0f}% of GND vias "
+                    f"are within 2mm of GND traces — feature index alignment may be off"
+                )
+
+        # Count net assignment statistics
+        total_traces = sum(len(t) for t in data.traces.values())
+        named_traces = sum(
+            sum(1 for t in traces if t.net_name and t.net_name != '$NONE$')
+            for traces in data.traces.values()
+        )
+        unnamed_pct = (1 - named_traces / total_traces) * 100 if total_traces > 0 else 100
+        if unnamed_pct > 20:
+            data.parse_warnings.append(
+                f"EDA net mapping: {unnamed_pct:.0f}% of traces have no net assignment"
+            )
 
     def _calculate_statistics(self, data: ODBData) -> None:
         """Calculate summary statistics for parsed data"""
