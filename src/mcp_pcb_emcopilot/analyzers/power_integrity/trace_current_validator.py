@@ -148,8 +148,13 @@ class TraceCurrentValidator:
             if not traces:
                 continue
 
-            min_width = min(t.width_mm for t in traces)
+            # Find narrowest trace segment with its location (#104)
+            narrowest_trace = min(traces, key=lambda t: t.width_mm)
+            min_width = narrowest_trace.width_mm
             max_width = max(t.width_mm for t in traces)
+            narrowest_x = (narrowest_trace.x1_mm + narrowest_trace.x2_mm) / 2
+            narrowest_y = (narrowest_trace.y1_mm + narrowest_trace.y2_mm) / 2
+            narrowest_layer = narrowest_trace.layer
             layers_used = set(t.layer for t in traces)
 
             # Determine if any segments are on internal layers
@@ -191,11 +196,13 @@ class TraceCurrentValidator:
                     "category": "power_trace_width",
                     "description": (
                         f"Power net {net_name}: narrowest trace {min_width:.3f}mm "
+                        f"at ({narrowest_x:.1f}, {narrowest_y:.1f})mm on {narrowest_layer} "
                         f"(~{capacity:.1f}A capacity at 10°C rise) may be insufficient "
                         f"for estimated {estimated_current:.1f}A load"
                     ),
                     "recommendation": (
-                        f"Widen {net_name} traces to at least "
+                        f"Widen {net_name} trace at ({narrowest_x:.1f}, {narrowest_y:.1f})mm "
+                        f"on {narrowest_layer} to at least "
                         f"{self._width_for_current(estimated_current, copper_oz, is_any_internal):.3f}mm "
                         f"for {estimated_current:.1f}A at 10°C rise (IPC-2152). "
                         f"{'Switching node — use wide copper pour with short, direct path.' if is_switching else ''}"
@@ -204,6 +211,9 @@ class TraceCurrentValidator:
                         "net": net_name,
                         "min_width_mm": round(min_width, 4),
                         "max_width_mm": round(max_width, 4),
+                        "location_x_mm": round(narrowest_x, 2),
+                        "location_y_mm": round(narrowest_y, 2),
+                        "location_layer": narrowest_layer,
                         "capacity_a": round(capacity, 2),
                         "estimated_current_a": estimated_current,
                         "copper_oz": copper_oz,

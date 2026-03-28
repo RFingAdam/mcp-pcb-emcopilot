@@ -35,6 +35,9 @@ class ReviewFinding:
     measured_value: Optional[float] = None
     limit_value: Optional[float] = None
     signal_name: Optional[str] = None
+    location_x_mm: Optional[float] = None
+    location_y_mm: Optional[float] = None
+    location_layer: Optional[str] = None
     related_findings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,6 +55,12 @@ class ReviewFinding:
             d["limit_value"] = self.limit_value
         if self.signal_name:
             d["signal_name"] = self.signal_name
+        if self.location_x_mm is not None:
+            d["location"] = {
+                "x_mm": round(self.location_x_mm, 2),
+                "y_mm": round(self.location_y_mm, 2) if self.location_y_mm else 0,
+                "layer": self.location_layer or "",
+            }
         if self.related_findings:
             d["related_findings"] = self.related_findings
         return d
@@ -511,34 +520,29 @@ def _run_pdn_analysis(
                     plane_area_mm2=(design.board_width_mm or 100) * (design.board_height_mm or 100) * 0.5,
                 )
 
-                # Deduplicate and cap PDN findings per rail to avoid noise
+                # Consolidate PDN findings into ONE summary per rail (#103)
                 raw_issues = getattr(pdn_result, "issues", [])
-                seen_descs: set[str] = set()
-                rail_findings = 0
-                for issue in raw_issues:
-                    desc = getattr(issue, "description", str(issue))
-                    if desc in seen_descs:
-                        continue
-                    seen_descs.add(desc)
-                    rail_findings += 1
-                    if rail_findings > 5:  # Cap at 5 unique findings per rail
-                        break
-                    severity = getattr(issue, "severity", "warning")
+                if raw_issues:
+                    # Extract worst-case impedance info
+                    worst_sev = "info"
+                    for issue in raw_issues:
+                        s = getattr(issue, "severity", "info")
+                        if SEVERITY_ORDER.get(s, 4) < SEVERITY_ORDER.get(worst_sev, 4):
+                            worst_sev = s
+
                     result.findings.append(ReviewFinding(
                         domain="power_integrity",
-                        severity=severity,
-                        title=f"PDN issue on {pn.net_name}",
-                        description=desc,
-                        recommendation=getattr(issue, "recommendation", ""),
-                        signal_name=pn.net_name,
-                    ))
-                if len(raw_issues) > 5:
-                    result.findings.append(ReviewFinding(
-                        domain="power_integrity",
-                        severity="info",
-                        title=f"PDN summary for {pn.net_name}",
-                        description=f"{len(raw_issues)} impedance violations found across frequency sweep — review full PDN profile",
-                        recommendation="Run pcb_calc_pdn_impedance for detailed frequency-domain analysis",
+                        severity=worst_sev,
+                        title=f"PDN: {pn.net_name} ({voltage:.1f}V)",
+                        description=(
+                            f"{pn.net_name} ({voltage:.1f}V): {len(raw_issues)} impedance "
+                            f"violations across frequency sweep. Run pcb_calc_pdn_impedance "
+                            f"for detailed frequency-domain analysis."
+                        ),
+                        recommendation=(
+                            f"Add decoupling capacitors near {pn.net_name} loads. "
+                            f"Consider multi-value bypass strategy (bulk + mid + high-freq)."
+                        ),
                         signal_name=pn.net_name,
                     ))
             except Exception:
