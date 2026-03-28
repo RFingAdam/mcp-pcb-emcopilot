@@ -84,12 +84,12 @@ SDIO_SPECS: Dict[str, Dict[str, Any]] = {
 
 # Signal name patterns for SDIO nets
 SDIO_PATTERNS = {
-    "clk": [r"(?i)sd(?:io)?.*clk", r"(?i)sdmmc.*clk", r"(?i)sd_clk"],
-    "cmd": [r"(?i)sd(?:io)?.*cmd", r"(?i)sdmmc.*cmd", r"(?i)sd_cmd"],
-    "data": [r"(?i)sd(?:io)?.*d(?:at)?[0-3]", r"(?i)sdmmc.*d(?:at)?[0-3]", r"(?i)sd_d[0-3]"],
-    "cd": [r"(?i)sd.*cd", r"(?i)sd.*det", r"(?i)card.*det", r"(?i)sd.*insert"],
-    "wp": [r"(?i)sd.*wp", r"(?i)sd.*wpr", r"(?i)write.*prot"],
-    "vdd": [r"(?i)sd.*vdd", r"(?i)sd.*pwr", r"(?i)vmmc"],
+    "clk": [r"(?i)^sd\d?[_]clk", r"(?i)^sdio\d?[_]clk"],
+    "cmd": [r"(?i)^sd\d?[_]cmd", r"(?i)^sdio\d?[_]cmd"],
+    "data": [r"(?i)^sd\d?[_]d(?:ata)?\d", r"(?i)^sdio\d?[_]d(?:ata)?\d"],
+    "cd": [r"(?i)^sd\d?[_]cd", r"(?i)sd.*det", r"(?i)card.*det"],
+    "wp": [r"(?i)^sd\d?[_]wp", r"(?i)write.*prot"],
+    "vdd": [r"(?i)^sd\d?[_]vdd", r"(?i)^vmmc"],
 }
 
 
@@ -184,6 +184,24 @@ class SDIOAnalyzer:
                 data_nets.append(name)
             elif _match_signal(name, "cd"):
                 cd_nets.append(name)
+
+        # Also use classified_nets for SDIO category
+        if classified_nets is not None:
+            for nc in getattr(classified_nets, "classified_nets", []):
+                if nc.category == "sdio":
+                    name = nc.net_name
+                    sub = (nc.subcategory or "").lower()
+                    if (sub == "clock" or _match_signal(name, "clk")) and name not in clk_nets:
+                        clk_nets.append(name)
+                    elif (sub == "command" or _match_signal(name, "cmd")) and name not in cmd_nets:
+                        cmd_nets.append(name)
+                    elif (sub == "card_detect" or _match_signal(name, "cd")) and name not in cd_nets:
+                        cd_nets.append(name)
+                    elif sub == "data" or _match_signal(name, "data"):
+                        if name not in data_nets:
+                            data_nets.append(name)
+                    elif name not in data_nets and 'DATA' in name.upper():
+                        data_nets.append(name)
 
         if not data_nets and not clk_nets:
             findings.append({
