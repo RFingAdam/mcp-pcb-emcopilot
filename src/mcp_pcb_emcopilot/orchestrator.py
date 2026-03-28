@@ -149,21 +149,28 @@ class ReviewResult:
     executive_summary: dict = field(default_factory=dict)
     recommendations: list[dict] = field(default_factory=list)
     review_context: dict = field(default_factory=dict)
+    unanswered_questions: list[dict] = field(default_factory=list)
+    assumptions_made: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the full review result to a JSON-safe dictionary."""
-        return {  # type: ignore[return-value]
+        d: dict[str, Any] = {
             "session_id": self.session_id,
             "timestamp": self.timestamp,
             "design_classification": self.design_classification,
             "detected_interfaces": self.detected_interfaces,
             "executive_summary": self.executive_summary,
-            "domain_results": [d.to_dict() for d in self.domain_results],
+            "domain_results": [d_.to_dict() for d_ in self.domain_results],
             "cross_correlations": [c.to_dict() for c in self.cross_correlations],
             "risk_matrix": [r.to_dict() for r in self.risk_matrix],
             "recommendations": self.recommendations,
             "review_context": self.review_context,
         }
+        if self.unanswered_questions:
+            d["unanswered_questions"] = self.unanswered_questions
+        if self.assumptions_made:
+            d["assumptions_made"] = self.assumptions_made
+        return d
 
 
 # =============================================================================
@@ -1444,6 +1451,26 @@ def run_design_review(
     design_classifier = DesignClassifier()
     classification = design_classifier.classify(design, net_cls, interfaces)
 
+    # Phase 1b: Review context — identify unanswered questions, build typed accessor
+    from .review_context import ReviewContext, get_review_questions
+
+    ctx_answers = ctx.get("interactive_answers", {})
+    review_ctx = ReviewContext(ctx_answers)
+
+    questions = get_review_questions(design, classification, net_cls)
+    unanswered = [q for q in questions if q["id"] not in ctx_answers]
+    assumptions_made: list[dict] = []
+
+    # Log assumptions for unanswered questions that have defaults
+    for q in unanswered:
+        if q.get("default") is not None:
+            assumptions_made.append({
+                "question_id": q["id"],
+                "question": q["text"],
+                "assumed_value": q["default"],
+                "why": q["why"],
+            })
+
     # Phase 2: Select analyzers
     analyzer_keys = _select_analyzers(design, classification, interfaces, net_cls)
 
@@ -1550,6 +1577,8 @@ def run_design_review(
         executive_summary=executive_summary,
         recommendations=recommendations,
         review_context=ctx,
+        unanswered_questions=unanswered,
+        assumptions_made=assumptions_made,
     )
 
     # Store in session
