@@ -643,7 +643,7 @@ def _run_dfm_placement_analysis(design: PCBDesignData) -> DomainResult:
             ))
 
         if len(components) >= 2:
-            placement_result = analyzer.analyze(  # type: ignore[attr-defined]
+            placement_result = analyzer.analyze_placement(
                 components=components,
                 board_width_mm=design.board_width_mm or 100,
                 board_height_mm=design.board_height_mm or 100,
