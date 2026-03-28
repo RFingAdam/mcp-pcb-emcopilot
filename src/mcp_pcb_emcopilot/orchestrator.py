@@ -8,6 +8,7 @@ Calls analyzer classes directly (not MCP tools) for efficiency.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -304,6 +305,10 @@ def _select_analyzers(
     if power_count > 0:
         analyzers.append("pdn")
         analyzers.append("current_profile")
+
+    # Crosstalk analysis (when high-speed signals present)
+    if has_high_speed:
+        analyzers.append("crosstalk")
 
     # Diff pair width consistency (when diff pairs exist)
     if len(net_cls.differential_pairs) > 0:
@@ -1562,11 +1567,25 @@ def run_design_review(
                 design, net_cls, "copper_pour_integrity",
                 "mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker"
             ))
+        elif key == "crosstalk":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "crosstalk",
+                "mcp_pcb_emcopilot.analyzers.signal_integrity.crosstalk_analyzer", "CrosstalkAnalyzer"
+            ))
         elif key == "current_profile":
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "current_profile",
                 "mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler"
             ))
+
+    # Filter accepted findings
+    accepted = getattr(design, '_accepted_findings', {})
+    if accepted:
+        for dr in domain_results:
+            for f in dr.findings:
+                fhash = hashlib.md5(f"{f.domain}{f.title}{f.description}".encode()).hexdigest()[:12]
+                if fhash in accepted:
+                    f.severity = "accepted"  # Downgrade to non-counting severity
 
     # Phase 4: Cross-correlation
     cross_correlations = _cross_correlate(domain_results, design, classification)
