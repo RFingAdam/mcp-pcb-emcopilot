@@ -294,6 +294,7 @@ def _select_analyzers(
     power_count = cat_counts.get("power", 0)
     if power_count > 0:
         analyzers.append("pdn")
+        analyzers.append("current_profile")
 
     # Diff pair width consistency (when diff pairs exist)
     if len(net_cls.differential_pairs) > 0:
@@ -1556,6 +1557,11 @@ def run_design_review(
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "copper_pour_integrity",
                 "mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker"
+            ))
+        elif key == "current_profile":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "current_profile",
+                "mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler"
             ))
 
     # Phase 4: Cross-correlation
