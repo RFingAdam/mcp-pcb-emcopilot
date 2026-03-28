@@ -263,6 +263,11 @@ def _select_analyzers(
     if rf_type_count >= 2:
         analyzers.append("coexistence")
 
+    # Impedance validation (always run when stackup data available)
+    has_stackup = any(l.thickness_mm and l.thickness_mm > 0 for l in design.layers)
+    if has_stackup and any(cat_counts.get(c, 0) > 0 for c in ("ddr", "usb", "pcie", "ethernet", "rf", "emmc", "sdio")):
+        analyzers.append("impedance_validation")
+
     # High-speed signal analysis
     high_speed_cats = {"ddr", "usb", "pcie", "ethernet", "lvds", "rf", "emmc", "sdio"}
     has_high_speed = any(cat_counts.get(c, 0) > 0 for c in high_speed_cats)
@@ -1451,6 +1456,11 @@ def run_design_review(
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "coexistence",
                 "mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer"
+            ))
+        elif key == "impedance_validation":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "impedance_validation",
+                "mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator"
             ))
 
     # Phase 4: Cross-correlation
