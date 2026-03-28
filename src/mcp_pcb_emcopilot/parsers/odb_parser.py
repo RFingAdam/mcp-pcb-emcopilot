@@ -485,14 +485,39 @@ class ODBParser:
                     except ValueError:
                         continue
 
-                    # Layer thickness
+                    # Copper weight (parse early — used by layer_dielectric logic)
+                    if attr_name == 'copper_weight' and num_val > 0:
+                        layer_info.copper_weight_oz = num_val
+                        # Also set copper thickness from weight
+                        if layer_info.layer_type in (
+                            LayerType.SIGNAL, LayerType.PLANE, LayerType.MIXED
+                        ):
+                            layer_info.thickness_mm = num_val * 0.035  # 1oz = 35μm
+                        continue
+
+                    # Layer dielectric thickness — for dielectric layers this IS
+                    # the layer thickness; for copper layers this is the adjacent
+                    # dielectric thickness (NOT the copper thickness)
                     if attr_name == 'layer_dielectric' and num_val > 0:
                         if file_units == 'inch':
-                            layer_info.thickness_mm = num_val * self.INCH_TO_MM
+                            thick_mm = num_val * self.INCH_TO_MM
                         elif file_units == 'mil':
-                            layer_info.thickness_mm = num_val * self.MIL_TO_MM
+                            thick_mm = num_val * self.MIL_TO_MM
                         else:
-                            layer_info.thickness_mm = num_val
+                            thick_mm = num_val
+
+                        if layer_info.layer_type in (LayerType.DIELECTRIC,):
+                            # Dielectric layer: this IS the layer thickness
+                            layer_info.thickness_mm = thick_mm
+                        else:
+                            # Copper/signal/plane layer: use copper_weight for
+                            # thickness, store dielectric info for reference only
+                            if not layer_info.thickness_mm or layer_info.thickness_mm <= 0:
+                                # Derive copper thickness from weight (1oz = 0.035mm)
+                                if layer_info.copper_weight_oz and layer_info.copper_weight_oz > 0:
+                                    layer_info.thickness_mm = layer_info.copper_weight_oz * 0.035
+                                else:
+                                    layer_info.thickness_mm = 0.035  # default 1oz
 
                     # Dielectric constant
                     elif attr_name == 'dielectric_constant' and num_val > 1.0:
@@ -501,10 +526,6 @@ class ODBParser:
                     # Loss tangent
                     elif attr_name == 'loss_tangent' and num_val >= 0:
                         layer_info.loss_tangent = num_val
-
-                    # Copper weight
-                    elif attr_name == 'copper_weight' and num_val > 0:
-                        layer_info.copper_weight_oz = num_val
 
                     # Material name
                     elif attr_name == 'dielectric_name':
