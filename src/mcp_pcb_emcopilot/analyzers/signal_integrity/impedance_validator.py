@@ -127,12 +127,18 @@ class ImpedanceValidator:
             tol = target["tolerance_pct"] / 100.0
 
             # Collect trace widths per layer for this interface
+            # Skip very short segments (<0.5mm) as they're typically pad
+            # transitions or connector landings, not controlled-impedance routing
             layer_widths: Dict[str, Set[float]] = {}
             net_layers: Dict[str, Set[str]] = {}  # net → {layers}
             sample_count = 0
+            MIN_TRACE_LENGTH_MM = 0.5  # Ignore pad transitions
 
             for trace in design.traces:
                 if trace.net_name in net_names and trace.width_mm > 0:
+                    seg_len = trace.length_mm or 0
+                    if seg_len < MIN_TRACE_LENGTH_MM:
+                        continue  # Skip pad-like short segments
                     w = round(trace.width_mm, 4)
                     layer = trace.layer
                     layer_widths.setdefault(layer, set()).add(w)

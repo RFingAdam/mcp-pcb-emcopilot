@@ -95,6 +95,11 @@ def _p(pattern: str, category: str, subcategory: Optional[str] = None, confidenc
     _NET_PATTERNS.append((re.compile(pattern, re.IGNORECASE), category, subcategory, confidence))
 
 
+# --- Power supply nets with interface prefixes (BEFORE all interface patterns) ---
+# Nets ending in voltage designations are power rails, not signals
+_p(r'[_]\d+P\d+V$', 'power', None, 0.92)  # HALOW_3P3V, WIFI_1P8V
+_p(r'[_]\d+V\d*$', 'power', None, 0.88)  # xxx_3V3, xxx_1V8
+
 # --- DDR --- (with proper subcategories for DDR_DQ, DDR_CA, DDR_CK naming)
 _p(r'^DDR\d?[_]DQ\d+', 'ddr', 'data', 0.95)  # DDR_DQ0, DDR_DQ15
 _p(r'^DDR\d?[_]DQS\d*', 'ddr', 'strobe', 0.95)  # DDR_DQS0_P
