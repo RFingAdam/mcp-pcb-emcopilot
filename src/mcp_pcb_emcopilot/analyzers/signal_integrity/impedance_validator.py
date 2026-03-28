@@ -69,6 +69,102 @@ def _microstrip_z0(w_mm: float, h_mm: float, er: float, t_mm: float = 0.035) -> 
     return (120 * math.pi) / (math.sqrt(er_eff) * (u + 1.393 + 0.667 * math.log(u + 1.444)))
 
 
+def _diff_microstrip_z0(w_mm: float, s_mm: float, h_mm: float, er: float, t_mm: float = 0.035) -> float:
+    """Edge-coupled differential microstrip impedance.
+
+    Uses Wadell/Kirschning approximation:
+    Z_diff = 2 * Z_se * (1 - 0.48 * exp(-0.96 * s/h))
+    where s = edge-to-edge spacing between P and N traces.
+    """
+    z_se = _microstrip_z0(w_mm, h_mm, er, t_mm)
+    if z_se <= 0 or h_mm <= 0:
+        return 0.0
+    # s is center-to-center spacing; edge-to-edge = s - w
+    s_edge = max(s_mm - w_mm, 0.01)
+    coupling = 0.48 * math.exp(-0.96 * s_edge / h_mm)
+    return 2 * z_se * (1 - coupling)
+
+
+def _diff_stripline_z0(w_mm: float, s_mm: float, b_mm: float, er: float, t_mm: float = 0.018) -> float:
+    """Edge-coupled differential stripline impedance.
+
+    Z_diff = 2 * Z_se * (1 - 0.347 * exp(-2.9 * s/b))
+    """
+    z_se = _stripline_z0(w_mm, b_mm, er, t_mm)
+    if z_se <= 0 or b_mm <= 0:
+        return 0.0
+    s_edge = max(s_mm - w_mm, 0.01)
+    coupling = 0.347 * math.exp(-2.9 * s_edge / b_mm)
+    return 2 * z_se * (1 - coupling)
+
+
+def _measure_diff_pair_spacing(
+    design: Any, p_net: str, n_net: str
+) -> Optional[tuple]:
+    """Measure actual P-N trace spacing from coordinates.
+
+    Returns (median_spacing_mm, trace_width_mm, layer, sample_count) or None.
+    """
+    p_traces = [t for t in design.traces if t.net_name == p_net]
+    n_traces = [t for t in design.traces if t.net_name == n_net]
+
+    if not p_traces or not n_traces:
+        return None
+
+    spacings: list[float] = []
+    widths: list[float] = []
+    layers: list[str] = []
+
+    for pt in p_traces:
+        if (pt.length_mm or 0) < 0.5:
+            continue
+        for nt in n_traces:
+            if pt.layer != nt.layer or (nt.length_mm or 0) < 0.5:
+                continue
+            # Check parallelism via dot product
+            pdx, pdy = pt.x2_mm - pt.x1_mm, pt.y2_mm - pt.y1_mm
+            ndx, ndy = nt.x2_mm - nt.x1_mm, nt.y2_mm - nt.y1_mm
+            p_len = math.sqrt(pdx**2 + pdy**2)
+            n_len = math.sqrt(ndx**2 + ndy**2)
+            if p_len < 0.3 or n_len < 0.3:
+                continue
+            dot = (pdx * ndx + pdy * ndy) / (p_len * n_len)
+            if abs(dot) < 0.9:
+                continue
+            # Center-to-center distance
+            pcx = (pt.x1_mm + pt.x2_mm) / 2
+            pcy = (pt.y1_mm + pt.y2_mm) / 2
+            ncx = (nt.x1_mm + nt.x2_mm) / 2
+            ncy = (nt.y1_mm + nt.y2_mm) / 2
+            dist = math.sqrt((pcx - ncx)**2 + (pcy - ncy)**2)
+            if 0.05 < dist < 3.0:
+                spacings.append(dist)
+                widths.append(pt.width_mm)
+                layers.append(pt.layer)
+
+    if len(spacings) < 3:
+        return None
+
+    med_idx = len(spacings) // 2
+    sorted_s = sorted(spacings)
+    med_w = sorted(widths)[len(widths) // 2]
+    # Most common layer
+    from collections import Counter
+    common_layer = Counter(layers).most_common(1)[0][0]
+
+    return (sorted_s[med_idx], med_w, common_layer, len(spacings))
+
+
+# Differential impedance targets
+DIFF_IMPEDANCE_TARGETS: Dict[str, Dict[str, Any]] = {
+    "ddr": {"z_diff": 80.0, "tolerance_pct": 15, "desc": "LPDDR4/5 CK/DQS (JEDEC)"},
+    "usb": {"z_diff": 90.0, "tolerance_pct": 15, "desc": "USB 2.0 (USB-IF)"},
+    "ethernet": {"z_diff": 100.0, "tolerance_pct": 10, "desc": "100BASE-TX/GbE (IEEE 802.3)"},
+    "pcie": {"z_diff": 85.0, "tolerance_pct": 15, "desc": "PCIe (PCI-SIG)"},
+    "lvds": {"z_diff": 100.0, "tolerance_pct": 10, "desc": "LVDS (ANSI/TIA-644)"},
+}
+
+
 def _stripline_z0(w_mm: float, b_mm: float, er: float, t_mm: float = 0.018) -> float:
     """Centered stripline impedance."""
     if w_mm <= 0 or b_mm <= 0 or er <= 0 or b_mm <= t_mm:
@@ -283,6 +379,91 @@ class ImpedanceValidator:
                                     "discontinuity_ohm": round(discontinuity, 1),
                                 },
                             })
+
+        # === Differential pair impedance analysis ===
+        if hasattr(classified_nets, 'differential_pairs'):
+            for dp in classified_nets.differential_pairs:
+                if dp.category not in DIFF_IMPEDANCE_TARGETS:
+                    continue
+
+                target = DIFF_IMPEDANCE_TARGETS[dp.category]
+                z_diff_target = target["z_diff"]
+                tol = target["tolerance_pct"] / 100.0
+
+                # Measure actual P-N spacing
+                measurement = _measure_diff_pair_spacing(
+                    design, dp.positive_net, dp.negative_net
+                )
+                if not measurement:
+                    continue
+
+                spacing_mm, width_mm, layer, samples = measurement
+                lm = layer_model.get(layer.lower())
+                if not lm:
+                    continue
+
+                # Calculate differential impedance
+                if lm["type"] == "microstrip":
+                    z_diff = _diff_microstrip_z0(
+                        width_mm, spacing_mm, lm["h_mm"], lm["er"], lm.get("t_mm", 0.035)
+                    )
+                else:
+                    z_diff = _diff_stripline_z0(
+                        width_mm, spacing_mm, lm["h_mm"], lm["er"], lm.get("t_mm", 0.018)
+                    )
+
+                if z_diff <= 0:
+                    continue
+
+                deviation = abs(z_diff - z_diff_target) / z_diff_target
+                if deviation > tol:
+                    z_se = lm["calc_fn"](width_mm, lm["h_mm"], lm["er"])
+                    severity = "critical" if deviation > 0.3 else "warning"
+                    findings.append({
+                        "severity": severity,
+                        "category": f"{dp.category}_diff_impedance",
+                        "description": (
+                            f"{dp.category.upper()} diff pair {dp.pair_name}: "
+                            f"Z_diff={z_diff:.0f}Ω (target {z_diff_target:.0f}Ω, "
+                            f"{deviation*100:.0f}% off) — w={width_mm:.4f}mm, "
+                            f"s={spacing_mm:.3f}mm, Z_SE={z_se:.0f}Ω on {layer} "
+                            f"— {target['desc']}"
+                        ),
+                        "recommendation": (
+                            f"Adjust {dp.pair_name} trace width or spacing to achieve "
+                            f"{z_diff_target:.0f}Ω differential. Current: w={width_mm:.4f}mm, "
+                            f"spacing={spacing_mm:.3f}mm on {layer}."
+                        ),
+                        "details": {
+                            "pair": dp.pair_name,
+                            "z_diff_ohm": round(z_diff, 1),
+                            "z_se_ohm": round(z_se, 1),
+                            "target_diff_ohm": z_diff_target,
+                            "width_mm": round(width_mm, 4),
+                            "spacing_mm": round(spacing_mm, 4),
+                            "layer": layer,
+                            "samples": samples,
+                        },
+                    })
+                else:
+                    findings.append({
+                        "severity": "info",
+                        "category": f"{dp.category}_diff_impedance",
+                        "description": (
+                            f"{dp.category.upper()} diff pair {dp.pair_name}: "
+                            f"Z_diff={z_diff:.0f}Ω ✓ (target {z_diff_target:.0f}Ω) "
+                            f"— w={width_mm:.4f}mm, s={spacing_mm:.3f}mm on {layer}"
+                        ),
+                        "recommendation": "",
+                        "details": {
+                            "pair": dp.pair_name,
+                            "z_diff_ohm": round(z_diff, 1),
+                            "target_diff_ohm": z_diff_target,
+                            "width_mm": round(width_mm, 4),
+                            "spacing_mm": round(spacing_mm, 4),
+                            "layer": layer,
+                        },
+                    })
 
         return findings
 
