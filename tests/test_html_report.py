@@ -729,7 +729,8 @@ class TestHTMLReportGenerator:
         )
         html = gen.generate(data)
         assert "Board Images" in html
-        assert "<svg" in html
+        # SVG is now base64-encoded as <img> tag to prevent script execution
+        assert "data:image/svg+xml;base64," in html
         assert "board_render" in html
 
     def test_save_writes_file(self):

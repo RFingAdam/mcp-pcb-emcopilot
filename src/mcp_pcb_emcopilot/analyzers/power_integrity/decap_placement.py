@@ -280,8 +280,10 @@ class DecapAnalyzer:
         # Via ESL
         via_esl = via_count * self.via_inductance
 
-        # Trace ESL over ground plane (~0.03 nH/mm for 0.2mm trace at 0.1mm height)
-        trace_esl = trace_length_mm * 0.03
+        # Trace ESL for microstrip over ground plane (~0.02 nH/mm)
+        # Source: IPC-2141A, Wadell "Transmission Line Design Handbook"
+        # (isolated wire in free space would be ~1 nH/mm; microstrip is much lower)
+        trace_esl = trace_length_mm * 0.02
 
         return pkg_esl + via_esl + trace_esl
 
