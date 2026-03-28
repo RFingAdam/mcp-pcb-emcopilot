@@ -304,9 +304,10 @@ class DDRAnalyzer:
 
         # Calculate effective dielectric constant
         if is_outer:
-            # Microstrip Hammerstad: Er_eff ≈ (Er+1)/2 + (Er-1)/2 * 1/sqrt(1+12h/w)
-            # For typical DDR traces (w/h ≈ 1.5): F ≈ 0.217
-            er_eff = (dielectric_constant + 1) / 2 + (dielectric_constant - 1) / 2 * 0.217
+            # Microstrip Hammerstad: Er_eff = (Er+1)/2 + (Er-1)/2 * 1/sqrt(1+12*h/w)
+            # Use actual w/h ratio (default 1.5 for typical DDR traces)
+            u = 1.5  # default w/h ratio for DDR traces
+            er_eff = (dielectric_constant + 1) / 2 + (dielectric_constant - 1) / 2 * (1 + 12 / u) ** (-0.5)
         else:
             # Stripline: effective Er equals substrate Er
             er_eff = dielectric_constant

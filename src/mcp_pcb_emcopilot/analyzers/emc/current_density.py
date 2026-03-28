@@ -170,7 +170,11 @@ def calculate_ground_stitch_spacing(
     dict
         Recommended spacing, wavelength, containment analysis.
     """
-    er_eff = (dielectric_constant + 1.0) / 2.0
+    # Hammerstad effective dielectric constant for microstrip
+    # Assume typical w/h ~ 1 (trace width ~ dielectric height).
+    # (er+1)/2 alone is the zero-width limit and overestimates wavelength.
+    w_over_h = 1.0  # typical microstrip w/h ratio
+    er_eff = (dielectric_constant + 1.0) / 2.0 + (dielectric_constant - 1.0) / 2.0 * (1 + 12 / w_over_h) ** (-0.5)
     wavelength = _wavelength_mm(max_frequency_hz, er_eff)
 
     # Constraint 1: lambda / N

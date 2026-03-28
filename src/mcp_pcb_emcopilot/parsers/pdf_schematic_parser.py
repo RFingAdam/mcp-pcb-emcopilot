@@ -200,58 +200,59 @@ class PDFSchematicParser:
         """Extract text and images using PyMuPDF."""
         fitz = self._fitz
         doc = fitz.open(result.file_path)  # type: ignore[union-attr]
-        result.page_count = len(doc)
+        try:
+            result.page_count = len(doc)
 
-        all_components: dict[str, dict] = {}  # keyed by reference
-        all_nets: dict[str, dict] = {}  # keyed by net name
+            all_components: dict[str, dict] = {}  # keyed by reference
+            all_nets: dict[str, dict] = {}  # keyed by net name
 
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            text = page.get_text("text") or ""
-            rect = page.rect
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                text = page.get_text("text") or ""
+                rect = page.rect
 
-            page_data = PDFSchematicPage(
-                page_number=page_num + 1,
-                text=text,
-                width_pts=rect.width,
-                height_pts=rect.height,
-            )
+                page_data = PDFSchematicPage(
+                    page_number=page_num + 1,
+                    text=text,
+                    width_pts=rect.width,
+                    height_pts=rect.height,
+                )
 
-            if text.strip():
-                result.has_text_layer = True
-                page_comps = self._extract_components(text, page_num + 1)
-                page_nets = self._extract_nets(text, page_num + 1)
-                page_data.components = page_comps
-                page_data.nets = page_nets
+                if text.strip():
+                    result.has_text_layer = True
+                    page_comps = self._extract_components(text, page_num + 1)
+                    page_nets = self._extract_nets(text, page_num + 1)
+                    page_data.components = page_comps
+                    page_data.nets = page_nets
 
-                # Merge into global lists (dedup by reference / net name)
-                for comp in page_comps:
-                    ref = comp["reference"]
-                    if ref not in all_components:
-                        all_components[ref] = comp
-                    else:
-                        # Track additional pages
-                        existing_pages = all_components[ref].get("pages", [all_components[ref].get("page", 1)])
-                        if page_num + 1 not in existing_pages:
-                            existing_pages.append(page_num + 1)
-                        all_components[ref]["pages"] = existing_pages
+                    # Merge into global lists (dedup by reference / net name)
+                    for comp in page_comps:
+                        ref = comp["reference"]
+                        if ref not in all_components:
+                            all_components[ref] = comp
+                        else:
+                            # Track additional pages
+                            existing_pages = all_components[ref].get("pages", [all_components[ref].get("page", 1)])
+                            if page_num + 1 not in existing_pages:
+                                existing_pages.append(page_num + 1)
+                            all_components[ref]["pages"] = existing_pages
 
-                for net in page_nets:
-                    name = net["name"]
-                    if name not in all_nets:
-                        all_nets[name] = net
-                    else:
-                        existing_pages = all_nets[name].get("pages", [all_nets[name].get("page", 1)])
-                        if page_num + 1 not in existing_pages:
-                            existing_pages.append(page_num + 1)
-                        all_nets[name]["pages"] = existing_pages
+                    for net in page_nets:
+                        name = net["name"]
+                        if name not in all_nets:
+                            all_nets[name] = net
+                        else:
+                            existing_pages = all_nets[name].get("pages", [all_nets[name].get("page", 1)])
+                            if page_num + 1 not in existing_pages:
+                                existing_pages.append(page_num + 1)
+                            all_nets[name]["pages"] = existing_pages
 
-            result.pages.append(page_data)
+                result.pages.append(page_data)
 
-        doc.close()
-
-        result.components = list(all_components.values())
-        result.nets = list(all_nets.values())
+            result.components = list(all_components.values())
+            result.nets = list(all_nets.values())
+        finally:
+            doc.close()
 
         if not result.has_text_layer:
             result.warnings.append(

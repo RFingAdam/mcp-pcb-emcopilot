@@ -610,7 +610,7 @@ def analyze_ibis_timing(
         "eye_height_mv": round(eye_height_mv, 1),
         "eye_width_ps": round(eye_width_ps, 1),
         "timing_margin_ps": round(timing_margin_ps, 1),
-        "c_comp_pf": round(c_comp_pf, 2) if c_comp_pf else 0.0,
+        "c_comp_pf": round(c_comp_pf, 2),
         "data_rate_gbps": data_rate_gbps,
         "trace_length_mm": trace_length_mm,
         "model_type": model_data.get("model_type", "unknown"),

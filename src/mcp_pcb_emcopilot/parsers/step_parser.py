@@ -222,9 +222,13 @@ class STEPParser:
                 i += 1
             elif ch == '.':
                 # Enumeration like .ENUM_VALUE.
-                end = raw.index('.', i + 1)
+                try:
+                    end = raw.index('.', i + 1)
+                except ValueError:
+                    # Unterminated enum token — take rest of string
+                    end = len(raw)
                 params.append(raw[i + 1:end])
-                i = end + 1
+                i = end + 1 if end < len(raw) else end
             elif ch in '-0123456789':
                 # Number
                 j = i + 1

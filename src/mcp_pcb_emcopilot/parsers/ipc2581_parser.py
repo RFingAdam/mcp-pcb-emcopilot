@@ -412,11 +412,16 @@ class IPC2581Parser:
 
         # Try with namespace
         for prefix, uri in self.NAMESPACES.items():
+            if not prefix:
+                # Empty prefix: try bare path without namespace
+                results.extend(element.findall(path))
+                continue
             ns_path = "/".join(f"{{{uri}}}{p}" for p in path.split("/"))
             results.extend(element.findall(ns_path))
 
-        # Try without namespace
-        results.extend(element.findall(path))
+        # Try without namespace (fallback)
+        if not results:
+            results.extend(element.findall(path))
 
         return results
 

@@ -235,7 +235,7 @@ def calc_cpw_impedance(trace_width_mm: float, gap_mm: float, dielectric_height_m
     if t > 0:
         delta = (1.25 * t / math.pi) * (1 + math.log(4 * math.pi * w / t))
         a_eff = a + delta / 2
-        b_eff = b - delta / 2
+        b_eff = max(b - delta / 2, 0.001)
         if b_eff <= a_eff:
             return {"error": "Trace thickness too large relative to gap width. Reduce trace_thickness_mm or increase gap_mm.", "success": False}
     else:
@@ -1328,7 +1328,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     if data is not None:
                         data.analysis_cache[name] = result
                 except Exception:
-                    pass
+                    import traceback
+                    traceback.print_exc()
 
         return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
     except PCBError as e:
@@ -2426,6 +2427,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         # NOTE: This runs synchronously and blocks the event loop.
         # Known limitation: _dispatch is sync, so run_in_executor cannot be
         # used here without refactoring the dispatch architecture.
+        # TODO: wrap in asyncio.to_thread() once _dispatch is made async-aware.
         from .orchestrator import run_design_review
         data = _get_session(args["session_id"])
         result = run_design_review(data, args["session_id"])

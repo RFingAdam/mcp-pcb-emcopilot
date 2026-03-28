@@ -640,9 +640,11 @@ def _generate_html_from_data(data: HTMLReportData) -> str:
         img_parts: list[str] = []
         for label, content in data.images.items():
             if content.strip().startswith("<svg") or content.strip().startswith("<?xml"):
-                safe_svg = _sanitize_svg(content)
+                # Encode SVG as base64 data URI to prevent script execution
+                svg_b64 = base64.b64encode(content.encode("utf-8")).decode("ascii")
                 img_parts.append(
-                    f'<div class="render-container">{safe_svg}'
+                    f'<div class="render-container">'
+                    f'<img src="data:image/svg+xml;base64,{svg_b64}" alt="{_escape_html(label)}"/>'
                     f'<div class="render-caption">{_escape_html(label)}</div></div>'
                 )
             else:

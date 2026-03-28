@@ -294,10 +294,8 @@ class FilterDesigner:
                 il_db.append(-300.0)  # clip
             else:
                 il_db.append(20 * math.log10(mag))
-            # Insertion loss is negative of the transfer function gain
-            # i.e., IL = -20*log10(|H|) but we report as signed dB
-            # (negative = attenuation).  Convention: 0 dB at DC, negative values = loss.
 
+        # Convention: 0 dB at DC, negative values = attenuation.
         # Find -3 dB cutoff
         cutoff_mhz = 0.0
         for i, db_val in enumerate(il_db):
