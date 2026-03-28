@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import time
 from dataclasses import asdict
 from enum import Enum
 from typing import Any
@@ -1303,6 +1304,18 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         _make_tool("pcb_list_sessions", "List all active design sessions.", {}, None),
         _make_tool("pcb_close_session", "Close a design session and free memory.", {
+            "session_id": {"type": "string"},
+        }, ["session_id"]),
+
+        # =====================================================================
+        # FALSE POSITIVE SUPPRESSION (2 tools)
+        # =====================================================================
+        _make_tool("pcb_accept_finding", "Mark a finding as accepted/false positive. It will be excluded from counts on subsequent reviews.", {
+            "session_id": {"type": "string"},
+            "finding_hash": {"type": "string", "description": "Hash of finding (domain+title+description)"},
+            "reason": {"type": "string", "description": "Why this finding is accepted"},
+        }, ["session_id", "finding_hash", "reason"]),
+        _make_tool("pcb_list_accepted_findings", "List all accepted/suppressed findings for a session.", {
             "session_id": {"type": "string"},
         }, ["session_id"]),
     ]
@@ -2807,6 +2820,19 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     if name == "pcb_close_session":
         closed = sessions.close_session(args["session_id"])
         return {"closed": closed, "session_id": args["session_id"]}
+
+    # === FALSE POSITIVE SUPPRESSION ===
+    if name == "pcb_accept_finding":
+        session = _get_session(args["session_id"])
+        accepted = getattr(session, '_accepted_findings', {})
+        accepted[args["finding_hash"]] = {"reason": args["reason"], "timestamp": time.time()}
+        session._accepted_findings = accepted
+        return _result({"accepted": True, "hash": args["finding_hash"]})
+
+    if name == "pcb_list_accepted_findings":
+        session = _get_session(args["session_id"])
+        accepted = getattr(session, '_accepted_findings', {})
+        return _result({"accepted_findings": accepted, "count": len(accepted)})
 
     raise ValueError(f"Unknown tool: {name}")
 
