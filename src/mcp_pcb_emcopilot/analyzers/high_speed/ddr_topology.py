@@ -160,7 +160,8 @@ def _classify_ddr_net(net_name: str) -> Optional[Dict[str, Any]]:
 
 def _prop_delay_ps_per_mm(dielectric_constant: float = 4.3) -> float:
     """Default propagation delay in ps/mm for FR4-like substrate."""
-    er_eff = (dielectric_constant + 1.0) / 2.0 + (dielectric_constant - 1.0) / 3.0
+    # Hammerstad εr_eff approximation for typical DDR microstrip (w/h ~ 1.5)
+    er_eff = (dielectric_constant + 1.0) / 2.0 + (dielectric_constant - 1.0) / 2.0 * 0.6
     return math.sqrt(er_eff) / (C0 * 1e-9)  # ps/mm
 
 
