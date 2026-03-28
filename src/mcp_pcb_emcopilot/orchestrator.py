@@ -267,6 +267,10 @@ def _select_analyzers(
     if cat_counts.get("power", 0) > 0:
         analyzers.append("trace_current")
 
+    # Per-IC decoupling adequacy
+    if len(design.components) > 5:
+        analyzers.append("decap_adequacy")
+
     # Impedance validation (always run when stackup data available)
     has_stackup = any(l.thickness_mm and l.thickness_mm > 0 for l in design.layers)
     if has_stackup and any(cat_counts.get(c, 0) > 0 for c in ("ddr", "usb", "pcie", "ethernet", "rf", "emmc", "sdio")):
@@ -1505,6 +1509,11 @@ def run_design_review(
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "power_trace_current",
                 "mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator"
+            ))
+        elif key == "decap_adequacy":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "decap_adequacy",
+                "mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker", "DecapAdequacyChecker"
             ))
         elif key == "diff_pair_width":
             domain_results.append(_run_generic_analyzer(
