@@ -33,7 +33,7 @@ class DesignSessionManager:
             self.close_session(oldest)
             logger.warning("Evicted oldest session %s (max %d reached)", oldest, MAX_SESSIONS)
         while True:
-            session_id = str(uuid.uuid4())[:8]
+            session_id = uuid.uuid4().hex[:12]
             if session_id not in self._sessions:
                 break
         self._sessions[session_id] = design_data

@@ -693,6 +693,21 @@ class GerberParser:
                             shape=p.shape
                         ))
 
+                # Replicate arcs
+                for i in range(original_arcs - sr_arc_count, original_arcs):
+                    if i >= 0 and i < len(data.arcs):
+                        a = data.arcs[i]
+                        data.arcs.append(GerberArc(
+                            start_x=a.start_x + dx,
+                            start_y=a.start_y + dy,
+                            end_x=a.end_x + dx,
+                            end_y=a.end_y + dy,
+                            center_x=a.center_x + dx,
+                            center_y=a.center_y + dy,
+                            width_mm=a.width_mm,
+                            clockwise=a.clockwise
+                        ))
+
     def _parse_file_attribute(self, line: str, data: GerberData) -> None:
         """Parse Gerber X2 file attribute"""
         # Format: TF.<attribute>,<value>[,<value>...]

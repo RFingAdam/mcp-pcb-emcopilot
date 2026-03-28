@@ -2303,12 +2303,15 @@ class ReportBuilder:
                 )
 
         # Emit findings for this domain with measured/limit/margin columns
+        # Pre-compute domain aliases as a set to avoid O(N*M) linear scan
+        domain_aliases = {
+            t.replace("pcb_analyze_", "").replace("pcb_", "")
+            for t in tool_names
+        }
+        domain_aliases.add(sect.key)
         domain_findings = [
             f for f in all_findings
-            if f.domain == sect.key or f.domain in [
-                t.replace("pcb_analyze_", "").replace("pcb_", "")
-                for t in tool_names
-            ]
+            if f.domain in domain_aliases
         ]
 
         if domain_findings:

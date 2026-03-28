@@ -148,6 +148,11 @@ class SimulationPlotter:
         status: str = "PASS",
     ) -> str:
         """Generate a synthetic eye diagram from signal integrity parameters."""
+        # Guard: height_mv must be less than voltage_swing_mv to avoid
+        # zero/negative noise_sigma in the trace generation loop.
+        if height_mv >= voltage_swing_mv:
+            height_mv = voltage_swing_mv * 0.9
+
         t = self.theme
         fig, ax = plt.subplots(figsize=self.figsize)
         _apply_theme(ax, t)
@@ -581,6 +586,9 @@ class SimulationPlotter:
 
         modes.sort(key=lambda x: x[1])
         modes = modes[:n_modes]
+
+        if not modes:
+            return self._save(fig, "cavity_resonance")
 
         if sensitive_bands is None:
             sensitive_bands = [

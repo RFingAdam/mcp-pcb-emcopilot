@@ -601,6 +601,9 @@ def quick_compliance_check(
     """
     predictor = EMCCompliancePredictor()
 
+    if not trace_lengths_mm:
+        return predictor.predict_compliance(standard)
+
     for i, (freq, length) in enumerate(zip(clock_frequencies_mhz, trace_lengths_mm)):
         predictor.add_clock(ClockSource(
             name=f"CLK{i}",
