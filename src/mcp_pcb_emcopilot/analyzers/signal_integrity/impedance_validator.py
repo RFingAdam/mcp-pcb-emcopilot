@@ -133,6 +133,10 @@ class ImpedanceValidator:
             net_layers: Dict[str, Set[str]] = {}  # net → {layers}
             sample_count = 0
             MIN_TRACE_LENGTH_MM = 0.5  # Ignore pad transitions
+            # For inner layers, only flag impedance issues on traces >5mm
+            # (short inner-layer segments are typically BGA escape routing,
+            # not controlled-impedance traces)
+            MIN_INNER_TRACE_MM = 5.0
 
             for trace in design.traces:
                 if trace.net_name in net_names and trace.width_mm > 0:
@@ -150,6 +154,20 @@ class ImpedanceValidator:
             if not layer_widths:
                 continue
 
+            # Calculate total trace length per layer for this interface
+            layer_total_length: Dict[str, float] = {}
+            for trace in design.traces:
+                if trace.net_name in net_names and trace.width_mm > 0:
+                    seg_len = trace.length_mm or 0
+                    layer_total_length[trace.layer] = layer_total_length.get(trace.layer, 0) + seg_len
+
+            # Determine outer vs inner layers
+            copper_layers = [l for l in design.layers if l.layer_type in ('signal', 'plane')]
+            outer_layer_names = set()
+            if copper_layers:
+                outer_layer_names.add(copper_layers[0].name)
+                outer_layer_names.add(copper_layers[-1].name)
+
             # Calculate impedance for each layer/width combination
             impedance_issues = []
             layer_impedances: Dict[str, Dict[float, float]] = {}  # layer → {width → Z₀}
@@ -157,6 +175,13 @@ class ImpedanceValidator:
             for layer, widths in layer_widths.items():
                 lm = layer_model.get(layer.lower())
                 if not lm:
+                    continue
+
+                # Skip inner layers with minimal routing (< 5mm total) —
+                # short BGA escape segments don't need impedance control
+                is_inner = layer not in outer_layer_names
+                total_on_layer = layer_total_length.get(layer, 0)
+                if is_inner and total_on_layer < MIN_INNER_TRACE_MM:
                     continue
 
                 for w in widths:
@@ -174,6 +199,7 @@ class ImpedanceValidator:
                             "z0_ohm": round(z0, 1),
                             "target_ohm": z_target,
                             "deviation_pct": round(deviation_pct * 100, 1),
+                            "total_length_mm": round(total_on_layer, 1),
                         })
 
             # Report impedance issues

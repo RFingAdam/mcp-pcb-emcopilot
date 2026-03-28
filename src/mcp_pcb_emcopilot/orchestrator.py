@@ -263,6 +263,10 @@ def _select_analyzers(
     if rf_type_count >= 2:
         analyzers.append("coexistence")
 
+    # Power trace current capacity (always run when power nets exist)
+    if cat_counts.get("power", 0) > 0:
+        analyzers.append("trace_current")
+
     # Impedance validation (always run when stackup data available)
     has_stackup = any(l.thickness_mm and l.thickness_mm > 0 for l in design.layers)
     if has_stackup and any(cat_counts.get(c, 0) > 0 for c in ("ddr", "usb", "pcie", "ethernet", "rf", "emmc", "sdio")):
@@ -279,6 +283,18 @@ def _select_analyzers(
     power_count = cat_counts.get("power", 0)
     if power_count > 0:
         analyzers.append("pdn")
+
+    # Diff pair width consistency (when diff pairs exist)
+    if len(net_cls.differential_pairs) > 0:
+        analyzers.append("diff_pair_width")
+
+    # SMPS loop analysis (when switching regulators detected)
+    if cat_counts.get("power", 0) > 3:
+        analyzers.append("smps_loop")
+
+    # Copper pour integrity (always run)
+    if design.zones:
+        analyzers.append("copper_pour_check")
 
     # Always-run analyzers
     analyzers.append("thermal")
@@ -720,28 +736,51 @@ def _run_ddr_analysis(
         strobe_nets = [n for n in ddr_nets if n.subcategory == "strobe"]
 
         # Build minimal byte lane structure from trace data
+        # Helper: get total trace length by net name (EDA-mapped, more reliable
+        # than net_index which may be 0 for Altium ODB++ exports)
+        def _net_length(net_name: str) -> float:
+            return sum(
+                t.length_mm or t.calc_length()
+                for t in design.traces if t.net_name == net_name
+            )
+
+        # Sort data/strobe nets by DQ/DQS number for proper byte lane grouping
+        import re as _re
+
+        def _dq_number(nc):
+            m = _re.search(r'DQ(\d+)', nc.net_name)
+            return int(m.group(1)) if m else 999
+
+        def _dqs_number(nc):
+            m = _re.search(r'DQS(\d+)', nc.net_name)
+            return int(m.group(1)) if m else 999
+
+        data_nets_sorted = sorted(data_nets, key=_dq_number)
+        strobe_p_nets = sorted(
+            [n for n in strobe_nets if n.differential_polarity == 'P'
+             or '_P' in n.net_name.upper()],
+            key=_dqs_number
+        )
+        # If no P-specific strobes, use all strobes
+        if not strobe_p_nets:
+            strobe_p_nets = sorted(strobe_nets, key=_dqs_number)
+
         byte_lanes = []
-        data_count = len(data_nets)
+        data_count = len(data_nets_sorted)
         lane_count = max(1, data_count // 8)
         for lane_idx in range(lane_count):
-            lane_data_nets = data_nets[lane_idx * 8:(lane_idx + 1) * 8]
+            lane_data = data_nets_sorted[lane_idx * 8:(lane_idx + 1) * 8]
             dq_lengths = []
-            for dn in lane_data_nets:
-                net_obj = design.get_net_by_name(dn.net_name)
-                if net_obj:
-                    traces = design.get_traces_on_net(net_obj.index)
-                    length = sum(t.calc_length() for t in traces)
-                    dq_lengths.append(length)
-                else:
-                    dq_lengths.append(50.0)  # Default estimate
+            for dn in lane_data:
+                length = _net_length(dn.net_name)
+                dq_lengths.append(length if length > 0 else 50.0)
 
-            # Find DQS for this lane
+            # Find DQS for this byte lane
             dqs_length = 50.0
-            if lane_idx < len(strobe_nets):
-                dqs_net = design.get_net_by_name(strobe_nets[lane_idx].net_name)
-                if dqs_net:
-                    dqs_traces = design.get_traces_on_net(dqs_net.index)
-                    dqs_length = sum(t.calc_length() for t in dqs_traces) or 50.0
+            if lane_idx < len(strobe_p_nets):
+                dqs_len = _net_length(strobe_p_nets[lane_idx].net_name)
+                if dqs_len > 0:
+                    dqs_length = dqs_len
 
             byte_lanes.append({
                 "dq_lengths_mm": dq_lengths or [50.0],
@@ -1461,6 +1500,26 @@ def run_design_review(
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "impedance_validation",
                 "mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator"
+            ))
+        elif key == "trace_current":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "power_trace_current",
+                "mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator"
+            ))
+        elif key == "diff_pair_width":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "diff_pair_width",
+                "mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker", "DiffPairWidthChecker"
+            ))
+        elif key == "smps_loop":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "smps_loop",
+                "mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer", "SMPSLoopAnalyzer"
+            ))
+        elif key == "copper_pour_check":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "copper_pour_integrity",
+                "mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker"
             ))
 
     # Phase 4: Cross-correlation
