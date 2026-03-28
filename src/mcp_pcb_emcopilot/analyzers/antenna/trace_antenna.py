@@ -141,9 +141,10 @@ class TraceAntennaAnalyzer:
         """
         length_m = length_mm / 1000
 
-        # Hammerstad approximation assuming typical w/h ≈ 1
-        # εr_eff = (εr+1)/2 + (εr-1)/2 * 1/sqrt(1+12h/w); for w/h=1: F≈0.277
-        er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * 0.277
+        # Hammerstad εr_eff using actual w/h ratio when available
+        w_over_h = self.trace_width_mm / self.height_mm if hasattr(self, 'height_mm') and self.height_mm > 0 else 1.0
+        f_wh = (1 + 12 / max(w_over_h, 0.1)) ** (-0.5)
+        er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * f_wh
 
         # Velocity factor
         vf = 1 / math.sqrt(er_eff)

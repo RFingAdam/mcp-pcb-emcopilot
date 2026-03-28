@@ -1645,9 +1645,9 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     if name == "pcb_analyze_length_matching":
         validate_positive(args.get("max_skew_ps", 0), "max_skew_ps")
         validate_range(args.get("effective_er", 0), 1.0, 100.0, "effective_er")
-        lengths = args["trace_lengths_mm"]
-        if not lengths:
-            return {"error": "trace_lengths_mm must contain at least one entry", "success": False}
+        lengths = args.get("trace_lengths_mm") or {}
+        if not lengths or len(lengths) < 2:
+            return {"error": "trace_lengths_mm must contain at least 2 entries for comparison", "success": False}
         max_skew_ps = args["max_skew_ps"]
         er = args["effective_er"]
         prop_delay_ps_per_mm = (1000 / C0) * math.sqrt(er) * 1e12
