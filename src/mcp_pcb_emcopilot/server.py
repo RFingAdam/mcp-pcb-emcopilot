@@ -1051,7 +1051,7 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
 
         # =====================================================================
-        # DESIGN REVIEW ORCHESTRATION (3 tools)
+        # DESIGN REVIEW ORCHESTRATION (5 tools)
         # =====================================================================
         _make_tool("pcb_set_review_context", "Set design review context: requirements, standards, known issues, operating conditions. Call before pcb_run_design_review.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
@@ -1062,6 +1062,13 @@ async def list_tools() -> list[Tool]:
             "thermal_limits": {"type": "object", "description": "Thermal constraints (e.g. {max_ambient_c: 40, max_junction_c: 125})"},
             "operating_conditions": {"type": "object", "description": "Operating conditions (e.g. {temp_min_c: -40, temp_max_c: 85, altitude_m: 3000})"},
         }, ["session_id"]),
+        _make_tool("pcb_get_review_questions", "Get list of questions the tool needs answered for a complete design review. Call after parsing, before running review. Returns questions tailored to the detected interfaces and design characteristics.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+        }, ["session_id"]),
+        _make_tool("pcb_answer_review_questions", "Provide answers to review questions identified by pcb_get_review_questions. Call before running design review to supply missing context.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "answers": {"type": "object", "description": "Dict of question_id: answer_value (e.g. {\"ddr_standard\": \"DDR4\", \"target_impedance_se\": 50})"},
+        }, ["session_id", "answers"]),
         _make_tool("pcb_run_design_review", "Run full automated multi-domain design review. Classifies design, selects relevant analyzers, runs analysis, cross-correlates findings, and generates structured results.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
         }, ["session_id"]),
@@ -2422,6 +2429,45 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             operating_conditions=args.get("operating_conditions"),
         )
         return {"success": True, "session_id": args["session_id"], "review_context": ctx}
+
+    if name == "pcb_get_review_questions":
+        from .review_context import get_review_questions
+        from .classifiers.net_classifier import NetClassifier
+        from .classifiers.design_classifier import DesignClassifier
+        from .classifiers.interface_detector import InterfaceDetector
+        data = _get_session(args["session_id"])
+        net_cls = NetClassifier().classify(data)
+        ifaces = InterfaceDetector().detect(data, net_cls)
+        classification = DesignClassifier().classify(data, net_cls, ifaces)
+        questions = get_review_questions(data, classification, net_cls)
+        # Mark which questions already have answers stored
+        existing_answers = (data.review_context or {}).get("interactive_answers", {})
+        for q in questions:
+            q["answered"] = q["id"] in existing_answers
+            if q["answered"]:
+                q["current_value"] = existing_answers[q["id"]]
+        return {
+            "success": True,
+            "questions": questions,
+            "count": len(questions),
+            "answered_count": sum(1 for q in questions if q["answered"]),
+        }
+
+    if name == "pcb_answer_review_questions":
+        data = _get_session(args["session_id"])
+        answers = args["answers"]
+        # Merge into review_context under "interactive_answers"
+        if not data.review_context:
+            data.review_context = {}
+        if "interactive_answers" not in data.review_context:
+            data.review_context["interactive_answers"] = {}
+        data.review_context["interactive_answers"].update(answers)
+        return {
+            "success": True,
+            "stored": len(answers),
+            "total_answers": len(data.review_context["interactive_answers"]),
+            "answers": data.review_context["interactive_answers"],
+        }
 
     if name == "pcb_run_design_review":
         # NOTE: This runs synchronously and blocks the event loop.
