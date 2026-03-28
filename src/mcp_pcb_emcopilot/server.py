@@ -1068,7 +1068,7 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
         _make_tool("pcb_answer_review_questions", "Provide answers to review questions identified by pcb_get_review_questions. Call before running design review to supply missing context.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
-            "answers": {"type": "object", "description": "Dict of question_id: answer_value (e.g. {\"ddr_standard\": \"DDR4\", \"target_impedance_se\": 50})"},
+            "answers": {"type": "string", "description": "JSON string of question_id: answer_value (e.g. '{\"ddr_standard\": \"LPDDR4\", \"emmc_speed_mode\": \"HS400\"}')"},
         }, ["session_id", "answers"]),
         _make_tool("pcb_run_design_review", "Run full automated multi-domain design review. Classifies design, selects relevant analyzers, runs analysis, cross-correlates findings, and generates structured results.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
@@ -2469,6 +2469,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     if name == "pcb_answer_review_questions":
         data = _get_session(args["session_id"])
         answers = args["answers"]
+        # Handle MCP transport serialization: answers may arrive as JSON string
+        if isinstance(answers, str):
+            import json as _json
+            answers = _json.loads(answers)
         # Merge into review_context under "interactive_answers"
         if not data.review_context:
             data.review_context = {}
