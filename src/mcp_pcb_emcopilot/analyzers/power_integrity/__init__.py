@@ -15,6 +15,7 @@ from .decap_placement import DecapAnalyzer, DecapRecommendation, DecapResult
 from .pdn_analyzer import PDNAnalyzer, PDNImpedancePoint, PDNResult
 from .pdn_impedance import calculate_pdn_impedance
 from .power_plane_analyzer import PlaneIssue, PowerPlaneAnalyzer, PowerPlaneResult
+from .current_profiler import CurrentProfiler
 from .vrm_analyzer import VRMAnalyzer, VRMIssue, VRMResult
 
 __all__ = [
@@ -38,4 +39,6 @@ __all__ = [
     "PlaneIssue",
     # Cavity Resonance
     "analyze_cavity_resonance",
+    # Current Profiling
+    "CurrentProfiler",
 ]
