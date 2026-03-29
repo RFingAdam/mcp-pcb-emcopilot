@@ -1138,6 +1138,18 @@ async def list_tools() -> list[Tool]:
         }, ["switching_frequency_khz"]),
 
         # =====================================================================
+        # EM SIMULATION EXTRACTION (2 tools)
+        # =====================================================================
+        _make_tool("pcb_extract_simulation_candidates", "Extract RF/high-speed structures from a parsed design that are suitable for full-wave EM simulation. Returns candidates with geometry, frequency, priority, and analytical impedance.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "max_candidates": {"type": "integer", "description": "Maximum candidates to return (default 10)"},
+        }, ["session_id"]),
+        _make_tool("pcb_generate_em_simulation", "Generate a standalone OpenEMS FDTD simulation script for a specific simulation candidate extracted from the design. Use pcb_extract_simulation_candidates first to get available candidates.", {
+            "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
+            "candidate_index": {"type": "integer", "description": "Index of candidate from pcb_extract_simulation_candidates (default 0)"},
+        }, ["session_id"]),
+
+        # =====================================================================
         # OPENEMS INTEGRATION (2 tools)
         # =====================================================================
         _make_tool("pcb_validate_with_openems", "Generate an OpenEMS FDTD simulation script to validate analytical impedance/radiation results. Supports microstrip, stripline, via, and trace_antenna models. Returns a standalone Python script.", {
@@ -2580,6 +2592,82 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             pcb_loop_area_cm2=args.get("pcb_loop_area_cm2", 1.0),
             limit_standard=args.get("limit_standard", "cispr32_classb"),
         )
+
+    # === EM SIMULATION EXTRACTION ===
+    if name == "pcb_extract_simulation_candidates":
+        from .analyzers.rf_si.rf_simulation_extractor import RFSimulationExtractor
+        from .classifiers.net_classifier import NetClassifier
+        data = _get_session(args["session_id"])
+        classifier = NetClassifier()
+        net_cls = classifier.classify(data)
+        extractor = RFSimulationExtractor()
+        max_cands = args.get("max_candidates", 10)
+        candidates = extractor.to_candidates(data, net_cls, max_candidates=max_cands)
+        # Cache candidates for pcb_generate_em_simulation
+        data.analysis_cache["_em_candidates"] = candidates
+        return {
+            "candidate_count": len(candidates),
+            "candidates": [
+                {
+                    "index": i,
+                    "name": c.name,
+                    "structure_type": c.structure_type,
+                    "interface": c.interface,
+                    "frequency_ghz": c.frequency_ghz,
+                    "priority": c.priority,
+                    "trace_width_mm": c.trace_width_mm,
+                    "trace_length_mm": c.trace_length_mm,
+                    "dielectric_height_mm": c.dielectric_height_mm,
+                    "dielectric_er": c.dielectric_er,
+                    "layer_name": c.layer_name,
+                    "layer_type": c.layer_type,
+                    "spacing_mm": c.spacing_mm,
+                    "via_drill_mm": c.via_drill_mm,
+                    "via_pad_mm": c.via_pad_mm,
+                    "z0_analytical": round(c.z0_analytical, 2),
+                    "z_diff_analytical": round(c.z_diff_analytical, 2) if c.z_diff_analytical else None,
+                    "net_names": c.net_names,
+                }
+                for i, c in enumerate(candidates)
+            ],
+        }
+
+    if name == "pcb_generate_em_simulation":
+        from .analyzers.rf_si.rf_simulation_extractor import RFSimulationExtractor
+        from .classifiers.net_classifier import NetClassifier
+        from .integrations.openems_bridge import OpenEMSBridge
+        data = _get_session(args["session_id"])
+        # Get or extract candidates
+        candidates = data.analysis_cache.get("_em_candidates")
+        if not candidates:
+            classifier = NetClassifier()
+            net_cls = classifier.classify(data)
+            extractor = RFSimulationExtractor()
+            candidates = extractor.to_candidates(data, net_cls, max_candidates=20)
+            data.analysis_cache["_em_candidates"] = candidates
+        idx = args.get("candidate_index", 0)
+        if not candidates:
+            raise ValueError("No simulation candidates found. Run pcb_extract_simulation_candidates first.")
+        if idx < 0 or idx >= len(candidates):
+            raise ValueError(f"candidate_index {idx} out of range (0-{len(candidates)-1})")
+        candidate = candidates[idx]
+        bridge = OpenEMSBridge()
+        model = bridge.generate_from_candidate(candidate)
+        # Cache the script
+        em_scripts = data.analysis_cache.setdefault("em_scripts", {})
+        em_scripts[candidate.name] = model.script
+        return {
+            "candidate_name": candidate.name,
+            "model_type": model.model_type,
+            "description": model.description,
+            "geometry": model.geometry,
+            "frequency_range_hz": list(model.frequency_range_hz),
+            "mesh_resolution": model.mesh_resolution,
+            "boundary_conditions": model.boundary_conditions,
+            "script": model.script,
+            "z0_analytical": round(candidate.z0_analytical, 2),
+            "z_diff_analytical": round(candidate.z_diff_analytical, 2) if candidate.z_diff_analytical else None,
+        }
 
     # === OPENEMS INTEGRATION ===
     if name == "pcb_validate_with_openems":

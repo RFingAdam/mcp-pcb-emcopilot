@@ -310,6 +310,10 @@ def _select_analyzers(
     if has_high_speed:
         analyzers.append("crosstalk")
 
+    # EM simulation candidate extraction (when high-speed signals and stackup)
+    if has_high_speed and has_stackup:
+        analyzers.append("em_simulation_extract")
+
     # Diff pair width consistency (when diff pairs exist)
     if len(net_cls.differential_pairs) > 0:
         analyzers.append("diff_pair_width")
@@ -1576,6 +1580,11 @@ def run_design_review(
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "current_profile",
                 "mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler"
+            ))
+        elif key == "em_simulation_extract":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "em_simulation",
+                "mcp_pcb_emcopilot.analyzers.rf_si.rf_simulation_extractor", "RFSimulationExtractor"
             ))
 
     # Filter accepted findings
