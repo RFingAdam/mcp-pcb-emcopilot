@@ -326,6 +326,13 @@ def _select_analyzers(
     if design.zones:
         analyzers.append("copper_pour_check")
 
+    # BOM cross-reference (when schematic data available)
+    if hasattr(design, 'schematic_data') and design.schematic_data:
+        analyzers.append("bom_cross_ref")
+
+    # Reference design comparison
+    analyzers.append("reference_design")
+
     # Always-run analyzers
     analyzers.append("thermal")
     analyzers.append("dfm_placement")
@@ -1508,6 +1515,16 @@ def run_design_review(
             domain_results.append(_run_dfm_placement_analysis(design))
         elif key == "validation":
             domain_results.append(_run_validation_analysis(design))
+        elif key == "bom_cross_ref":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "bom_cross_reference",
+                "mcp_pcb_emcopilot.analyzers.validation.bom_cross_reference", "BOMCrossReferenceAnalyzer"
+            ))
+        elif key == "reference_design":
+            domain_results.append(_run_generic_analyzer(
+                design, net_cls, "reference_design",
+                "mcp_pcb_emcopilot.analyzers.validation.reference_design_db", "ReferenceDesignComparator"
+            ))
         elif key == "ddr":
             domain_results.append(_run_ddr_analysis(design, interfaces, net_cls))
         elif key == "usb":
