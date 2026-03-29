@@ -906,32 +906,97 @@ def generate_html_report(
     elif "WARNING" in overall_status.upper():
         status_cls = "status-warning"
 
+    # --- VP Executive Dashboard ---
+    crit_count = severity_counts.get('CRITICAL', 0)
+    high_count = severity_counts.get('HIGH', 0)
+    warn_count = severity_counts.get('WARNING', 0)
+    pass_count = severity_counts.get('PASS', 0)
+    info_count = severity_counts.get('INFO', 0)
+
+    # SVG donut gauge for overall status
+    gauge_color = "#dc3545" if "FAIL" in overall_status.upper() else "#ffc107" if "WARN" in overall_status.upper() else "#28a745"
+    gauge_pct = max(5, min(95, 100 - (crit_count * 5 + high_count * 3 + warn_count)))  # Rough health score
+    gauge_offset = 283 - (283 * gauge_pct / 100)
+
+    # Domain risk breakdown
+    domain_bars = ""
+    for dr in domain_results:
+        d_name = dr.get("domain", "?")
+        d_findings = dr.get("findings", [])
+        d_crits = sum(1 for f in d_findings if f.get("severity") in ("critical",))
+        d_warns = sum(1 for f in d_findings if f.get("severity") in ("warning", "high"))
+        d_info = sum(1 for f in d_findings if f.get("severity") in ("info",))
+        d_total = len(d_findings)
+        if d_total == 0:
+            continue
+        bar_color = "#dc3545" if d_crits > 0 else "#ffc107" if d_warns > 0 else "#28a745"
+        bar_width = min(100, max(5, d_total * 2))
+        domain_bars += (
+            f'<div class="domain-bar" style="margin: 4px 0;">'
+            f'<span style="display:inline-block;width:220px;font-size:13px;color:var(--text);">{_escape_html(d_name)}</span>'
+            f'<span style="display:inline-block;width:{bar_width}%;max-width:50%;height:18px;'
+            f'background:{bar_color};border-radius:3px;vertical-align:middle;"></span>'
+            f'<span style="font-size:12px;margin-left:8px;color:var(--muted);">'
+            f'{d_crits}C {d_warns}W {d_info}I</span></div>\n'
+        )
+
+    # Top 5 critical findings
+    top_crits = []
+    for dr in domain_results:
+        for f in dr.get("findings", []):
+            if f.get("severity") == "critical":
+                loc = f.get("location", {})
+                loc_str = f" at ({loc['x_mm']:.0f},{loc['y_mm']:.0f})mm" if loc.get("x_mm") else ""
+                top_crits.append(f"{dr.get('domain','')}: {f.get('description','')[:100]}{loc_str}")
+    top_crits_html = ""
+    if top_crits:
+        items = "".join(f"<li>{_escape_html(c)}</li>" for c in top_crits[:5])
+        top_crits_html = f'<div style="margin-top:12px;"><strong>Top Critical Findings:</strong><ol style="margin:6px 0;padding-left:20px;font-size:13px;">{items}</ol></div>'
+
     summary_cards = f"""
-<div class="summary-grid">
-  <div class="summary-card">
-    <div class="value {status_cls}">{_escape_html(overall_status)}</div>
-    <div class="label">Overall Status</div>
+<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:20px;">
+  <!-- Overall gauge -->
+  <div style="text-align:center;min-width:160px;">
+    <svg width="140" height="140" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#e9ecef" stroke-width="10"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="{gauge_color}" stroke-width="10"
+        stroke-dasharray="283" stroke-dashoffset="{gauge_offset:.0f}"
+        transform="rotate(-90 50 50)" stroke-linecap="round"/>
+      <text x="50" y="45" text-anchor="middle" font-size="16" font-weight="bold" fill="{gauge_color}">{gauge_pct}%</text>
+      <text x="50" y="60" text-anchor="middle" font-size="9" fill="var(--muted)">health score</text>
+    </svg>
+    <div style="font-size:18px;font-weight:bold;color:{gauge_color};margin-top:4px;">{_escape_html(overall_status)}</div>
   </div>
-  <div class="summary-card">
-    <div class="value">{total_findings}</div>
-    <div class="label">Total Findings</div>
+
+  <!-- Severity breakdown -->
+  <div style="min-width:200px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Findings ({total_findings})</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="text-align:center;padding:8px 14px;background:#dc354520;border-radius:8px;border-left:4px solid #dc3545;">
+        <div style="font-size:24px;font-weight:bold;color:#dc3545;">{crit_count}</div>
+        <div style="font-size:11px;color:var(--muted);">Critical</div>
+      </div>
+      <div style="text-align:center;padding:8px 14px;background:#ffc10720;border-radius:8px;border-left:4px solid #ffc107;">
+        <div style="font-size:24px;font-weight:bold;color:#e6a800;">{warn_count + high_count}</div>
+        <div style="font-size:11px;color:var(--muted);">Warning</div>
+      </div>
+      <div style="text-align:center;padding:8px 14px;background:#28a74520;border-radius:8px;border-left:4px solid #28a745;">
+        <div style="font-size:24px;font-weight:bold;color:#28a745;">{pass_count}</div>
+        <div style="font-size:11px;color:var(--muted);">Pass</div>
+      </div>
+      <div style="text-align:center;padding:8px 14px;background:#17a2b820;border-radius:8px;border-left:4px solid #17a2b8;">
+        <div style="font-size:24px;font-weight:bold;color:#17a2b8;">{info_count}</div>
+        <div style="font-size:11px;color:var(--muted);">Info</div>
+      </div>
+    </div>
+    {top_crits_html}
   </div>
-  <div class="summary-card">
-    <div class="value" style="color: var(--badge-critical-bg);">{severity_counts.get('CRITICAL', 0)}</div>
-    <div class="label">Critical</div>
-  </div>
-  <div class="summary-card">
-    <div class="value" style="color: var(--badge-high-bg);">{severity_counts.get('HIGH', 0)}</div>
-    <div class="label">High</div>
-  </div>
-  <div class="summary-card">
-    <div class="value" style="color: var(--badge-warning-bg);">{severity_counts.get('WARNING', 0)}</div>
-    <div class="label">Warning</div>
-  </div>
-  <div class="summary-card">
-    <div class="value" style="color: var(--badge-pass-bg);">{severity_counts.get('PASS', 0)}</div>
-    <div class="label">Pass</div>
-  </div>
+</div>
+
+<!-- Domain risk heatmap -->
+<div style="margin:16px 0;padding:12px;background:var(--card-bg);border-radius:8px;border:1px solid var(--border);">
+  <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Domain Analysis ({len(domain_results)} domains)</div>
+  {domain_bars}
 </div>
 """
 
