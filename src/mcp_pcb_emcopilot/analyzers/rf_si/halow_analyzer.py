@@ -47,11 +47,15 @@ ANTENNA_PATTERNS = [
 ]
 
 RF_FILTER_PATTERNS = {
-    "saw": [r"(?i)saw", r"(?i)surface\s*acoustic"],
-    "baw": [r"(?i)baw", r"(?i)bulk\s*acoustic"],
+    "saw": [r"(?i)saw", r"(?i)surface\s*acoustic", r"(?i)^sf\d{2}[-_]", r"(?i)safea"],
+    "baw": [r"(?i)baw", r"(?i)bulk\s*acoustic", r"(?i)^b39\d{3}", r"(?i)^b39\w+[bp]\d{3}"],
     "lpf": [r"(?i)lpf", r"(?i)low.?pass"],
     "bpf": [r"(?i)bpf", r"(?i)band.?pass.*900", r"(?i)900.*band.?pass"],
+    "diplexer": [r"(?i)diplex", r"(?i)triplex", r"(?i)^b392\d{2}b"],
 }
+
+# BF* reference prefix is a strong indicator of a filter component
+_FILTER_REF_PREFIX = re.compile(r'^BF\d+$', re.IGNORECASE)
 
 # Net patterns for HaLow RF signals
 HALOW_NET_PATTERNS = [
@@ -267,9 +271,25 @@ class HaLowAnalyzer:
         # --- SAW/BAW filter presence ---
         filters_found: Dict[str, List[str]] = {}
         for comp in design.components:
+            # Check by value/part_number patterns
             for ftype, patterns in RF_FILTER_PATTERNS.items():
                 if _component_matches(comp, patterns):
                     filters_found.setdefault(ftype, []).append(comp.reference)
+                    break
+            else:
+                # Check BF* reference prefix as filter indicator
+                if _FILTER_REF_PREFIX.match(comp.reference):
+                    val = (comp.value or '').upper()
+                    if '925' in val or '900' in val or '0925' in val:
+                        filters_found.setdefault("saw_900mhz", []).append(comp.reference)
+                    elif '2672' in val or '2615' in val or '2.4' in val or '2400' in val:
+                        filters_found.setdefault("baw_2.4ghz", []).append(comp.reference)
+                    elif '4377' in val or '5GHZ' in val or 'B39871' in val:
+                        filters_found.setdefault("baw_5ghz", []).append(comp.reference)
+                    elif '7509' in val or 'B39242' in val or 'DIPLEX' in val or 'TRIPLEX' in val:
+                        filters_found.setdefault("diplexer", []).append(comp.reference)
+                    else:
+                        filters_found.setdefault("filter_unknown", []).append(comp.reference)
 
         if not filters_found:
             findings.append({
@@ -282,23 +302,49 @@ class HaLowAnalyzer:
                 "recommendation": (
                     "Sub-1GHz ISM TX path MUST have a bandpass filter to suppress "
                     "harmonics: 2nd harmonic (1.8GHz) falls in cellular bands, "
-                    "3rd harmonic (2.7GHz) near WiFi 5GHz. Without TX filtering, "
-                    "FCC Part 15.247 / ETSI EN 300 220 spurious emission limits "
-                    "will likely fail. RX-only filtering protects receiver "
-                    "sensitivity but does NOT address radiated TX emissions. "
-                    "Add a SAW/BAW bandpass filter centered at 900MHz with "
-                    "<2dB insertion loss on both TX and RX paths."
+                    "3rd harmonic (2.7GHz) near WiFi 5GHz. Add a SAW/BAW bandpass "
+                    "filter centered at 900MHz with <2dB insertion loss."
                 ),
                 "details": {"filters_detected": {}},
             })
         else:
+            # Filters found — check if TX path is covered
+            has_900mhz_filters = any(
+                '900' in k or 'saw' in k.lower()
+                for k in filters_found
+            )
+            total_filter_count = sum(len(v) for v in filters_found.values())
+
             findings.append({
                 "severity": "info",
                 "category": "halow_filter",
-                "description": f"RF filters detected: {filters_found}",
+                "description": (
+                    f"RF filters detected ({total_filter_count} total): "
+                    f"{', '.join(f'{k}={v}' for k, v in filters_found.items())}"
+                ),
                 "recommendation": "",
                 "details": {"filters_detected": filters_found},
             })
+
+            # Check if TX path specifically has filtering
+            # RX-only filters protect the receiver but don't suppress TX harmonics
+            if has_900mhz_filters:
+                findings.append({
+                    "severity": "warning",
+                    "category": "halow_tx_filter",
+                    "description": (
+                        "900MHz SAW filters detected (likely RX path). Verify that the "
+                        "HaLow TX path also has a bandpass filter between PA output and "
+                        "antenna switch. RX filters protect receiver sensitivity but do "
+                        "NOT suppress TX harmonics that desense co-located LTE/GNSS receivers."
+                    ),
+                    "recommendation": (
+                        "Confirm TX path filtering in schematic. If only RX SAW filters "
+                        "are present, add a 900MHz bandpass on the TX path to suppress "
+                        "2nd harmonic (1800MHz → LTE Band 3) and 3rd harmonic (2700MHz → LTE Band 7)."
+                    ),
+                    "details": {"filters_900mhz": filters_found.get("saw_900mhz", []) + filters_found.get("saw", [])},
+                })
 
         # --- Antenna keep-out zone ---
         for ant in antenna_comps:
