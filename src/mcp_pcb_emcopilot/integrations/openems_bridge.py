@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from ..analyzers.rf_si.rf_simulation_extractor import SimulationCandidate
 
 
 @dataclass
@@ -537,4 +540,438 @@ phi = np.array([0, 90])
 nf2ff_res = nf2ff.CalcNF2FF(sim_path, freq_calc, theta, phi)
 print(f"Directivity: {{nf2ff_res.Dmax[0]:.2f}} dBi")
 print(f"Radiated power: {{nf2ff_res.Prad[0]:.6f}} W")
+'''
+
+    # =================================================================
+    # Coupled-line models (differential pair simulation)
+    # =================================================================
+
+    def generate_coupled_microstrip_model(
+        self,
+        trace_width_mm: float,
+        spacing_mm: float,
+        dielectric_height_mm: float,
+        er: float = 4.3,
+        trace_length_mm: float = 50.0,
+        frequency_ghz: float = 1.0,
+        trace_thickness_mm: float = 0.035,
+    ) -> OpenEMSModel:
+        """Generate OpenEMS model for edge-coupled differential microstrip.
+
+        Two parallel traces over a ground plane with 4 lumped ports
+        (near/far end of each trace).
+        """
+        freq_hz = frequency_ghz * 1e9
+        c0 = 299792458.0
+        wavelength_mm = (c0 / freq_hz / math.sqrt(er)) * 1000
+        margin_mm = max(5.0, dielectric_height_mm * 10)
+
+        geometry = {
+            "trace_width_mm": trace_width_mm,
+            "spacing_mm": spacing_mm,
+            "trace_length_mm": trace_length_mm,
+            "trace_thickness_mm": trace_thickness_mm,
+            "dielectric_height_mm": dielectric_height_mm,
+            "dielectric_er": er,
+            "substrate_width_mm": trace_length_mm + 2 * margin_mm,
+            "substrate_depth_mm": (spacing_mm + 2 * trace_width_mm) * 10,
+            "air_height_mm": dielectric_height_mm * 10,
+            "wavelength_mm": wavelength_mm,
+        }
+
+        model = OpenEMSModel(
+            model_type="coupled_microstrip",
+            description=(
+                f"Coupled microstrip: w={trace_width_mm}mm, s={spacing_mm}mm, "
+                f"h={dielectric_height_mm}mm, er={er}, f={frequency_ghz}GHz"
+            ),
+            geometry=geometry,
+            frequency_range_hz=(0, freq_hz * 2),
+            mesh_resolution=20,
+        )
+        model.script = self._generate_coupled_microstrip_script(geometry, freq_hz)
+        return model
+
+    def generate_coupled_stripline_model(
+        self,
+        trace_width_mm: float,
+        spacing_mm: float,
+        total_dielectric_height_mm: float,
+        er: float = 4.3,
+        trace_length_mm: float = 50.0,
+        frequency_ghz: float = 1.0,
+        trace_thickness_mm: float = 0.018,
+    ) -> OpenEMSModel:
+        """Generate OpenEMS model for edge-coupled differential stripline.
+
+        Two parallel traces centered between two ground planes with 4 lumped ports.
+        """
+        freq_hz = frequency_ghz * 1e9
+        c0 = 299792458.0
+        wavelength_mm = (c0 / freq_hz / math.sqrt(er)) * 1000
+
+        geometry = {
+            "trace_width_mm": trace_width_mm,
+            "spacing_mm": spacing_mm,
+            "trace_length_mm": trace_length_mm,
+            "trace_thickness_mm": trace_thickness_mm,
+            "dielectric_height_mm": total_dielectric_height_mm / 2,
+            "total_height_mm": total_dielectric_height_mm,
+            "dielectric_er": er,
+            "substrate_width_mm": trace_length_mm + 20,
+            "substrate_depth_mm": (spacing_mm + 2 * trace_width_mm) * 10,
+            "wavelength_mm": wavelength_mm,
+        }
+
+        model = OpenEMSModel(
+            model_type="coupled_stripline",
+            description=(
+                f"Coupled stripline: w={trace_width_mm}mm, s={spacing_mm}mm, "
+                f"b={total_dielectric_height_mm}mm, er={er}, f={frequency_ghz}GHz"
+            ),
+            geometry=geometry,
+            frequency_range_hz=(0, freq_hz * 2),
+            mesh_resolution=20,
+        )
+        model.script = self._generate_coupled_stripline_script(geometry, freq_hz)
+        return model
+
+    # =================================================================
+    # Dispatcher: SimulationCandidate -> OpenEMSModel
+    # =================================================================
+
+    def generate_from_candidate(self, candidate: "SimulationCandidate") -> OpenEMSModel:
+        """Route a SimulationCandidate to the appropriate model generator."""
+        st = candidate.structure_type
+
+        if st == "microstrip":
+            return self.generate_microstrip_model(
+                trace_width_mm=candidate.trace_width_mm,
+                dielectric_height_mm=candidate.dielectric_height_mm,
+                trace_thickness_mm=candidate.copper_thickness_mm,
+                er=candidate.dielectric_er,
+                frequency_ghz=candidate.frequency_ghz,
+                trace_length_mm=candidate.trace_length_mm,
+            )
+        elif st == "stripline":
+            return self.generate_stripline_model(
+                trace_width_mm=candidate.trace_width_mm,
+                dielectric_height_mm=candidate.dielectric_height_mm,
+                trace_thickness_mm=candidate.copper_thickness_mm,
+                er=candidate.dielectric_er,
+                frequency_ghz=candidate.frequency_ghz,
+                trace_length_mm=candidate.trace_length_mm,
+            )
+        elif st == "coupled_microstrip":
+            return self.generate_coupled_microstrip_model(
+                trace_width_mm=candidate.trace_width_mm,
+                spacing_mm=candidate.spacing_mm or 0.2,
+                dielectric_height_mm=candidate.dielectric_height_mm,
+                er=candidate.dielectric_er,
+                trace_length_mm=candidate.trace_length_mm,
+                frequency_ghz=candidate.frequency_ghz,
+                trace_thickness_mm=candidate.copper_thickness_mm,
+            )
+        elif st == "coupled_stripline":
+            return self.generate_coupled_stripline_model(
+                trace_width_mm=candidate.trace_width_mm,
+                spacing_mm=candidate.spacing_mm or 0.2,
+                total_dielectric_height_mm=candidate.dielectric_height_mm,
+                er=candidate.dielectric_er,
+                trace_length_mm=candidate.trace_length_mm,
+                frequency_ghz=candidate.frequency_ghz,
+                trace_thickness_mm=candidate.copper_thickness_mm,
+            )
+        elif st == "via_transition":
+            return self.generate_via_model(
+                drill_diameter_mm=candidate.via_drill_mm or 0.3,
+                pad_diameter_mm=candidate.via_pad_mm or 0.6,
+                board_thickness_mm=candidate.dielectric_height_mm,
+                er=candidate.dielectric_er,
+                frequency_ghz=candidate.frequency_ghz,
+            )
+        else:
+            raise ValueError(f"Unknown structure_type '{st}'")
+
+    def generate_batch(
+        self, candidates: list["SimulationCandidate"]
+    ) -> list[OpenEMSModel]:
+        """Generate OpenEMS models for a list of candidates."""
+        models: list[OpenEMSModel] = []
+        for c in candidates:
+            try:
+                models.append(self.generate_from_candidate(c))
+            except Exception:
+                pass  # skip candidates that fail
+        return models
+
+    # =================================================================
+    # Script generators for coupled-line models
+    # =================================================================
+
+    def _generate_coupled_microstrip_script(self, geom: dict, freq_hz: float) -> str:
+        """Generate OpenEMS script for edge-coupled differential microstrip."""
+        return f'''#!/usr/bin/env python3
+"""OpenEMS coupled microstrip (differential pair) simulation.
+
+Auto-generated by MCP PCB EMCopilot.
+Traces: w={geom["trace_width_mm"]}mm, s={geom["spacing_mm"]}mm, h={geom["dielectric_height_mm"]}mm, er={geom["dielectric_er"]}
+"""
+import os
+import numpy as np
+
+try:
+    from CSXCAD import ContinuousStructure
+    from openEMS import openEMS
+    from openEMS.physical_constants import C0, EPS0, MUE0
+except ImportError:
+    raise ImportError(
+        "openEMS not installed. Install via: "
+        "conda install -c conda-forge openems"
+    )
+
+# --- Simulation Parameters ---
+f_max = {freq_hz * 2:.1f}  # Hz
+trace_w = {geom["trace_width_mm"]:.4f}  # mm
+trace_s = {geom["spacing_mm"]:.4f}  # mm  (center-to-center)
+trace_l = {geom["trace_length_mm"]:.4f}  # mm
+trace_t = {geom["trace_thickness_mm"]:.4f}  # mm
+sub_h = {geom["dielectric_height_mm"]:.4f}  # mm
+sub_er = {geom["dielectric_er"]:.2f}
+sub_w = {geom["substrate_width_mm"]:.4f}  # mm
+sub_d = {geom["substrate_depth_mm"]:.4f}  # mm
+air_h = {geom["air_height_mm"]:.4f}  # mm
+
+unit = 1e-3  # mm
+
+# Edge-to-edge gap
+gap = trace_s - trace_w  # approximate edge gap from center-to-center
+if gap < 0.01:
+    gap = 0.01  # minimum gap
+
+# Trace Y positions (symmetric about Y=0)
+y1_center = -trace_s / 2   # trace 1 center
+y2_center = trace_s / 2    # trace 2 center
+
+# --- Setup FDTD ---
+FDTD = openEMS(NrTS=60000, EndCriteria=1e-5)
+FDTD.SetGaussExcite(f_max / 2, f_max / 2)
+FDTD.SetBoundaryCond(["PML_8"] * 6)
+
+CSX = ContinuousStructure()
+FDTD.SetCSX(CSX)
+mesh = CSX.GetGrid()
+mesh.SetDeltaUnit(unit)
+
+# --- Materials ---
+substrate = CSX.AddMaterial("substrate", epsilon=sub_er)
+copper = CSX.AddMetal("copper")
+
+# --- Geometry ---
+# Ground plane
+copper.AddBox([0, -sub_d/2, 0], [sub_w, sub_d/2, 0], priority=10)
+
+# Substrate
+substrate.AddBox([0, -sub_d/2, 0], [sub_w, sub_d/2, sub_h], priority=1)
+
+# Trace margins
+margin_x = (sub_w - trace_l) / 2
+trace_start_x = margin_x
+trace_end_x = margin_x + trace_l
+
+# Trace 1 (P)
+copper.AddBox(
+    [trace_start_x, y1_center - trace_w/2, sub_h],
+    [trace_end_x, y1_center + trace_w/2, sub_h + trace_t],
+    priority=10
+)
+
+# Trace 2 (N)
+copper.AddBox(
+    [trace_start_x, y2_center - trace_w/2, sub_h],
+    [trace_end_x, y2_center + trace_w/2, sub_h + trace_t],
+    priority=10
+)
+
+# --- 4 Lumped Ports ---
+# Port 1: Trace 1 near end
+port1 = FDTD.AddLumpedPort(1, 50,
+    [trace_start_x, y1_center - trace_w/2, 0],
+    [trace_start_x, y1_center + trace_w/2, sub_h], "z", excite=1)
+# Port 2: Trace 1 far end
+port2 = FDTD.AddLumpedPort(2, 50,
+    [trace_end_x, y1_center - trace_w/2, 0],
+    [trace_end_x, y1_center + trace_w/2, sub_h], "z")
+# Port 3: Trace 2 near end
+port3 = FDTD.AddLumpedPort(3, 50,
+    [trace_start_x, y2_center - trace_w/2, 0],
+    [trace_start_x, y2_center + trace_w/2, sub_h], "z")
+# Port 4: Trace 2 far end
+port4 = FDTD.AddLumpedPort(4, 50,
+    [trace_end_x, y2_center - trace_w/2, 0],
+    [trace_end_x, y2_center + trace_w/2, sub_h], "z")
+
+# --- Mesh ---
+mesh.AddLine("x", np.concatenate([
+    np.array([0, sub_w]),
+    np.linspace(trace_start_x, trace_end_x, 40),
+]))
+mesh.AddLine("y", np.concatenate([
+    np.array([-sub_d/2, sub_d/2]),
+    np.linspace(y1_center - trace_w, y1_center + trace_w, 8),
+    np.linspace(y2_center - trace_w, y2_center + trace_w, 8),
+]))
+mesh.AddLine("z", np.concatenate([
+    np.array([-air_h, sub_h + air_h]),
+    np.linspace(0, sub_h + trace_t, 10),
+]))
+mesh.SmoothMeshLines("all", C0 / f_max / unit / 20)
+
+# --- Run ---
+sim_path = os.path.join(os.path.dirname(__file__), "coupled_microstrip_sim")
+FDTD.Run(sim_path, cleanup=True)
+
+# --- Post-process: 4-port S-parameters ---
+freq = np.linspace(1e6, f_max, 1000)
+port1.CalcPort(sim_path, freq)
+port2.CalcPort(sim_path, freq)
+port3.CalcPort(sim_path, freq)
+port4.CalcPort(sim_path, freq)
+
+# Single-ended S-parameters
+s11 = port1.uf_ref / port1.uf_inc
+s21 = port2.uf_ref / port1.uf_inc
+s31 = port3.uf_ref / port1.uf_inc  # near-end coupling
+s41 = port4.uf_ref / port1.uf_inc  # far-end coupling
+
+# Approximate differential impedance from port 1 excitation
+Z0_se = port1.uf_tot / port1.if_tot
+
+# Mixed-mode: Zdiff ~ 2 * Zodd, Zcomm ~ Zeven / 2
+fc_idx = len(freq) // 2
+print(f"=== Coupled Microstrip Results at {{freq[fc_idx]/1e9:.2f}} GHz ===")
+print(f"Z0 (single-ended):  {{np.real(Z0_se[fc_idx]):.1f}} ohms")
+print(f"S11: {{20*np.log10(np.abs(s11[fc_idx])):.1f}} dB")
+print(f"S21 (through):  {{20*np.log10(np.abs(s21[fc_idx])):.1f}} dB")
+print(f"S31 (NEXT):     {{20*np.log10(np.abs(s31[fc_idx])):.1f}} dB")
+print(f"S41 (FEXT):     {{20*np.log10(np.abs(s41[fc_idx])):.1f}} dB")
+'''
+
+    def _generate_coupled_stripline_script(self, geom: dict, freq_hz: float) -> str:
+        """Generate OpenEMS script for edge-coupled differential stripline."""
+        return f'''#!/usr/bin/env python3
+"""OpenEMS coupled stripline (differential pair) simulation.
+
+Auto-generated by MCP PCB EMCopilot.
+Traces: w={geom["trace_width_mm"]}mm, s={geom["spacing_mm"]}mm, b={geom["total_height_mm"]}mm, er={geom["dielectric_er"]}
+"""
+import os
+import numpy as np
+
+try:
+    from CSXCAD import ContinuousStructure
+    from openEMS import openEMS
+    from openEMS.physical_constants import C0
+except ImportError:
+    raise ImportError("openEMS not installed.")
+
+# --- Simulation Parameters ---
+f_max = {freq_hz * 2:.1f}
+trace_w = {geom["trace_width_mm"]:.4f}
+trace_s = {geom["spacing_mm"]:.4f}  # center-to-center
+trace_l = {geom["trace_length_mm"]:.4f}
+trace_t = {geom["trace_thickness_mm"]:.4f}
+sub_h = {geom["dielectric_height_mm"]:.4f}  # half-height (trace at center)
+total_h = {geom["total_height_mm"]:.4f}
+sub_er = {geom["dielectric_er"]:.2f}
+sub_w = {geom["substrate_width_mm"]:.4f}
+sub_d = {geom["substrate_depth_mm"]:.4f}
+
+unit = 1e-3
+
+# Trace Y positions
+y1_center = -trace_s / 2
+y2_center = trace_s / 2
+
+# --- Setup FDTD ---
+FDTD = openEMS(NrTS=60000, EndCriteria=1e-5)
+FDTD.SetGaussExcite(f_max / 2, f_max / 2)
+FDTD.SetBoundaryCond(["PML_8"] * 6)
+
+CSX = ContinuousStructure()
+FDTD.SetCSX(CSX)
+mesh = CSX.GetGrid()
+mesh.SetDeltaUnit(unit)
+
+substrate = CSX.AddMaterial("substrate", epsilon=sub_er)
+copper = CSX.AddMetal("copper")
+
+# Bottom ground
+copper.AddBox([0, -sub_d/2, 0], [sub_w, sub_d/2, 0], priority=10)
+# Top ground
+copper.AddBox([0, -sub_d/2, total_h], [sub_w, sub_d/2, total_h], priority=10)
+# Dielectric fill
+substrate.AddBox([0, -sub_d/2, 0], [sub_w, sub_d/2, total_h], priority=1)
+
+# Traces centered vertically
+trace_z = sub_h
+margin_x = (sub_w - trace_l) / 2
+trace_start_x = margin_x
+trace_end_x = margin_x + trace_l
+
+# Trace 1 (P)
+copper.AddBox(
+    [trace_start_x, y1_center - trace_w/2, trace_z],
+    [trace_end_x, y1_center + trace_w/2, trace_z + trace_t],
+    priority=10
+)
+
+# Trace 2 (N)
+copper.AddBox(
+    [trace_start_x, y2_center - trace_w/2, trace_z],
+    [trace_end_x, y2_center + trace_w/2, trace_z + trace_t],
+    priority=10
+)
+
+# --- 4 Lumped Ports ---
+port1 = FDTD.AddLumpedPort(1, 50,
+    [trace_start_x, y1_center - trace_w/2, 0],
+    [trace_start_x, y1_center + trace_w/2, trace_z], "z", excite=1)
+port2 = FDTD.AddLumpedPort(2, 50,
+    [trace_end_x, y1_center - trace_w/2, 0],
+    [trace_end_x, y1_center + trace_w/2, trace_z], "z")
+port3 = FDTD.AddLumpedPort(3, 50,
+    [trace_start_x, y2_center - trace_w/2, 0],
+    [trace_start_x, y2_center + trace_w/2, trace_z], "z")
+port4 = FDTD.AddLumpedPort(4, 50,
+    [trace_end_x, y2_center - trace_w/2, 0],
+    [trace_end_x, y2_center + trace_w/2, trace_z], "z")
+
+# --- Mesh ---
+mesh.SmoothMeshLines("all", C0 / f_max / unit / 20)
+
+# --- Run ---
+sim_path = os.path.join(os.path.dirname(__file__), "coupled_stripline_sim")
+FDTD.Run(sim_path, cleanup=True)
+
+# --- Post-process ---
+freq = np.linspace(1e6, f_max, 1000)
+port1.CalcPort(sim_path, freq)
+port2.CalcPort(sim_path, freq)
+port3.CalcPort(sim_path, freq)
+port4.CalcPort(sim_path, freq)
+
+s11 = port1.uf_ref / port1.uf_inc
+s21 = port2.uf_ref / port1.uf_inc
+s31 = port3.uf_ref / port1.uf_inc
+s41 = port4.uf_ref / port1.uf_inc
+Z0_se = port1.uf_tot / port1.if_tot
+
+fc_idx = len(freq) // 2
+print(f"=== Coupled Stripline Results at {{freq[fc_idx]/1e9:.2f}} GHz ===")
+print(f"Z0 (single-ended):  {{np.real(Z0_se[fc_idx]):.1f}} ohms")
+print(f"S11: {{20*np.log10(np.abs(s11[fc_idx])):.1f}} dB")
+print(f"S21 (through):  {{20*np.log10(np.abs(s21[fc_idx])):.1f}} dB")
+print(f"S31 (NEXT):     {{20*np.log10(np.abs(s31[fc_idx])):.1f}} dB")
+print(f"S41 (FEXT):     {{20*np.log10(np.abs(s41[fc_idx])):.1f}} dB")
 '''
