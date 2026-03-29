@@ -39,6 +39,8 @@ _WARNING_COUPLING_MM = 5.0    # parallel coupling > 5 mm
 _CRITICAL_SPACING_MULT = 2.0  # spacing < 2x trace width
 _WARNING_SPACING_MULT = 3.0   # spacing < 3x trace width
 _PARALLEL_DOT_THRESHOLD = 0.9  # |dot product| > 0.9 means parallel
+_MAX_TRACES_PER_LAYER = 500     # cap per-layer traces to limit O(N^2)
+_SPATIAL_BIN_MM = 1.0           # Y-distance bin for spatial filtering
 
 
 def _segment_direction(x1: float, y1: float, x2: float, y2: float) -> tuple[float, float]:
@@ -160,6 +162,21 @@ class CrosstalkAnalyzer:
         flagged_pairs: set[tuple[str, str, str]] = set()
 
         for layer, layer_trs in layer_traces.items():
+            # Sort by segment length descending — longest segments have most coupling risk
+            layer_trs.sort(
+                key=lambda t: _segment_length(t.x1_mm, t.y1_mm, t.x2_mm, t.y2_mm),
+                reverse=True,
+            )
+            # Cap at _MAX_TRACES_PER_LAYER to bound the O(N^2) comparison
+            layer_trs = layer_trs[:_MAX_TRACES_PER_LAYER]
+
+            # Build spatial bins by Y-coordinate midpoint for fast neighbour lookup
+            y_bins: Dict[int, List[int]] = defaultdict(list)
+            for idx, tr in enumerate(layer_trs):
+                y_mid = (tr.y1_mm + tr.y2_mm) / 2
+                bin_key = int(y_mid // _SPATIAL_BIN_MM)
+                y_bins[bin_key].append(idx)
+
             n = len(layer_trs)
             for i in range(n):
                 tr_a = layer_trs[i]
@@ -171,7 +188,16 @@ class CrosstalkAnalyzer:
                 if len_a < 0.5:
                     continue
 
-                for j in range(i + 1, n):
+                # Only compare against traces in nearby Y bins (within 1mm)
+                y_mid_a = (tr_a.y1_mm + tr_a.y2_mm) / 2
+                bin_a = int(y_mid_a // _SPATIAL_BIN_MM)
+                nearby_indices: set[int] = set()
+                for bk in (bin_a - 1, bin_a, bin_a + 1):
+                    for idx in y_bins.get(bk, ()):
+                        if idx > i:
+                            nearby_indices.add(idx)
+
+                for j in nearby_indices:
                     tr_b = layer_trs[j]
                     net_b = tr_b.net_name
 

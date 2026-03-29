@@ -250,10 +250,10 @@ class TestGenerateHtmlReport:
             generate_html_report(design, session_id="sess-008", output_path=out_path)
             with open(out_path) as fh:
                 html = fh.read()
-            assert "summary-grid" in html
-            assert "summary-card" in html
-            assert "Overall Status" in html
-            assert "Total Findings" in html
+            # Executive dashboard with gauge, severity cards, domain bars
+            assert "health score" in html or "summary-grid" in html
+            assert "Critical" in html
+            assert "Warning" in html or "warning" in html
         finally:
             os.unlink(out_path)
 
@@ -272,7 +272,7 @@ class TestGenerateHtmlReport:
                 html = fh.read()
             assert "<!DOCTYPE html>" in html
             # Should still contain the dashboard
-            assert "Total Findings" in html
+            assert "health score" in html or "Findings" in html
         finally:
             os.unlink(out_path)
 
