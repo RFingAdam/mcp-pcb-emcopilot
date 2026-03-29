@@ -36,11 +36,27 @@ INTERFACE_FREQUENCIES: Dict[str, float] = {
 INTERFACE_PRIORITY: Dict[str, float] = {
     "rf": 1.0,
     "pcie": 0.8,
-    "usb": 0.7,
-    "ddr": 0.6,
+    "usb": 0.8,
+    "ddr": 0.7,
     "ethernet": 0.5,
     "emmc": 0.4,
 }
+
+# RF subcategories that get top priority (1.0)
+_RF_TOP_SUBCATEGORIES = {"halow", "wifi", "bluetooth", "antenna"}
+
+# Default target impedances for deviation calculation
+_TARGET_Z0: Dict[str, float] = {
+    "rf": 50.0,
+    "usb": 90.0,
+    "pcie": 85.0,
+    "ddr": 50.0,
+    "ethernet": 100.0,
+    "emmc": 50.0,
+}
+
+# Maximum candidates returned by analyze() and to_candidates()
+DEFAULT_MAX_CANDIDATES = 10
 
 # Categories considered high-speed / RF
 HS_CATEGORIES = {"rf", "usb", "ddr", "pcie", "ethernet", "emmc"}
@@ -121,6 +137,96 @@ def _diff_z0(z_se: float, s_mm: float, h_mm: float) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Priority / dedup / sort helpers
+# ---------------------------------------------------------------------------
+
+def _compute_priority(
+    category: str,
+    subcategory: Optional[str],
+    structure_type: str,
+    z_diff: Optional[float],
+    z_se: float,
+) -> float:
+    """Assign a priority score following the documented rules.
+
+    - RF signal nets with subcategory in (halow, wifi, bluetooth, antenna): 1.0
+    - Differential pairs with >20% impedance deviation: 0.9
+    - USB/PCIe single-ended: 0.8
+    - DDR clock/strobe: 0.7
+    - Via transitions on high-speed nets: 0.6
+    - Ethernet: 0.5
+    - eMMC/SDIO: 0.4
+    - Everything else: 0.2
+    """
+    sub_lower = (subcategory or "").lower()
+
+    # RF top-priority subcategories
+    if category == "rf" and sub_lower in _RF_TOP_SUBCATEGORIES:
+        return 1.0
+
+    # Via transitions on any high-speed net
+    if structure_type == "via_transition":
+        return 0.6
+
+    # Differential pair with >20% deviation from target
+    if "coupled" in structure_type and z_diff is not None:
+        target = _TARGET_Z0.get(category, 50.0)
+        if target > 0 and abs(z_diff - target) / target > 0.20:
+            return 0.9
+
+    # USB / PCIe single-ended
+    if category in ("usb", "pcie"):
+        return 0.8
+
+    # DDR clock/strobe
+    if category == "ddr":
+        return 0.7
+
+    # Ethernet
+    if category == "ethernet":
+        return 0.5
+
+    # eMMC / SDIO
+    if category in ("emmc", "sdio"):
+        return 0.4
+
+    # RF without top subcategory still gets the base interface priority
+    if category == "rf":
+        return 1.0
+
+    return 0.2
+
+
+def _deduplicate_candidates(
+    candidates: List[SimulationCandidate],
+) -> List[SimulationCandidate]:
+    """Deduplicate: same structure_type + layer + trace width (within 5%) -> keep longest."""
+    buckets: Dict[tuple, SimulationCandidate] = {}
+    for c in candidates:
+        # Quantise width to 5% buckets
+        w_bucket = round(c.trace_width_mm / max(c.trace_width_mm * 0.05, 0.001)) if c.trace_width_mm > 0 else 0
+        key = (c.structure_type, c.layer_name.lower(), w_bucket)
+        existing = buckets.get(key)
+        if existing is None or c.trace_length_mm > existing.trace_length_mm:
+            buckets[key] = c
+    return list(buckets.values())
+
+
+def _sort_candidates(
+    candidates: List[SimulationCandidate],
+) -> List[SimulationCandidate]:
+    """Sort by priority (highest first), then by impedance deviation from target (largest first)."""
+    def sort_key(c: SimulationCandidate) -> tuple:
+        target = _TARGET_Z0.get(c.interface, 50.0)
+        z_ref = c.z_diff_analytical if c.z_diff_analytical else c.z0_analytical
+        deviation = abs(z_ref - target) if z_ref > 0 and target > 0 else 0.0
+        return (-c.priority, -deviation)
+
+    candidates.sort(key=sort_key)
+    return candidates
+
+
+# ---------------------------------------------------------------------------
 # Extractor
 # ---------------------------------------------------------------------------
 class RFSimulationExtractor:
@@ -134,24 +240,53 @@ class RFSimulationExtractor:
         design: PCBDesignData,
         classified_nets: Any = None,
         interfaces: Any = None,
+        max_candidates: int = DEFAULT_MAX_CANDIDATES,
     ) -> List[Dict[str, Any]]:
         """Analyze design and return findings (info-level) listing simulation candidates.
 
         This is the standard analyzer interface used by ``_run_generic_analyzer``.
+        Returns at most *max_candidates* findings, deduplicated and prioritised.
         """
         candidates = self.extract(design, classified_nets)
+        candidates = _deduplicate_candidates(candidates)
+        candidates = _sort_candidates(candidates)
+        candidates = candidates[:max_candidates]
+
         findings: List[Dict[str, Any]] = []
         for c in candidates:
+            # Build actionable description
+            nets_str = ", ".join(c.net_names[:3])
+            target_z = _TARGET_Z0.get(c.interface, 50.0)
+            z_ref = c.z_diff_analytical if c.z_diff_analytical else c.z0_analytical
+            deviation_pct = abs(z_ref - target_z) / target_z * 100 if target_z > 0 and z_ref > 0 else 0.0
+
+            desc_parts = [
+                f"{c.structure_type} on {c.layer_name}",
+                f"net {nets_str}",
+                f"({c.interface} interface)",
+                f"— w={c.trace_width_mm:.3f}mm, L={c.trace_length_mm:.1f}mm",
+            ]
+            if c.z_diff_analytical:
+                desc_parts.append(
+                    f"Zdiff={c.z_diff_analytical:.1f}\u03A9 (target {target_z:.0f}\u03A9, {deviation_pct:.0f}% dev)"
+                )
+            else:
+                desc_parts.append(
+                    f"Z0={c.z0_analytical:.1f}\u03A9 (target {target_z:.0f}\u03A9, {deviation_pct:.0f}% dev)"
+                )
+            desc_parts.append(f"@ {c.frequency_ghz}GHz.")
+
+            sim_validates = "impedance and insertion loss"
+            if "via" in c.structure_type:
+                sim_validates = "via transition discontinuity and return loss"
+            elif "coupled" in c.structure_type:
+                sim_validates = "differential impedance, mode conversion, and skew"
+            desc_parts.append(f"Simulation validates {sim_validates}.")
+
             findings.append({
                 "severity": "info",
                 "category": f"EM simulation candidate: {c.name}",
-                "description": (
-                    f"{c.structure_type} on {c.layer_name} — "
-                    f"w={c.trace_width_mm:.3f}mm, L={c.trace_length_mm:.1f}mm, "
-                    f"Z0(analytical)={c.z0_analytical:.1f}\u03A9"
-                    + (f", Zdiff={c.z_diff_analytical:.1f}\u03A9" if c.z_diff_analytical else "")
-                    + f" @ {c.frequency_ghz}GHz"
-                ),
+                "description": " ".join(desc_parts),
                 "recommendation": (
                     "Run pcb_generate_em_simulation to get full-wave S-parameter validation."
                 ),
@@ -283,12 +418,14 @@ class RFSimulationExtractor:
                 z_se = self._calc_z0(trace_w, h_mm, er, t_mm, ltype)
                 z_diff = _diff_z0(z_se, spacing, h_mm) if spacing and spacing > 0 else None
 
+                priority = _compute_priority(nc.category, nc.subcategory, struct_type, z_diff, z_se)
+
                 candidates.append(SimulationCandidate(
                     name=f"{dp.pair_name}_diff_pair",
                     structure_type=struct_type,
                     interface=nc.category,
                     frequency_ghz=freq,
-                    priority=INTERFACE_PRIORITY.get(nc.category, 0.3),
+                    priority=priority,
                     trace_width_mm=trace_w,
                     trace_length_mm=round(total_length, 2),
                     dielectric_height_mm=h_mm,
@@ -309,13 +446,14 @@ class RFSimulationExtractor:
 
             # Single-ended candidate
             z_se = self._calc_z0(trace_w, h_mm, er, t_mm, ltype)
+            priority = _compute_priority(nc.category, nc.subcategory, ltype, None, z_se)
 
             candidates.append(SimulationCandidate(
                 name=f"{net_name}_{ltype}",
                 structure_type=ltype,
                 interface=nc.category,
                 frequency_ghz=freq,
-                priority=INTERFACE_PRIORITY.get(nc.category, 0.3),
+                priority=priority,
                 trace_width_mm=trace_w,
                 trace_length_mm=round(total_length, 2),
                 dielectric_height_mm=h_mm,
@@ -333,12 +471,13 @@ class RFSimulationExtractor:
             if len(layers_used) > 1 and vias:
                 drill = vias[0].drill_mm
                 pad = vias[0].pad_diameter_mm
+                via_priority = _compute_priority(nc.category, nc.subcategory, "via_transition", None, 0.0)
                 candidates.append(SimulationCandidate(
                     name=f"{net_name}_via_transition",
                     structure_type="via_transition",
                     interface=nc.category,
                     frequency_ghz=freq,
-                    priority=max(0.1, INTERFACE_PRIORITY.get(nc.category, 0.3) - 0.1),
+                    priority=via_priority,
                     trace_width_mm=trace_w,
                     trace_length_mm=0.0,
                     dielectric_height_mm=design.board_thickness_mm or 1.6,
@@ -363,10 +502,13 @@ class RFSimulationExtractor:
         self,
         design: PCBDesignData,
         classified_nets: Any = None,
-        max_candidates: int = 10,
+        max_candidates: int = DEFAULT_MAX_CANDIDATES,
     ) -> List[SimulationCandidate]:
-        """Extract and return the top-N candidates."""
-        return self.extract(design, classified_nets)[:max_candidates]
+        """Extract, deduplicate, sort and return the top-N candidates."""
+        candidates = self.extract(design, classified_nets)
+        candidates = _deduplicate_candidates(candidates)
+        candidates = _sort_candidates(candidates)
+        return candidates[:max_candidates]
 
     # ------------------------------------------------------------------
     # Internal helpers
