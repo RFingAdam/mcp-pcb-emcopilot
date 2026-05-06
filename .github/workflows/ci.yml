@@ -37,4 +37,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[all,dev]"
       - run: pytest tests/ -v --tb=short
-      - run: pytest tests/ --cov=mcp_pcb_emcopilot --cov-report=term-missing --cov-fail-under=50
+      - run: pytest tests/ --cov=mcp_pcb_emcopilot --cov-report=term-missing --cov-fail-under=78

@@ -4,8 +4,6 @@ Creates mock PCBDesignData with traces, vias, zones, and runs all 6 new tools
 through their dispatch handlers.
 """
 
-import json
-import math
 import os
 import sys
 
@@ -320,7 +318,6 @@ def test_emi_hotspots():
 def test_dispatch_all_tools():
     """Test all 6 new tools through the dispatch system."""
     from mcp_pcb_emcopilot.server import _dispatch, sessions
-    from mcp_pcb_emcopilot.session import DesignSessionManager
 
     design = make_mock_design()
     sid = sessions.create_session(design)

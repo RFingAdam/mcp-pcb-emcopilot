@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # IPC-2152 simplified current capacity (Amps) for given trace width (mm)
 # at 10°C temperature rise, 1oz (35μm) copper

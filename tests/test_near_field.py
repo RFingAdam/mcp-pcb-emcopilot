@@ -23,14 +23,10 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from mcp_pcb_emcopilot.analyzers.emc.near_field import (
-    _C,
     ELECTRIC_SOURCE_TYPES,
     MAGNETIC_SOURCE_TYPES,
-    FieldPoint,
-    NearFieldAnalysis,
     NearFieldAnalyzer,
     NearFieldSource,
-    SourceResult,
     classify_source,
     determine_region,
     e_field_electric_dipole,

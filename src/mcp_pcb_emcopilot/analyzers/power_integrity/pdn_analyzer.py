@@ -440,14 +440,17 @@ class PDNAnalyzer:
 
         # Check for anti-resonance peaks
         for freq in anti_resonance_freqs:
-            point = next((p for p in profile if abs(p.frequency_hz - freq) < freq * 0.1), None)  # type: ignore[assignment]
-            if point and point.impedance_ohm > z_target * 0.8:
+            ar_point: Optional[PDNImpedancePoint] = next(
+                (p for p in profile if abs(p.frequency_hz - freq) < freq * 0.1),
+                None,
+            )
+            if ar_point and ar_point.impedance_ohm > z_target * 0.8:
                 issues.append(PDNIssue(
                     issue_type=PDNIssueType.ANTI_RESONANCE,
                     severity="medium",
                     description=f"Anti-resonance peak detected at {freq/1e6:.2f} MHz",
                     frequency_hz=freq,
-                    impedance_ohm=point.impedance_ohm if point else None,
+                    impedance_ohm=ar_point.impedance_ohm if ar_point else None,
                     recommendation="Add decoupling capacitor to bridge the anti-resonance gap",
                 ))
 

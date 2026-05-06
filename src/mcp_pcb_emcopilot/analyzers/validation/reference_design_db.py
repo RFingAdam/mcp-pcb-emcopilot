@@ -1,8 +1,7 @@
 """Reference design database and comparator for common SoCs."""
 from __future__ import annotations
 
-import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 REFERENCE_DESIGNS: Dict[str, Dict[str, Any]] = {
     "MIMX8UD": {

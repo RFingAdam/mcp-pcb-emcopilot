@@ -165,7 +165,7 @@ class STEPParser:
         Handles: strings 'foo', numbers, references #123, tuples (a,b,c),
         lists (#1,#2), special tokens ($, *, .ENUM.).
         """
-        params = []
+        params: list[Any] = []
         i = 0
         raw = raw.strip()
 
@@ -199,7 +199,7 @@ class STEPParser:
                 j = i + 1
                 while j < len(raw) and raw[j].isdigit():
                     j += 1
-                params.append(int(raw[i + 1:j]))  # type: ignore[arg-type]
+                params.append(int(raw[i + 1:j]))
                 i = j
             elif ch == '(':
                 # Tuple/list — find matching close paren
@@ -212,10 +212,10 @@ class STEPParser:
                         depth -= 1
                     j += 1
                 inner = raw[i + 1:j - 1]
-                params.append(self._parse_param_list(inner))  # type: ignore[arg-type]
+                params.append(self._parse_param_list(inner))
                 i = j
             elif ch == '$':
-                params.append(None)  # type: ignore[arg-type]
+                params.append(None)
                 i += 1
             elif ch == '*':
                 params.append('*')
@@ -238,7 +238,7 @@ class STEPParser:
                     val = float(raw[i:j])
                     if val == int(val) and 'e' not in raw[i:j].lower() and '.' not in raw[i:j]:
                         val = int(val)
-                    params.append(val)  # type: ignore[arg-type]
+                    params.append(val)
                 except ValueError:
                     params.append(raw[i:j])
                 i = j

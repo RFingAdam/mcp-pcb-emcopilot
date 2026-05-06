@@ -358,11 +358,13 @@ def calculate_smps_emi(
             e_dbuvm = -100.0
 
         # Get limit (only meaningful for f > 30 MHz typically)
+        limit: Optional[float]
+        margin: Optional[float]
         if f_mhz >= 30:
             # Reuse limit function pattern
             if "cispr" in limit_standard:
                 if f_mhz < 230:
-                    limit: float = 40 if "classb" in limit_standard else 50
+                    limit = 40 if "classb" in limit_standard else 50
                 elif f_mhz < 1000:
                     limit = 47 if "classb" in limit_standard else 57
                 else:
@@ -382,7 +384,8 @@ def calculate_smps_emi(
                 worst_margin_db = margin
                 worst_harmonic = n
         else:
-            limit = None  # type: ignore[assignment]
+            # Out of regulated range — no limit / margin to compute.
+            limit = None
             margin = None
 
         harmonics.append({

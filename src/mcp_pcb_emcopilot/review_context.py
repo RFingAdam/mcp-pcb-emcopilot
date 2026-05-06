@@ -275,8 +275,10 @@ class ReviewContext:
         else:
             val = self._answers.get("target_impedance_se")
             default = 50.0
+        if val is None:
+            return default
         try:
-            return float(val)  # type: ignore[arg-type]
+            return float(val)
         except (TypeError, ValueError):
             return default
 

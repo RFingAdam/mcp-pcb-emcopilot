@@ -1,7 +1,6 @@
 """Solder paste stencil analyzer for DFM"""
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -148,7 +147,7 @@ class SolderPasteAnalyzer:
             stencil_thickness_mm = self._select_stencil_thickness(component)
 
         # Analyze each pad
-        pad_results = []
+        pad_results: list[dict[str, Any]] = []
         worst_area_ratio = float('inf')
         worst_aspect_ratio = float('inf')
 
@@ -245,10 +244,10 @@ class SolderPasteAnalyzer:
             pad_width_mm=first_pad.width_mm,
             pad_length_mm=first_pad.length_mm,
             pad_area_mm2=round(first_pad.width_mm * first_pad.length_mm, 4),
-            aperture_width_mm=first_result["aperture_width_mm"],  # type: ignore
-            aperture_length_mm=first_result["aperture_length_mm"],  # type: ignore
+            aperture_width_mm=first_result["aperture_width_mm"],
+            aperture_length_mm=first_result["aperture_length_mm"],
             aperture_area_mm2=round(
-                first_result["aperture_width_mm"] * first_result["aperture_length_mm"], 4  # type: ignore
+                first_result["aperture_width_mm"] * first_result["aperture_length_mm"], 4
             ),
             stencil_thickness_mm=stencil_thickness_mm,
             area_ratio=round(worst_area_ratio, 3),
@@ -294,22 +293,23 @@ class SolderPasteAnalyzer:
         Based on empirical data from stencil printing studies.
         """
         # Area ratio dominates
+        base_efficiency: float
         if area_ratio >= 0.75:
-            base_efficiency = 95
+            base_efficiency = 95.0
         elif area_ratio >= 0.66:
-            base_efficiency = 85
+            base_efficiency = 85.0
         elif area_ratio >= 0.55:
-            base_efficiency = 75
+            base_efficiency = 75.0
         elif area_ratio >= 0.45:
-            base_efficiency = 60
+            base_efficiency = 60.0
         else:
-            base_efficiency = 40
+            base_efficiency = 40.0
 
         # Aspect ratio modifier
         if aspect_ratio < 1.0:
-            base_efficiency *= 0.7  # type: ignore[assignment]
+            base_efficiency *= 0.7
         elif aspect_ratio < 1.5:
-            base_efficiency *= 0.85  # type: ignore[assignment]
+            base_efficiency *= 0.85
 
         return min(100, base_efficiency)
 

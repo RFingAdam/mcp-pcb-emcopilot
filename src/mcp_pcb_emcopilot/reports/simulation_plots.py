@@ -20,14 +20,12 @@ from __future__ import annotations
 import math
 import os
 import tempfile
-from dataclasses import dataclass, field
 from typing import Optional
 
 import matplotlib
 
 matplotlib.use("Agg")  # non-interactive backend
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
 
 # ---------------------------------------------------------------------------
@@ -373,7 +371,7 @@ class SimulationPlotter:
         elec_len = trace_length_mm / wavelength_base
 
         emissions = []
-        for h, f in zip(harmonics, freqs_mhz):
+        for h, f in zip(harmonics, freqs_mhz, strict=False):
             rolloff = 0 if h == 1 else -20 * math.log10(h)
             if f > knee_freq:
                 rolloff -= 20 * math.log10(f / knee_freq)
@@ -394,7 +392,7 @@ class SimulationPlotter:
 
         # Bar chart of harmonics
         bar_colors = []
-        for e, l in zip(emissions, fcc_limits):
+        for e, l in zip(emissions, fcc_limits, strict=False):
             if e > l:
                 bar_colors.append(t["fail"])
             elif e > l - 6:
@@ -423,7 +421,7 @@ class SimulationPlotter:
                     cispr_limits.append(None)
 
             # Plot only where we have limits
-            valid_x = [x for x, cl in zip(x_pos, cispr_limits) if cl is not None]
+            valid_x = [x for x, cl in zip(x_pos, cispr_limits, strict=False) if cl is not None]
             valid_l = [cl for cl in cispr_limits if cl is not None]
             if valid_x:
                 ax.step(valid_x, valid_l, where="mid", color=t["trace4"], linewidth=2,
@@ -683,7 +681,7 @@ class SimulationPlotter:
                               color=t["grid"], alpha=0.5, label="Margin to Tj_max")
 
         # Tj_max markers
-        for i, (tj, tj_max) in enumerate(zip(tjs, tj_maxs)):
+        for i, (tj, tj_max) in enumerate(zip(tjs, tj_maxs, strict=False)):
             ax.plot(tj_max, i, marker="|", color=t["limit"], markersize=20, markeredgewidth=2)
             ax.text(tj + margins[i] / 2, i, f"+{margins[i]}°C",
                     ha="center", va="center", fontsize=8, fontweight="bold",
@@ -1249,7 +1247,7 @@ class SimulationPlotter:
                 s=100, linewidths=2, zorder=6,
                 label="Required attenuation",
             )
-            for ff, ra in zip(failure_frequencies_mhz, required_attenuation_db):
+            for ff, ra in zip(failure_frequencies_mhz, required_attenuation_db, strict=False):
                 ax1.annotate(
                     f"-{ra:.0f} dB", xy=(ff, -ra),
                     xytext=(5, 8), textcoords="offset points",
@@ -1382,7 +1380,7 @@ class SimulationPlotter:
                    alpha=0.6, label="6 dB margin guideline")
 
         # Label each bar with the margin value
-        for i, (margin, bar) in enumerate(zip(margins, bars)):
+        for i, (margin, bar) in enumerate(zip(margins, bars, strict=False)):
             x_pos_text = margin + (1.0 if margin >= 0 else -1.0)
             ha = "left" if margin >= 0 else "right"
             ax.text(x_pos_text, i, f"{margin:+.1f} dB",

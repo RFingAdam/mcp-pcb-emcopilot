@@ -26,7 +26,6 @@ Format Limitations:
 from __future__ import annotations
 
 import logging
-import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -306,16 +305,15 @@ class AltiumPcbParser:
 
         Returns:
             AltiumBoardData with all extracted information
-        """  # type: ignore[assignment]
-        file_path = Path(file_path)  # type: ignore[assignment]
-  # type: ignore[attr-defined]
-        if not file_path.exists():  # type: ignore[attr-defined]
-            raise FileNotFoundError(f"PcbDoc file not found: {file_path}")
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"PcbDoc file not found: {path}")
 
-        data = AltiumBoardData(source_file=str(file_path))
+        data = AltiumBoardData(source_file=str(path))
 
         try:
-            ole = olefile.OleFileIO(str(file_path))
+            ole = olefile.OleFileIO(str(path))
 
             # Parse each section
             self._parse_board_info(ole, data)
@@ -352,7 +350,7 @@ class AltiumPcbParser:
 
         except Exception as e:
             logger.error(f"Failed to parse PcbDoc: {e}")
-            raise ValueError(f"PcbDoc parse error: {str(e)}")
+            raise ValueError(f"PcbDoc parse error: {str(e)}") from e
 
     def _parse_pipe_delimited(self, raw_data: bytes) -> List[Dict[str, str]]:
         """Parse pipe-delimited records from Altium data stream.
@@ -733,8 +731,8 @@ class AltiumPcbParser:
             max_x = comp_max_x + adaptive_margin
             max_y = comp_max_y + adaptive_margin
 
-            data.properties['DIMENSION_SOURCE'] = 'component_bounding_box'  # type: ignore[assignment]
-            data.properties['DIMENSION_MARGIN_MM'] = adaptive_margin  # type: ignore[assignment]
+            data.properties['DIMENSION_SOURCE'] = 'component_bounding_box'
+            data.properties['DIMENSION_MARGIN_MM'] = f"{adaptive_margin:.3f}"
 
         # Option 3: If still no bounds, use traces
         if (min_x == float('inf') or max_x == float('-inf')) and data.traces:
@@ -1300,19 +1298,16 @@ class AltiumPcbParser:
             'M': 10.0,   # Motors/modules
         }
 
-        # Extract reference designator prefix  # type: ignore[attr-defined]
-        ref_des = comp.designator.upper() if comp.designator else ''  # type: ignore[attr-defined]
+        ref_des = comp.reference.upper() if comp.reference else ''
         ref_prefix = ''.join(c for c in ref_des if c.isalpha())
 
-        # Try to match prefix with known sizes
         estimated_size = default_size
         for prefix, size in ref_des_sizes.items():
             if ref_prefix.startswith(prefix):
                 estimated_size = size
                 break
 
-        # Check package/footprint name for additional hints  # type: ignore[attr-defined]
-        footprint = (comp.footprint or comp.package_name or '').upper()  # type: ignore[attr-defined]
+        footprint = (comp.footprint or '').upper()
 
         # Large package indicators
         if any(x in footprint for x in ['BGA', 'QFN', 'QFP', 'TQFP', 'LQFP']):
@@ -1448,16 +1443,15 @@ class AltiumSchematicParser:
 
         Returns:
             AltiumSchematicData with components and nets
-        """  # type: ignore[assignment]
-        file_path = Path(file_path)  # type: ignore[assignment]
-  # type: ignore[attr-defined]
-        if not file_path.exists():  # type: ignore[attr-defined]
-            raise FileNotFoundError(f"SchDoc file not found: {file_path}")
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"SchDoc file not found: {path}")
 
-        data = AltiumSchematicData(source_file=str(file_path))
+        data = AltiumSchematicData(source_file=str(path))
 
         try:
-            ole = olefile.OleFileIO(str(file_path))
+            ole = olefile.OleFileIO(str(path))
 
             # Main schematic data is in FileHeader stream
             if ole.exists(['FileHeader']):
@@ -1473,7 +1467,7 @@ class AltiumSchematicParser:
 
         except Exception as e:
             logger.error(f"Failed to parse SchDoc: {e}")
-            raise ValueError(f"SchDoc parse error: {str(e)}")
+            raise ValueError(f"SchDoc parse error: {str(e)}") from e
 
     def _parse_fileheader(self, raw_data: bytes, data: AltiumSchematicData) -> None:
         """Parse FileHeader stream containing schematic records.
@@ -1696,11 +1690,11 @@ class AltiumProjectParser:
 
         # Extract BOM from PCB components
         if result['pcb']:
-            result['bom_data'] = self._extract_bom_from_pcb(result['pcb'])  # type: ignore[arg-type]
+            result['bom_data'] = self._extract_bom_from_pcb(result['pcb'])
 
         return result
 
-    def _extract_bom_from_pcb(self, pcb_data: AltiumBoardData) -> List[Dict[str, Any]]:  # type: ignore[arg-type]
+    def _extract_bom_from_pcb(self, pcb_data: AltiumBoardData) -> List[Dict[str, Any]]:
         """Extract BOM data from parsed PCB."""
         bom = []
 

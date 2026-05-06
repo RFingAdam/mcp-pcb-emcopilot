@@ -37,11 +37,11 @@ def svg_to_png(
     """
     try:
         import cairosvg
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "cairosvg is required for PNG export. "
             "Install with: pip install cairosvg"
-        )
+        ) from e
 
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".png", prefix="pcb_render_")

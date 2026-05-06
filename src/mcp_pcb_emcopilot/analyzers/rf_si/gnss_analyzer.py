@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import math
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ...models.pcb_data import PCBDesignData
 
@@ -326,7 +326,7 @@ class GNSSAnalyzer:
 
         # --- Switching regulator EMI proximity ---
         for receiver in gnss_receivers:
-            nearby_smps = []
+            nearby_smps: list[dict[str, Any]] = []
             for smps in smps_comps:
                 dist = _distance_2d(receiver.x_mm, receiver.y_mm, smps.x_mm, smps.y_mm)
                 if dist < SMPS_CLEARANCE_MM:
@@ -338,7 +338,7 @@ class GNSSAnalyzer:
 
             if nearby_smps:
                 findings.append({
-                    "severity": "critical" if any(s["distance_mm"] < 8.0 for s in nearby_smps) else "warning",
+                    "severity": "critical" if any(float(s["distance_mm"]) < 8.0 for s in nearby_smps) else "warning",
                     "category": "gnss_smps_emi",
                     "description": (
                         f"GNSS receiver {receiver.reference} has {len(nearby_smps)} "

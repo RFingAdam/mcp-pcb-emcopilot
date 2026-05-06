@@ -5,10 +5,9 @@ import html
 import os
 import tempfile
 import uuid
-from typing import Optional
 
 try:
-    from flask import Flask, Response, jsonify, redirect, request, url_for
+    from flask import Flask, Response, jsonify, redirect, request
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False

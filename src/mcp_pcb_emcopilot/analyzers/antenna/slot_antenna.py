@@ -329,7 +329,7 @@ class SlotAntennaAnalyzer:
     def analyze(
         self,
         slots: list[dict],
-        operating_frequencies_mhz: list[float] = None,  # type: ignore[assignment]
+        operating_frequencies_mhz: Optional[list[float]] = None,
     ) -> SlotAntennaResult:
         """
         Analyze all slots for antenna behavior.

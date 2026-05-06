@@ -371,7 +371,7 @@ class FilterDesigner:
         # Check whether requirements are met
         achieved: list[float] = []
         all_met = True
-        for f_fail, req_db in zip(failure_frequencies_mhz, required_attenuation_db):
+        for f_fail, req_db in zip(failure_frequencies_mhz, required_attenuation_db, strict=False):
             il_at_freq = self._interpolate_il(
                 il_result.frequencies_mhz, il_result.insertion_loss_db, f_fail,
             )

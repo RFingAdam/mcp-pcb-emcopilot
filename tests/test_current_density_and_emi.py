@@ -7,7 +7,6 @@ Covers Issues #14 and #15:
 Tests all 4 new MCP tools through their dispatch handlers.
 """
 
-import json
 import math
 import os
 import sys

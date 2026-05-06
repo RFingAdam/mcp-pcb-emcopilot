@@ -3,8 +3,6 @@
 Validates that calculator tools reject invalid inputs with structured errors,
 and that invalid session IDs produce SessionError.
 """
-import json
-import math
 
 import pytest
 
@@ -17,20 +15,6 @@ from mcp_pcb_emcopilot.errors import SessionError, ValidationError
 from mcp_pcb_emcopilot.server import (
     _dispatch,
     _get_session,
-    analyze_crosstalk,
-    analyze_current_loop,
-    analyze_trace_timing,
-    analyze_via,
-    calc_cpw_impedance,
-    calc_dielectric_loss,
-    calc_differential_impedance,
-    calc_microstrip_impedance,
-    calc_plane_resonance,
-    calc_skin_effect,
-    calc_stripline_impedance,
-    calc_trace_width_for_current,
-    calc_via_stitching_requirements,
-    estimate_rise_time_bandwidth,
 )
 
 

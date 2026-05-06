@@ -387,7 +387,7 @@ def _analyze_insertion_loss(data: TouchstoneData) -> dict:
 
     # Find -3dB bandwidth
     bw_3db = None
-    for i, (f, il) in enumerate(zip(freqs, s21_db)):
+    for i, (f, il) in enumerate(zip(freqs, s21_db, strict=False)):
         if il < -3.0:
             bw_3db = f
             break
@@ -570,7 +570,7 @@ def check_channel_compliance(
     # Check return loss
     # Find worst return loss up to Nyquist
     rl_values_in_band = [
-        s11 for f, s11 in zip(freqs, s11_db)
+        s11 for f, s11 in zip(freqs, s11_db, strict=False)
         if f <= specs["nyquist_ghz"] * 1e9
     ]
     if rl_values_in_band:

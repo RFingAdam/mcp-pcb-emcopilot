@@ -9,6 +9,7 @@ Calls analyzer classes directly (not MCP tools) for efficiency.
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -17,6 +18,8 @@ from .classifiers.design_classifier import DesignClassificationResult, DesignCla
 from .classifiers.interface_detector import InterfaceDetectionResult, InterfaceDetector
 from .classifiers.net_classifier import NetClassificationResult, NetClassifier
 from .models.pcb_data import PCBDesignData
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data structures
@@ -119,7 +122,7 @@ class CrossCorrelation:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize cross-correlation to a JSON-safe dictionary."""
-        return {  # type: ignore[return-value]
+        return {
             "domains": self.domains,
             "title": self.title,
             "description": self.description,
@@ -138,7 +141,7 @@ class RiskEntry:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize risk entry to a JSON-safe dictionary."""
-        return {  # type: ignore[return-value]
+        return {
             "finding": self.finding_title,
             "severity": self.severity,
             "likelihood": self.likelihood,
@@ -473,11 +476,6 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
 
         via_density = stitching_vias / board_area_cm2 if board_area_cm2 > 0 else 0
 
-        # Inject via density into the analyzer by pre-populating via_density
-        # in the GroundPlane structures
-        for p in planes:
-            p.via_stitching_density = via_density  # type: ignore[attr-defined]
-
         gnd_result = analyzer.analyze_grounding(
             planes=planes,
             board_width_mm=board_w,
@@ -561,8 +559,11 @@ def _run_pdn_analysis(
                         ),
                         signal_name=pn.net_name,
                     ))
-            except Exception:
-                pass  # Skip individual rail failures
+            except Exception as e:
+                logger.warning(
+                    "PDN analysis failed for rail %r: %s",
+                    getattr(pn, "net_name", "?"), e, exc_info=True,
+                )
 
         result.status = "fail" if result.critical_count > 0 else "warning" if result.warning_count > 0 else "pass"
     except Exception as e:
@@ -1104,7 +1105,7 @@ def _run_ethernet_analysis(
         eth_iface = None
         for iface in interfaces.interfaces:
             itype = iface.interface_type.lower()
-            if itype in ("gbe", "100base-tx", "sgmii", "ethernet"):
+            if any(tok in itype for tok in ("gbe", "base-t", "sgmii", "ethernet")):
                 eth_iface = iface
                 break
 
@@ -1721,7 +1722,8 @@ def _safe_serialize(obj: Any) -> dict[str, Any]:
     """Safely serialize an object to a dict."""
     try:
         if hasattr(obj, "to_dict"):
-            return obj.to_dict()  # type: ignore[no-any-return]
+            td: dict[str, Any] = obj.to_dict()
+            return td
         elif hasattr(obj, "__dataclass_fields__"):
             from dataclasses import asdict
             return asdict(obj)

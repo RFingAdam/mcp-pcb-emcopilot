@@ -22,11 +22,7 @@ from mcp_pcb_emcopilot.analyzers.stackup_optimizer import (
     C0,
     KEY_FREQUENCIES,
     MATERIAL_LIBRARY,
-    ImpedanceResult,
-    StackupComparison,
-    StackupOptimizationResult,
     StackupOptimizer,
-    StackupVariant,
 )
 
 # =============================================================================

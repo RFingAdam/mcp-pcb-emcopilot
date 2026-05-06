@@ -13,7 +13,6 @@ use the SParameterCalculator in sparam_calculator.py instead.
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 # Physical constants
 C0 = 299792458.0          # speed of light, m/s

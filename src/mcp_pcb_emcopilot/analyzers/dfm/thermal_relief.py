@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass
@@ -83,7 +83,7 @@ class ThermalReliefAnalyzer:
     COPPER_K = 385
 
     # Standard thermal relief configurations
-    RELIEF_CONFIGS = {
+    RELIEF_CONFIGS: dict[str, dict[str, float]] = {
         "ipc_class_2": {"spokes": 4, "spoke_width_mm": 0.254, "gap_angle_deg": 45},
         "ipc_class_3": {"spokes": 4, "spoke_width_mm": 0.381, "gap_angle_deg": 45},
         "high_current": {"spokes": 4, "spoke_width_mm": 0.508, "gap_angle_deg": 30},
@@ -411,7 +411,7 @@ class ThermalReliefAnalyzer:
         else:
             config = "ipc_class_2"
 
-        base = self.RELIEF_CONFIGS[config].copy()  # type: ignore[attr-defined]
+        base = self.RELIEF_CONFIGS[config].copy()
 
         # Adjust for power dissipation
         if power_dissipation_w > 1:

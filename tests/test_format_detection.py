@@ -1,8 +1,5 @@
 """Tests for PCB file format auto-detection."""
-import os
-import tempfile
 
-import pytest
 
 from mcp_pcb_emcopilot.parsers import detect_format
 

@@ -4,9 +4,7 @@ Generates specific, coordinate-level fix recommendations for each finding.
 """
 from __future__ import annotations
 
-import math
 from typing import Any, Dict, List, Optional
-
 
 # IPC-2152 width lookup for current capacity
 _WIDTH_FOR_CURRENT = {0.5: 0.20, 1.0: 0.38, 1.5: 0.55, 2.0: 0.70, 3.0: 1.00}

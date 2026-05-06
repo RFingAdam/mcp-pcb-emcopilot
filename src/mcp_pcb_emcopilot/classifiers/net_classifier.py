@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ..models.pcb_data import PCBComponent, PCBDesignData, PCBNet
+from ..models.pcb_data import PCBDesignData, PCBNet
 
 # =============================================================================
 # Data structures
@@ -568,10 +568,11 @@ class NetClassifier:
                 'high_speed': None,
                 'signal': None,
             }
-            if nc_lower in nc_map and nc_map[nc_lower]:
+            mapped = nc_map.get(nc_lower)
+            if mapped is not None:
                 return NetClassification(
                     net_name=name, net_index=net.index,
-                    category=nc_map[nc_lower], confidence=0.80,  # type: ignore[arg-type]
+                    category=mapped, confidence=0.80,
                     source='net_class', subcategory=net.net_class,
                 )
 

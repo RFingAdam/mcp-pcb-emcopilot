@@ -14,9 +14,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
-
-from ...models.pcb_data import PCBDesignData
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

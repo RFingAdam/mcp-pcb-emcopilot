@@ -944,5 +944,5 @@ class StackupOptimizer:
             norm_cost = v.cost_score / max_cost
             scores[v.name] = 0.4 * norm_imp + 0.3 * norm_loss + 0.3 * norm_cost
 
-        best = min(scores, key=scores.get)  # type: ignore[arg-type]
+        best = min(scores, key=lambda k: scores[k])
         return f"Recommended variant: {best} (weighted score {scores[best]:.2f})."

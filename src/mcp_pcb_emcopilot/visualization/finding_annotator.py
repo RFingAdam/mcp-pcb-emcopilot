@@ -9,8 +9,7 @@ Pure Python, no external dependencies (SVG is XML text).
 """
 from __future__ import annotations
 
-import math
-from typing import Any, List, Optional
+from typing import Any, List
 from xml.sax.saxutils import escape
 
 from ..models.pcb_data import PCBDesignData

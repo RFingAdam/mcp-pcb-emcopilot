@@ -877,10 +877,10 @@ class EMIRiskScorer:
                 for net_name, (nx_loc, ny_loc) in net_locations.items():
                     dist = _distance(cx, cy, nx_loc, ny_loc)
                     if dist <= radius:
-                        risk: NetEMIRisk | None = risk_lookup.get(net_name)  # type: ignore[no-redef]
-                        if risk:
+                        risk_entry: NetEMIRisk | None = risk_lookup.get(net_name)
+                        if risk_entry:
                             contributing.append(net_name)
-                            total_risk += risk.risk_score
+                            total_risk += risk_entry.risk_score
 
                 if contributing:
                     avg_risk = total_risk / len(contributing)

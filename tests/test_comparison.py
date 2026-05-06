@@ -3,13 +3,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 from mcp_pcb_emcopilot.analyzers.comparison import (
-    ComponentChange,
     DesignComparator,
-    DesignComparison,
-    NetChange,
 )
 
 

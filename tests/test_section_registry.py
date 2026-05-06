@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from mcp_pcb_emcopilot.reports.section_registry import (
     REPORT_SECTIONS,
     SectionDef,

@@ -2,8 +2,6 @@
 import json
 import os
 
-import pytest
-
 
 class TestPluginMetadata:
     def test_metadata_valid_json(self):

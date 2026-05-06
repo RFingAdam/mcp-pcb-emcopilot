@@ -12,7 +12,6 @@ All arithmetic uses pure Python math -- no numpy required.
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 # PCIe generation specifications
 # Each entry: (data_rate_gts, nyquist_freq_ghz, insertion_loss_limit_db, max_lane_skew_ps)
@@ -250,7 +249,7 @@ def validate_pcie_lanes(
         }
 
     # Reference lane = the one with minimum delay (shortest trace)
-    ref_lane = min(lane_delays, key=lane_delays.get)  # type: ignore[arg-type]
+    ref_lane = min(lane_delays, key=lambda k: lane_delays[k])
     ref_delay = lane_delays[ref_lane]
 
     # Calculate skew relative to reference
@@ -277,7 +276,7 @@ def validate_pcie_lanes(
     notes.append(f"Reference lane: {ref_lane} ({lane_lengths_mm[ref_lane]:.2f} mm)")
 
     if pass_fail == "FAIL":
-        worst_lane = max(skews, key=skews.get)  # type: ignore[arg-type]
+        worst_lane = max(skews, key=lambda k: skews[k])
         notes.append(
             f"FAIL: lane {worst_lane} skew {max_skew:.1f} ps exceeds {max_skew_limit_ps} ps limit "
             f"-- shorten by {(max_skew - max_skew_limit_ps) / delay_ps_per_mm:.2f} mm or add serpentine to shorter lanes"

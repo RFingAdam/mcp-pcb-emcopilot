@@ -122,7 +122,7 @@ class IPC2581Via:
             start_idx = next((i for i, l in enumerate(layer_names) if l.upper() == start_upper), 0)
             end_idx = next((i for i, l in enumerate(layer_names) if l.upper() == end_upper), len(layer_names) - 1)
             layer_span = abs(end_idx - start_idx) + 1
-        except:
+        except (StopIteration, AttributeError):
             layer_span = len(layer_names)
 
         if is_top and is_bottom:
@@ -271,17 +271,15 @@ class IPC2581Parser:
 
         Returns:
             IPC2581Data with all extracted information
-        """  # type: ignore[assignment]
-        file_path = Path(file_path)  # type: ignore[assignment]
-  # type: ignore[attr-defined]
-        if not file_path.exists():  # type: ignore[attr-defined]
-            raise FileNotFoundError(f"IPC-2581 file not found: {file_path}")
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"IPC-2581 file not found: {path}")
 
-        data = IPC2581Data(source_file=str(file_path))
+        data = IPC2581Data(source_file=str(path))
 
         try:
-            # Load XML content based on file type  # type: ignore[arg-type]
-            xml_content = self._load_file(file_path)  # type: ignore[arg-type]
+            xml_content = self._load_file(path)
 
             # Parse XML
             root = ET.fromstring(xml_content)
@@ -352,10 +350,10 @@ class IPC2581Parser:
 
         except ET.ParseError as e:
             logger.error(f"XML parse error: {e}")
-            raise ValueError(f"Invalid IPC-2581 XML: {str(e)}")
+            raise ValueError(f"Invalid IPC-2581 XML: {str(e)}") from e
         except Exception as e:
             logger.error(f"Failed to parse IPC-2581: {e}")
-            raise ValueError(f"IPC-2581 parse error: {str(e)}")
+            raise ValueError(f"IPC-2581 parse error: {str(e)}") from e
 
     def _load_file(self, file_path: Path) -> bytes:
         """Load file content, handling compression."""
@@ -569,8 +567,8 @@ class IPC2581Parser:
                     "x": self._parse_float(pad.get("x", "0")) * self.unit_factor,
                     "y": self._parse_float(pad.get("y", "0")) * self.unit_factor,
                     "pad_stack_ref": pad.get("padstackDefRef", ""),
-                }  # type: ignore[union-attr]
-                pkg_data["pads"].append(pad_data)  # type: ignore[union-attr]
+                }
+                pkg_data["pads"].append(pad_data)
 
             self._packages[pkg_name] = pkg_data
 
@@ -895,7 +893,6 @@ class IPC2581Parser:
         Aggregates total trace length and calculates length per net
         for high-speed analysis.
         """
-        import math
 
         # Build net name to net mapping
         net_name_to_net = {net.name: net for net in data.nets}

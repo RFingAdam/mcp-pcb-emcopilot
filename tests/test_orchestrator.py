@@ -7,7 +7,6 @@ and end-to-end dispatch through server.py.
 import json
 import os
 import sys
-import time
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -27,7 +26,6 @@ from mcp_pcb_emcopilot.models.pcb_data import (
     PCBZone,
 )
 from mcp_pcb_emcopilot.orchestrator import (
-    CrossCorrelation,
     DomainResult,
     ReviewFinding,
     _build_executive_summary,
@@ -590,7 +588,6 @@ def test_estimate_voltage_from_name():
 
 def test_dispatch_set_review_context():
     """Test pcb_set_review_context through server dispatch."""
-    from mcp_pcb_emcopilot.parsers import parse_pcb_file
     from mcp_pcb_emcopilot.server import _dispatch, sessions
 
     # Create a session with mock design

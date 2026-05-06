@@ -9,7 +9,7 @@ Pure Python, no external dependencies.
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Optional
 from xml.sax.saxutils import escape
 
 from ..models.pcb_data import PCBDesignData

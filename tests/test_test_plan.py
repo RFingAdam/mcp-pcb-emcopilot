@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 from mcp_pcb_emcopilot.reports.test_plan import (
-    ComplianceTestEntry,
     ComplianceTestPlan,
-    EquipmentRecommendation,
     RiskFinding,
     Severity,
     TestPlanGenerator,

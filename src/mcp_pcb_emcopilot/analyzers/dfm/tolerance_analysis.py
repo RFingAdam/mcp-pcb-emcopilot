@@ -171,8 +171,12 @@ class ToleranceAnalyzer:
                 "contribution_percent": round(percent_contribution, 1),
             })
 
-        # Sort by contribution
-        contributor_details.sort(key=lambda x: x["contribution_percent"], reverse=True)  # type: ignore
+        # Sort by contribution (cast because the dict value type is ``object``
+        # but ``contribution_percent`` is always a float at runtime).
+        contributor_details.sort(
+            key=lambda x: float(x["contribution_percent"]),  # type: ignore[arg-type]
+            reverse=True,
+        )
 
         # Monte Carlo if requested
         mc_mean = None
@@ -195,19 +199,20 @@ class ToleranceAnalyzer:
         margin = min(wc_min - spec_min, spec_max - wc_max)
 
         # DFM score
+        score: float
         if within_spec:
             if margin > 0.1:
-                score = 95
+                score = 95.0
             elif margin > 0.05:
-                score = 85
+                score = 85.0
             elif margin > 0:
-                score = 75
+                score = 75.0
             else:
-                score = 65
+                score = 65.0
         else:
             # Out of spec
             overshoot = max(spec_min - wc_min, wc_max - spec_max)
-            score = max(0, 50 - overshoot * 100)  # type: ignore
+            score = max(0.0, 50.0 - overshoot * 100)
 
         # Generate issues and recommendations
         issues = []
@@ -219,7 +224,7 @@ class ToleranceAnalyzer:
             # Find largest contributors
             top_contributors = contributor_details[:3]
             for tc in top_contributors:
-                if tc["contribution_percent"] > 20:  # type: ignore
+                if float(tc["contribution_percent"]) > 20:  # type: ignore[arg-type]
                     recommendations.append(
                         f"Reduce tolerance on {tc['name']} ({tc['contribution_percent']:.0f}% contribution)"
                     )
@@ -266,7 +271,7 @@ class ToleranceAnalyzer:
         results = []
 
         for _ in range(iterations):
-            total = 0
+            total: float = 0.0
             for c in contributors:
                 # Generate random value based on distribution
                 if c.distribution == "normal":
@@ -285,7 +290,7 @@ class ToleranceAnalyzer:
                         c.nominal_mm,
                     )
 
-                total += value * c.sensitivity  # type: ignore
+                total += value * c.sensitivity
 
             results.append(total)
 

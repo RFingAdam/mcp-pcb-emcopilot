@@ -141,8 +141,12 @@ class TraceAntennaAnalyzer:
         """
         length_m = length_mm / 1000
 
-        # Hammerstad εr_eff using actual w/h ratio when available
-        w_over_h = self.trace_width_mm / self.height_mm if hasattr(self, 'height_mm') and self.height_mm > 0 else 1.0
+        # Hammerstad εr_eff using actual w/h ratio when available (optional
+        # ``trace_width_mm`` / ``height_mm`` are only set by the per-analysis
+        # caller; fall back to 1.0 when they weren't provided).
+        trace_w = getattr(self, 'trace_width_mm', 0.0)
+        height = getattr(self, 'height_mm', 0.0)
+        w_over_h = trace_w / height if trace_w and height and height > 0 else 1.0
         f_wh = (1 + 12 / max(w_over_h, 0.1)) ** (-0.5)
         er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * f_wh
 

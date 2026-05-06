@@ -16,10 +16,7 @@ from __future__ import annotations
 import logging
 import math
 import re
-from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
-
-from ...models.pcb_data import PCBDesignData
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +225,10 @@ class SMPSLoopAnalyzer:
                 loop_description = f"Estimated: {ic_ref}->{nearest_inductor.reference} (no cap found)"
                 detail_distances = {"ic_to_inductor_mm": round(d, 2)}
             else:
+                # The earlier ``continue`` guarantees at least one association
+                # is non-None, and the elif above handled the inductor-only
+                # branch — so ``nearest_cap`` must be present here.
+                assert nearest_cap is not None
                 cap_x = getattr(nearest_cap, "x_mm", 0.0)
                 cap_y = getattr(nearest_cap, "y_mm", 0.0)
                 d = _distance_mm(ic_x, ic_y, cap_x, cap_y)

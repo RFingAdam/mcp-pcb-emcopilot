@@ -68,8 +68,10 @@ def parse_eng_notation(value_str: str) -> float:
     # Try plain float
     try:
         return float(s)
-    except ValueError:
-        raise ValueError(f"Cannot parse engineering notation: '{value_str}'")
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot parse engineering notation: '{value_str}'"
+        ) from e
 
 
 def _parse_triplet(parts: list[str]) -> dict[str, float]:
