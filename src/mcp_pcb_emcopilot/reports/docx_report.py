@@ -8,12 +8,15 @@ Optional dependency: python-docx (pip install python-docx).
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
 from typing import Optional
 
 from ..models.pcb_data import PCBDesignData
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -51,11 +54,11 @@ def _check_docx():
     try:
         from docx import Document  # noqa: F401
         return True
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "python-docx is required for DOCX report generation. "
             "Install with: pip install python-docx"
-        )
+        ) from e
 
 
 # ---------------------------------------------------------------------------
@@ -225,8 +228,10 @@ def generate_all_renders(
             svg = renderer.render_board(highlight_nets=nets)
             out = os.path.join(output_dir, f"nets_{group_label}.png")
             results[f"nets_{group_label}"] = svg_to_png(svg, out, width=width_px)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "net-group render failed for %r: %s", group_label, e, exc_info=True,
+            )
 
     # Annotated board with findings
     if design.review_results:
@@ -246,8 +251,10 @@ def generate_all_renders(
             safe = net_name.replace("/", "_").replace(" ", "_")
             out = os.path.join(output_dir, f"net_{safe}.png")
             results[f"net_{net_name}"] = svg_to_png(svg, out, width=width_px)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "individual-net render failed for %r: %s", net_name, e, exc_info=True,
+            )
 
     return results
 

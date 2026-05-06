@@ -7,14 +7,16 @@ report sections (skipping empty ones), and outputs DOCX + HTML.
 
 from __future__ import annotations
 
+import logging
 import os
-import uuid
 from datetime import datetime
 from typing import Any, Optional
 
 from ..models.pcb_data import PCBDesignData
 from .section_registry import REPORT_SECTIONS, SectionDef
 from .tracked_finding import TrackedFinding
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Domain key -> finding-ID prefix mapping
@@ -67,8 +69,18 @@ _DOMAIN_PREFIXES: dict[str, str] = {
 
 
 def _prefix_for(domain: str) -> str:
-    """Return the finding-ID prefix for *domain*, falling back to first 3 chars."""
-    return _DOMAIN_PREFIXES.get(domain, domain[:3].upper() or "GEN")
+    """Return the finding-ID prefix for *domain*.
+
+    Falls back to the first three *letters* of the domain name (so a domain
+    like ``"emc_something"`` becomes ``EMC`` rather than ``EM_`` — the
+    underscore would otherwise fail :class:`TrackedFinding`'s
+    ``^[A-Z]+-\\d{3}$`` validator).
+    """
+    mapped = _DOMAIN_PREFIXES.get(domain)
+    if mapped:
+        return mapped
+    letters = "".join(c for c in domain.upper() if c.isalpha())[:3]
+    return letters or "GEN"
 
 
 # ---------------------------------------------------------------------------
@@ -673,8 +685,8 @@ class ReportBuilder:
                 target_ohm=target, tolerance_pct=10.0,
                 trace_type=trace_type, status=status,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 2. Eye Diagram ------------------------------------------
         try:
@@ -701,8 +713,8 @@ class ReportBuilder:
                     "spec_name": "DDR", "status": hs_status,
                 }
             plots["eye_diagram"] = plotter.eye_diagram(**eye_kw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 3. S-Parameters (Insertion/Return Loss) -----------------
         try:
@@ -712,8 +724,8 @@ class ReportBuilder:
                 s_kw["s21_limit_db"] = s_cache.get("limit_db", -3.0)
                 s_kw["channel_name"] = s_cache.get("channel", "DDR Channel")
             plots["s_parameters"] = plotter.s_parameter_plot(**s_kw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 4. PDN Impedance ----------------------------------------
         try:
@@ -748,8 +760,8 @@ class ReportBuilder:
                 rail_voltage=rail_v, load_current_a=load_a,
                 ripple_pct=ripple, status=pdn_status,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 5. Clock EMI Spectrum -----------------------------------
         try:
@@ -763,8 +775,8 @@ class ReportBuilder:
                 clk_kw["rise_time_ns"] = clk_cache.get("rise_time_ns", 0.5)
                 clk_kw["trace_length_mm"] = clk_cache.get("trace_length_mm", 25.0)
             plots["clock_emi"] = plotter.clock_emi_spectrum(**clk_kw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 6. CISPR 25 Compliance ----------------------------------
         try:
@@ -777,8 +789,8 @@ class ReportBuilder:
                 cispr_kw["clock_mhz"] = auto_cache.get("clock_frequency_mhz", 100.0)
                 cispr_kw["cispr_class"] = auto_cache.get("cispr_class", 3)
             plots["cispr25"] = plotter.cispr25_compliance(**cispr_kw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 7. Cavity Resonance -------------------------------------
         try:
@@ -788,8 +800,8 @@ class ReportBuilder:
                 er=4.2,
                 status=_domain_status("power_integrity"),
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 8. Thermal Budget ---------------------------------------
         try:
@@ -801,8 +813,8 @@ class ReportBuilder:
             plots["thermal"] = plotter.thermal_budget(
                 ambient_c=ambient, status=th_status,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 9. Conducted Emissions ----------------------------------
         try:
@@ -817,8 +829,8 @@ class ReportBuilder:
                 ce_kw["rise_time_ns"] = ce_cache.get("rise_time_ns", 15.0)
                 ce_kw["input_voltage"] = ce_cache.get("input_voltage", 5.0)
             plots["conducted_emissions"] = plotter.conducted_emissions_plot(**ce_kw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 10. Near-Field EMI --------------------------------------
         try:
@@ -829,8 +841,8 @@ class ReportBuilder:
                 ],
                 status=_domain_status("emc"),
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 11. Filter Response -------------------------------------
         try:
@@ -838,8 +850,8 @@ class ReportBuilder:
                 topology="Pi-filter", cutoff_frequency_mhz=30.0,
                 status="PASS",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # ---- 12. Immunity Margin -------------------------------------
         try:
@@ -851,8 +863,8 @@ class ReportBuilder:
                 interface_results=interface_results,
                 status=_domain_status("immunity") if _has_domain("immunity") else "WARNING",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("simulation-plot generation failed: %s", e, exc_info=True)
 
         # Filter out any empty paths
         return {k: v for k, v in plots.items() if v and os.path.exists(v)}
@@ -871,16 +883,10 @@ class ReportBuilder:
         """Assemble DOCX report. Returns (path, sections_generated, sections_skipped)."""
         from .docx_report import (
             _check_docx,
-            _set_cell_shading,
-            add_finding_box,
-            add_image_with_caption,
-            add_styled_table,
         )
         _check_docx()
         from docx import Document
         from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.oxml import parse_xml
-        from docx.oxml.ns import nsdecls, qn
         from docx.shared import Inches, Pt, RGBColor
 
         sim_plots = sim_plots or {}
@@ -1820,7 +1826,6 @@ class ReportBuilder:
         all_findings: list[TrackedFinding], verdict: str,
         sim_plots: Optional[dict[str, str]] = None,
     ) -> None:
-        from docx.shared import Pt
 
         from .docx_report import add_styled_table
 
@@ -2035,7 +2040,7 @@ class ReportBuilder:
     ) -> None:
         from docx.shared import Pt, RGBColor
 
-        from .docx_report import add_finding_box, add_styled_table
+        from .docx_report import add_styled_table
 
         doc.add_heading(f"{sect.number}. {sect.title}", level=1)
 

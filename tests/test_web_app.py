@@ -9,7 +9,7 @@ import pytest
 # Flask may not be installed
 flask_available = True
 try:
-    import flask
+    import flask  # noqa: F401 — availability check only
 except ImportError:
     flask_available = False
 

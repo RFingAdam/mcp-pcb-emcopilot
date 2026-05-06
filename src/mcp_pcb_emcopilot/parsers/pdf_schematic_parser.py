@@ -144,7 +144,7 @@ class PDFSchematicParser:
         if self._fitz is not None:
             return True
         try:
-            import fitz  # type: ignore[import-untyped]
+            import fitz
             self._fitz = fitz
             return True
         except ImportError:
@@ -199,7 +199,7 @@ class PDFSchematicParser:
     def _parse_with_fitz(self, result: PDFSchematicResult) -> None:
         """Extract text and images using PyMuPDF."""
         fitz = self._fitz
-        doc = fitz.open(result.file_path)  # type: ignore[union-attr]
+        doc = fitz.open(result.file_path)
         try:
             result.page_count = len(doc)
 
@@ -320,7 +320,7 @@ class PDFSchematicParser:
             return None
 
         fitz = self._fitz
-        doc = fitz.open(file_path)  # type: ignore[union-attr]
+        doc = fitz.open(file_path)
         try:
             if page_number < 1 or page_number > len(doc):
                 raise ValueError(
@@ -329,7 +329,7 @@ class PDFSchematicParser:
 
             page = doc[page_number - 1]
             zoom = dpi / 72.0
-            mat = fitz.Matrix(zoom, zoom)  # type: ignore[union-attr]
+            mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat)
 
             os.makedirs(output_dir, exist_ok=True)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # ISO 11452 field strength and BCI levels (duplicated from automotive_emc

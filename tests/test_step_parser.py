@@ -4,8 +4,6 @@ Tests STEP text parsing with inline mock STEP content, component extraction,
 clearance calculation, enclosure fit check, and dispatch through server.py.
 """
 
-import json
-import math
 import os
 import sys
 import tempfile

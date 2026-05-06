@@ -11,8 +11,6 @@ import math
 import pytest
 
 from mcp_pcb_emcopilot.analyzers.signal_integrity.return_path_viz import (
-    C0,
-    EPS0,
     MU0,
     SIGMA_CU,
     ReturnPathVisualizer,

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import re
-from collections import Counter
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)

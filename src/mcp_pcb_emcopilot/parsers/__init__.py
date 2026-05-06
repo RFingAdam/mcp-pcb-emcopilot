@@ -55,8 +55,8 @@ def detect_format(file_path: str) -> str:
                     return "allegro"
                 if "ALLEGRO" in header.upper() or "ORCAD" in header.upper():
                     return "allegro"
-        except Exception:
-            pass
+        except OSError as e:
+            logger.debug("format-sniff read failed for %s: %s", file_path, e)
         return "allegro"
     elif ext in (".xml", ".cvg"):
         # Could be IPC-2581 or other XML — check content
@@ -65,8 +65,8 @@ def detect_format(file_path: str) -> str:
                 header = f.read(1000)
                 if "IPC-2581" in header or "Stackup" in header:
                     return "ipc2581"
-        except Exception:
-            pass
+        except OSError as e:
+            logger.debug("format-sniff read failed for %s: %s", file_path, e)
         return "ipc2581"
     elif ext in (".step", ".stp"):
         return "step"
@@ -85,8 +85,8 @@ def detect_format(file_path: str) -> str:
                     return "allegro"
                 if "ALLEGRO" in header.upper() or "ORCAD" in header.upper():
                     return "allegro"
-        except Exception:
-            pass
+        except OSError as e:
+            logger.debug("format-sniff read failed for %s: %s", file_path, e)
         return "unknown"
     else:
         return "unknown"
@@ -156,7 +156,8 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
 def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
     """Wrap a format-specific parser with error handling."""
     try:
-        return parser_fn(file_path)  # type: ignore[no-any-return]
+        result: PCBDesignData = parser_fn(file_path)
+        return result
     except ParseError:
         raise  # Re-raise our own errors as-is
     except Exception as e:
@@ -172,7 +173,7 @@ def _parse_kicad(file_path: str) -> PCBDesignData:
     from .kicad_pcb_parser import KiCadPcbParser
 
     parser = KiCadPcbParser()
-    board = parser.parse_file(file_path)  # type: ignore[attr-defined]
+    board = parser.parse_file(file_path)
 
     data = PCBDesignData(
         source_file=file_path,
@@ -427,11 +428,13 @@ def _parse_altium(file_path: str) -> PCBDesignData:
     """Parse Altium .PcbDoc into PCBDesignData."""
     try:
         from .altium_parser import AltiumPcbParser
-    except ImportError:
-        raise ImportError("Altium parser requires 'olefile' package: pip install olefile")
+    except ImportError as e:
+        raise ImportError(
+            "Altium parser requires 'olefile' package: pip install olefile"
+        ) from e
 
-    parser = AltiumPcbParser()  # type: ignore[attr-defined]
-    board = parser.parse(file_path)  # type: ignore[attr-defined]
+    parser = AltiumPcbParser()
+    board = parser.parse(file_path)
 
     data = PCBDesignData(
         source_file=file_path,
@@ -579,8 +582,8 @@ def _parse_ipc2581(file_path: str) -> PCBDesignData:
     """Parse IPC-2581 XML into PCBDesignData."""
     from .ipc2581_parser import IPC2581Parser
 
-    parser = IPC2581Parser()  # type: ignore[attr-defined]
-    ipc = parser.parse(file_path)  # type: ignore[attr-defined]
+    parser = IPC2581Parser()
+    ipc = parser.parse(file_path)
 
     data = PCBDesignData(
         source_file=file_path,
@@ -629,7 +632,7 @@ def _parse_step(file_path: str) -> PCBDesignData:
     from .step_parser import STEPParser
 
     parser = STEPParser()
-    result = parser.parse_file(file_path)  # type: ignore[attr-defined]
+    result = parser.parse_file(file_path)
 
     board_3d = result.get("board_3d", {})
     step_components = result.get("step_components", [])
@@ -669,4 +672,4 @@ def parse_schematic_pdf(file_path: str) -> PDFSchematicResult:
     from .pdf_schematic_parser import PDFSchematicParser
 
     parser = PDFSchematicParser()
-    return parser.parse(file_path)  # type: ignore[no-any-return]
+    return parser.parse(file_path)

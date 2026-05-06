@@ -4,7 +4,6 @@ Creates mock PCBDesignData and exercises all four visualization MCP tools
 through their dispatch handlers.
 """
 
-import json
 import os
 import sys
 

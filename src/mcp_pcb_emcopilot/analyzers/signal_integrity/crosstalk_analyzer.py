@@ -14,8 +14,6 @@ import math
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-from ...models.pcb_data import PCBDesignData
-
 logger = logging.getLogger(__name__)
 
 # High-speed net categories that warrant crosstalk analysis

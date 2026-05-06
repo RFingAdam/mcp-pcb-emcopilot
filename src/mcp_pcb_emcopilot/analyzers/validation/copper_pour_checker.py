@@ -16,8 +16,6 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List
 
-from ...models.pcb_data import PCBDesignData
-
 logger = logging.getLogger(__name__)
 
 # Thresholds
@@ -83,7 +81,11 @@ class CopperPourChecker:
                         "area_mm2": round(area_mm2, 4),
                     })
 
-                # Check for non-ground pours (potential misassignment)
+                # Check for non-ground pours (potential misassignment).
+                # ``net_name`` is a ``str | None``; the earlier ``if is_floating``
+                # branch handled the None case, but narrow explicitly for mypy.
+                if net_name is None:
+                    continue
                 name_upper = net_name.upper()
                 is_ground = any(kw in name_upper for kw in _GROUND_KEYWORDS)
                 is_power = any(

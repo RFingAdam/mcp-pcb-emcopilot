@@ -5,12 +5,9 @@ import math
 
 import pytest
 
-from mcp_pcb_emcopilot.analyzers.emc.automotive_emc import CISPR25_CONDUCTED_LIMITS
 from mcp_pcb_emcopilot.analyzers.emc.conducted_emissions import (
-    FCC_PART15_CONDUCTED_LIMITS,
     ConductedEmissionAnalysis,
     ConductedEmissionAnalyzer,
-    ConductedEmissionFinding,
     LISNModel,
 )
 
@@ -188,7 +185,7 @@ class TestSMPSHarmonics:
             duty_cycle=0.5, rise_time_ns=20.0, num_harmonics=5,
             input_filter_db=20.0,
         )
-        for nf, f in zip(h_no_filter, h_filtered):
+        for nf, f in zip(h_no_filter, h_filtered, strict=False):
             assert f["level_dbuv"] < nf["level_dbuv"]
             assert abs(nf["level_dbuv"] - f["level_dbuv"] - 20.0) < 0.1
 

@@ -8,7 +8,6 @@ Tests the following without requiring a real PDF file or PyMuPDF:
 - SchematicLayoutValidator cross-reference
 """
 
-import json
 import os
 import sys
 import tempfile

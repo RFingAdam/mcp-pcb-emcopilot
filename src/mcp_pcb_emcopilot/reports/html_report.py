@@ -21,7 +21,7 @@ import re
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from ..models.pcb_data import PCBDesignData
 

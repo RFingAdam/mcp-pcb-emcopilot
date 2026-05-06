@@ -1,10 +1,7 @@
 """Tests for the interactive HTML report generator."""
 
 import os
-import re
 import tempfile
-
-import pytest
 
 from mcp_pcb_emcopilot.models.pcb_data import (
     PCBComponent,

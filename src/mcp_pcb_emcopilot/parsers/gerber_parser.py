@@ -10,14 +10,43 @@ Supports full RS-274X specification including:
 """
 from __future__ import annotations
 
+import ast
 import logging
 import math
+import operator as _op
 import re
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_SAFE_BINOPS: Dict[type, Callable[[float, float], float]] = {
+    ast.Add: _op.add,
+    ast.Sub: _op.sub,
+    ast.Mult: _op.mul,
+    ast.Div: _op.truediv,
+}
+_SAFE_UNARYOPS: Dict[type, Callable[[float], float]] = {
+    ast.UAdd: _op.pos,
+    ast.USub: _op.neg,
+}
+
+
+def _safe_eval_arith(node: ast.AST) -> float:
+    """Recursively evaluate an arithmetic-only AST. Raises ValueError on unsupported nodes."""
+    if isinstance(node, ast.Expression):
+        return _safe_eval_arith(node.body)
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return float(node.value)
+        raise ValueError(f"non-numeric constant: {node.value!r}")
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _SAFE_UNARYOPS:
+        return float(_SAFE_UNARYOPS[type(node.op)](_safe_eval_arith(node.operand)))
+    if isinstance(node, ast.BinOp) and type(node.op) in _SAFE_BINOPS:
+        return float(_SAFE_BINOPS[type(node.op)](
+            _safe_eval_arith(node.left), _safe_eval_arith(node.right),
+        ))
+    raise ValueError(f"disallowed expression node: {type(node).__name__}")
 
 logger = logging.getLogger(__name__)
 
@@ -108,25 +137,25 @@ class ApertureMacro:
         return result
 
     def _evaluate_expression(self, expr: str) -> float:
-        """Evaluate a simple arithmetic expression"""
-        expr = expr.strip()
+        """Evaluate a Gerber aperture-macro arithmetic expression.
 
-        # Handle simple number
+        Supports only the operators Gerber aperture macros use:
+        ``+ - * / x X`` and parentheses over numeric literals. Parsed via
+        :mod:`ast` with a whitelist walk so untrusted aperture-macro
+        strings can never execute code.
+        """
+        expr = expr.strip()
         try:
             return float(expr)
         except ValueError:
             pass
 
-        # Handle expressions with x (multiply), +, -, /
-        # Replace x with * for eval
         expr = expr.replace('x', '*').replace('X', '*')
-
         try:
-            # Use a safe eval with only math operations
-            allowed: dict[str, Any] = {'__builtins__': {}}
-            return float(eval(expr, allowed, {}))
-        except Exception as e:
-            logger.debug(f"Failed to evaluate expression '{expr}': {e}")
+            tree = ast.parse(expr, mode='eval')
+            return _safe_eval_arith(tree)
+        except (SyntaxError, ValueError, ZeroDivisionError) as e:
+            logger.debug("Failed to evaluate expression '%s': %s", expr, e)
             return 0.0
 
 
@@ -381,20 +410,17 @@ class GerberParser:
 
         Returns:
             GerberData with all extracted features
-        """  # type: ignore[assignment]
-        file_path = Path(file_path)  # type: ignore[assignment]
-  # type: ignore[attr-defined]
-        if not file_path.exists():  # type: ignore[attr-defined]
-            raise FileNotFoundError(f"Gerber file not found: {file_path}")
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Gerber file not found: {path}")
 
-        data = GerberData(source_file=str(file_path))
+        data = GerberData(source_file=str(path))
 
-        # Infer layer type from filename  # type: ignore[attr-defined]
-        self._infer_layer_type(file_path.name, data)  # type: ignore[attr-defined]
+        self._infer_layer_type(path.name, data)
 
-        # Read and parse content
         try:
-            with open(file_path, encoding='utf-8', errors='ignore') as f:
+            with open(path, encoding='utf-8', errors='ignore') as f:
                 content = f.read()
 
             self._parse_content(content, data)

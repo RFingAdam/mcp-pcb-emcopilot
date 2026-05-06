@@ -47,10 +47,14 @@ dev = [
     "mypy>=1.10",
     "cairosvg>=2.7",
     "python-docx>=1.1",
+    "flask>=3.0",
 ]
 report = [
     "cairosvg>=2.7",
     "python-docx>=1.1",
+]
+web = [
+    "flask>=3.0",
 ]
 
 [project.urls]
@@ -76,20 +80,30 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = [
-    "E501",   # line too long
-    "E741",   # ambiguous variable names (l, I, O) — common in engineering formulas
-    "UP006",  # use X | Y instead of Union (not supported in Python 3.9)
-    "UP045",  # use X | Y instead of Optional
-    "F401",   # imported but unused — re-exports in __init__.py
-    "F841",   # local variable assigned but never used — intermediate calculations
-    "B007",   # loop control variable not used — intentional patterns
-    "B011",   # assert False — used in test stubs
-    "B904",   # raise without from — pre-existing pattern
-    "B905",   # zip without strict= — pre-existing pattern
-    "UP035",  # deprecated typing imports — supporting Python 3.9+
+    "E501",   # line too long — 120-col limit handles readability
+    "E741",   # ambiguous names (l, I, O) — engineering formulas routinely use these
     "E701",   # multiple statements on one line — compact patterns
-    "E722",   # bare except — pre-existing pattern
+    "UP006",  # use X | Y instead of Union — supporting Python 3.9+
+    "UP007",  # use X | Y instead of Optional — supporting Python 3.9+
+    "UP035",  # deprecated typing imports — supporting Python 3.9+
+    "UP038",  # isinstance(x, (A, B)) → A | B — idiomatic tuple is fine
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py intentionally re-exports many names
+"**/__init__.py" = ["F401"]
+# Test fixtures have unused args/vars by pytest convention
+"tests/**/*.py" = ["F841", "B007", "B011"]
+# Intermediate calculations in analyzers/classifiers/parsers/reports are often
+# named to document the formula step (e.g. complementary modulus ``k0_prime``)
+# even if not re-referenced. Losing the name reduces the readability of the
+# implementation — analyzer correctness is enforced by tests, not unused-var.
+"src/mcp_pcb_emcopilot/analyzers/**/*.py" = ["F841", "B007"]
+"src/mcp_pcb_emcopilot/classifiers/**/*.py" = ["F841", "B007"]
+"src/mcp_pcb_emcopilot/parsers/**/*.py" = ["F841", "B007"]
+"src/mcp_pcb_emcopilot/reports/**/*.py" = ["F841", "B007"]
+"src/mcp_pcb_emcopilot/server.py" = ["F841"]
+"src/mcp_pcb_emcopilot/orchestrator.py" = ["F841"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -105,6 +119,31 @@ module = [
     "mcp_pcb_emcopilot.analyzers.emc.filter_design",
 ]
 ignore_errors = true
+
+# Dispatch-style modules: 100+-branch ``if name == "..."`` functions
+# rebind the same local names (``analyzer``, ``renderer``, ``parser``) to
+# different classes per branch by design. mypy cannot track the union
+# without a tag, and peppering every branch with ``# type: ignore`` tokens
+# both fails to silence the real issue (the rebinding) and clutters the
+# code. The runtime contract is enforced by the comprehensive smoke test
+# in ``tests/test_all_tools_smoke.py`` which invokes every branch.
+[[tool.mypy.overrides]]
+module = [
+    "mcp_pcb_emcopilot.server",
+]
+ignore_errors = true
+
+# ``current_profiler`` and ``review_context`` read deeply-nested dicts of
+# mixed numeric types (int / float / Decimal) via ``dict.get("key", 0)``.
+# Each call is correct at runtime — the helper's return type is narrower
+# than the dict-value union, so ``warn_return_any`` fires on every lookup.
+# Suppressing at module level keeps the rule useful elsewhere.
+[[tool.mypy.overrides]]
+module = [
+    "mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler",
+    "mcp_pcb_emcopilot.review_context",
+]
+disable_error_code = ["no-any-return"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

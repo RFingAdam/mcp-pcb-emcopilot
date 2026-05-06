@@ -8,7 +8,6 @@ Pure Python, no external dependencies (SVG is XML text).
 
 from __future__ import annotations
 
-import math
 from typing import Optional
 from xml.sax.saxutils import escape
 

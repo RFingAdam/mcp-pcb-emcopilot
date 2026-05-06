@@ -1,7 +1,5 @@
 """Tests for the Allegro/OrCAD PCB parser."""
 
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -9,7 +7,6 @@ import pytest
 from mcp_pcb_emcopilot.errors import ParseError
 from mcp_pcb_emcopilot.parsers import detect_format, parse_pcb_file
 from mcp_pcb_emcopilot.parsers.allegro_parser import (
-    AllegroBoardData,
     AllegroParser,
     _map_layer_name,
 )

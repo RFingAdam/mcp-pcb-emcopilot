@@ -4,12 +4,10 @@ from __future__ import annotations
 import pytest
 
 from mcp_pcb_emcopilot.analyzers.emc.automotive_emc import (
-    CISPR25_CONDUCTED_LIMITS,
     CISPR25_RADIATED_LIMITS,
     ISO11452_BCI_LEVELS,
     ISO11452_FIELD_LEVELS,
     AutomotiveComplianceResult,
-    AutomotiveEMCAnalysis,
     AutomotiveEMCAnalyzer,
 )
 

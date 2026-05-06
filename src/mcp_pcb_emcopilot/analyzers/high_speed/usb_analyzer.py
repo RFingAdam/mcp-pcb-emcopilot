@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 # Speed of light in mm/ps
 SPEED_OF_LIGHT_MM_PS = 299.792458

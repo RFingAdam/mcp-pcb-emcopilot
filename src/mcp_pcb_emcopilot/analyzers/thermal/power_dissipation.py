@@ -6,7 +6,6 @@ components with high thermal loads.
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -326,13 +325,13 @@ class PowerDissipationAnalyzer:
         peak_loc = (0.0, 0.0)
         if board_area_cm2 and board_area_cm2 > 0:
             # Simple estimate: highest power component density
-            for comp in analyzed:  # type: ignore
+            for cp in analyzed:
                 # Assume component area based on package (rough estimate)
                 comp_area_cm2 = 0.5  # Default
-                density = comp.power_dissipation_w / comp_area_cm2  # type: ignore
+                density = cp.power_dissipation_w / comp_area_cm2
                 if density > peak_density:
                     peak_density = density
-                    peak_loc = comp.position  # type: ignore
+                    peak_loc = cp.position
 
         score = self._calculate_score(issues, total_power, analyzed)
 

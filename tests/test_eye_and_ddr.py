@@ -10,8 +10,6 @@ Covers:
 - MCP tool dispatch for all three new tools
 """
 
-import json
-import math
 import os
 import sys
 

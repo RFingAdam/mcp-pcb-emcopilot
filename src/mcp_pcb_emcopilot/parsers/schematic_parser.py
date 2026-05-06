@@ -11,7 +11,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class KiCadSchematicParser:
 
         except Exception as e:
             logger.error(f"Failed to parse KiCad schematic: {e}")
-            raise ValueError(f"KiCad schematic parse error: {str(e)}")
+            raise ValueError(f"KiCad schematic parse error: {str(e)}") from e
 
     def _parse_kicad_sch(self, content: str) -> None:
         """Parse KiCad schematic S-expression content."""
@@ -234,14 +234,18 @@ class SchematicParserFactory:
     """Factory to create appropriate parser based on file type."""
 
     @staticmethod
-    def create_parser(file_path: str) -> KiCadSchematicParser | object:
+    def create_parser(file_path: str) -> Any:
         """Create parser based on file extension.
 
         Args:
             file_path: Path to schematic file
 
         Returns:
-            Appropriate parser instance
+            A parser instance whose ``.parse(file_path)`` returns
+            :class:`ParsedSchematicData`. Typed as ``Any`` because the
+            concrete class varies by extension (``KiCadSchematicParser``,
+            ``AltiumSchematicParser``) and they share a duck-typed parse
+            surface rather than an abstract base class.
 
         Raises:
             ValueError: If file type is not supported
@@ -275,4 +279,5 @@ class SchematicParserFactory:
             ValueError: If file format is not supported
         """
         parser = SchematicParserFactory.create_parser(file_path)
-        return parser.parse(file_path)  # type: ignore[no-any-return, attr-defined]
+        result: ParsedSchematicData = parser.parse(file_path)
+        return result

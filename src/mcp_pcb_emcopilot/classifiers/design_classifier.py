@@ -4,9 +4,8 @@ Classifies a design by type (RF, mixed-signal, digital, power, etc.)
 and computes a complexity score based on the design characteristics.
 """
 
-import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from ..models.pcb_data import PCBDesignData
 from .interface_detector import InterfaceDetectionResult, InterfaceDetector
@@ -62,7 +61,7 @@ class DesignClassificationResult:
 # =============================================================================
 
 # Each design type has scoring rules based on net categories and interfaces
-_TYPE_SIGNALS = {
+_TYPE_SIGNALS: dict[str, dict[str, Any]] = {
     'rf': {
         'net_categories': {'rf': 3.0},
         'interfaces': {'RF': 2.0, 'WiFi': 1.5, 'Bluetooth': 1.5, 'Cellular': 2.0, 'GNSS': 1.5, 'LoRa': 1.5},
@@ -188,7 +187,7 @@ class DesignClassifier:
 
         # Score based on net categories
         for dtype, config in _TYPE_SIGNALS.items():
-            for cat, weight in config['net_categories'].items():  # type: ignore[attr-defined]
+            for cat, weight in config['net_categories'].items():
                 count = cat_counts.get(cat, 0)
                 if count > 0:
                     # Logarithmic scaling so 100 DDR nets don't dominate
@@ -198,7 +197,7 @@ class DesignClassifier:
         # Score based on detected interfaces
         for iface in iface_det.interfaces:
             for dtype, config in _TYPE_SIGNALS.items():
-                for iface_pattern, weight in config['interfaces'].items():  # type: ignore[attr-defined]
+                for iface_pattern, weight in config['interfaces'].items():
                     if iface_pattern.lower() in iface.interface_type.lower():
                         scores[dtype] += weight * iface.confidence
 

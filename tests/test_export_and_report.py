@@ -126,7 +126,7 @@ class TestDocxReport:
     def test_generate_docx_basic(self):
         """generate_docx_report should produce a valid DOCX."""
         try:
-            from docx import Document
+            from docx import Document  # noqa: F401 — availability check only
         except ImportError:
             pytest.skip("python-docx not installed")
 
@@ -157,7 +157,7 @@ class TestDocxReport:
     def test_generate_docx_with_images(self):
         """generate_docx_report should embed images from image_dir."""
         try:
-            from docx import Document
+            from docx import Document  # noqa: F401 — availability check only
         except ImportError:
             pytest.skip("python-docx not installed")
 
@@ -187,7 +187,7 @@ class TestDocxReport:
     def test_generate_docx_with_review_results(self):
         """generate_docx_report should include review findings."""
         try:
-            from docx import Document
+            from docx import Document  # noqa: F401 — availability check only
         except ImportError:
             pytest.skip("python-docx not installed")
 

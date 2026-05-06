@@ -20,7 +20,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -658,7 +658,7 @@ class CrossValidator:
             if num1 == 0 or num2 == 0:
                 return num1 == num2
             diff_percent = abs(num1 - num2) / max(num1, num2) * 100
-            return diff_percent <= self.value_tolerance_percent  # type: ignore[no-any-return]
+            return bool(diff_percent <= self.value_tolerance_percent)
 
         # String comparison with normalization
         return self._normalize_value(val1) == self._normalize_value(val2)

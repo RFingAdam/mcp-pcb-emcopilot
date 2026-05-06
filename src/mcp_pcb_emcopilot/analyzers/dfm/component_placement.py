@@ -278,8 +278,9 @@ class PlacementAnalyzer:
                 min_clearance = min(min_clearance, clearance)
 
                 # Get minimum required clearance
-                types = tuple(sorted([c1.component_type, c2.component_type]))
-                min_required = self.MIN_CLEARANCES.get(types, 0.5)  # type: ignore[arg-type]
+                sorted_types = sorted([c1.component_type, c2.component_type])
+                types: tuple[str, str] = (sorted_types[0], sorted_types[1])
+                min_required = self.MIN_CLEARANCES.get(types, 0.5)
 
                 # Also check package-specific clearances
                 for pkg, pkg_clearance in self.PACKAGE_CLEARANCES.items():

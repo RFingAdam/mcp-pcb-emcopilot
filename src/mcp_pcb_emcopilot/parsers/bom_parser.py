@@ -13,7 +13,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class BOMParser:
 
         except Exception as e:
             logger.error(f"Failed to parse BOM: {e}")
-            raise ValueError(f"BOM parse error: {str(e)}")
+            raise ValueError(f"BOM parse error: {str(e)}") from e
 
     def _parse_csv(self, file_path: str) -> ParsedBOMData:
         """Parse CSV BOM file with automatic delimiter detection."""
@@ -108,7 +108,7 @@ class BOMParser:
             try:
                 dialect = sniffer.sniff(sample)
                 delimiter = dialect.delimiter
-            except:
+            except csv.Error:
                 delimiter = ','  # Default to comma
 
         # Parse CSV
@@ -116,7 +116,7 @@ class BOMParser:
             reader = csv.DictReader(f, delimiter=delimiter)
 
             # Map column names to standardized keys
-            column_map = self._map_columns(reader.fieldnames or [])  # type: ignore[arg-type]
+            column_map = self._map_columns(list(reader.fieldnames or []))
 
             for line_num, row in enumerate(reader, start=2):  # Start at 2 (after header)
                 try:
@@ -139,8 +139,10 @@ class BOMParser:
         """Parse Excel BOM file using openpyxl."""
         try:
             import openpyxl
-        except ImportError:
-            raise ValueError("openpyxl not installed. Install with: pip install openpyxl")
+        except ImportError as e:
+            raise ValueError(
+                "openpyxl not installed. Install with: pip install openpyxl"
+            ) from e
 
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         ws = wb.active

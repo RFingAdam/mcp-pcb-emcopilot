@@ -18,7 +18,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class EMCStandard(str, Enum):
@@ -604,7 +603,7 @@ def quick_compliance_check(
     if not trace_lengths_mm:
         return predictor.predict_compliance(standard)
 
-    for i, (freq, length) in enumerate(zip(clock_frequencies_mhz, trace_lengths_mm)):
+    for i, (freq, length) in enumerate(zip(clock_frequencies_mhz, trace_lengths_mm, strict=False)):
         predictor.add_clock(ClockSource(
             name=f"CLK{i}",
             frequency_mhz=freq,

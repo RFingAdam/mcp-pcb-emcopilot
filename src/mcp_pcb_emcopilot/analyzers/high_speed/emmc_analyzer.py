@@ -13,9 +13,7 @@ Analyzes eMMC HS200/HS400 routing for compliance:
 from __future__ import annotations
 
 import logging
-import math
 import re
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ...models.pcb_data import PCBDesignData

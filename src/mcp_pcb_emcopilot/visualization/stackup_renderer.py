@@ -113,7 +113,7 @@ class StackupRenderer:
             f'{self.design.board_thickness_mm:.2f} mm)</text>\n'
         )
 
-        y = top_margin
+        y: float = top_margin
         for i, ly in enumerate(layers):
             h = row_heights[i]
             fill = _layer_colour(ly.layer_type)
@@ -190,7 +190,7 @@ class StackupRenderer:
                 f'class="badge" fill="{fg}" text-anchor="middle">{badge_label}</text>\n'
             )
 
-            y += h  # type: ignore[assignment]
+            y += h
 
         # Total thickness annotation
         parts.append(

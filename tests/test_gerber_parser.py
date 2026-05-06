@@ -181,3 +181,57 @@ class TestGerberEdgeCases:
         parser = GerberParser()
         data = parser.parse(str(old_gerber))
         assert data.format_spec == "RS-274D"
+
+
+class TestApertureMacroExpressionSafety:
+    """Regression tests for the aperture-macro expression evaluator.
+
+    The evaluator used to call ``eval()`` with ``__builtins__: {}`` as its only
+    sandbox, which is not safe — dunder traversal can reach arbitrary callables.
+    It now parses via :mod:`ast` and walks a strict whitelist.
+    """
+
+    @staticmethod
+    def _calc(expr):
+        from mcp_pcb_emcopilot.parsers.gerber_parser import ApertureMacro
+        return ApertureMacro(name="t")._evaluate_expression(expr)
+
+    def test_plain_number(self):
+        assert self._calc("0.254") == 0.254
+
+    def test_basic_arithmetic(self):
+        assert self._calc("1 + 2") == 3.0
+        assert self._calc("10 - 4") == 6.0
+        assert self._calc("3 * 4") == 12.0
+        assert self._calc("10 / 4") == 2.5
+
+    def test_gerber_x_multiplication(self):
+        # Gerber uses ``x`` / ``X`` as the multiply operator in aperture macros.
+        assert self._calc("3x4") == 12.0
+        assert self._calc("3X4") == 12.0
+
+    def test_parentheses_and_unary(self):
+        assert self._calc("-(2 + 3)") == -5.0
+        assert self._calc("(1 + 2) * 3") == 9.0
+
+    def test_rejects_name_reference(self):
+        # Anything resembling an identifier — env lookup, builtin, etc. —
+        # must fall back to 0.0, never raise an import or execute code.
+        assert self._calc("__import__") == 0.0
+        assert self._calc("open") == 0.0
+
+    def test_rejects_function_call(self):
+        assert self._calc("exit()") == 0.0
+        assert self._calc("print(1)") == 0.0
+
+    def test_rejects_attribute_access(self):
+        # The classic sandbox-escape shape targeting object dunders.
+        payload = "(1).__class__.__bases__[0].__subclasses__()"
+        assert self._calc(payload) == 0.0
+
+    def test_rejects_comprehensions_and_lambdas(self):
+        assert self._calc("[x for x in range(10)]") == 0.0
+        assert self._calc("(lambda: 1)()") == 0.0
+
+    def test_division_by_zero_returns_zero(self):
+        assert self._calc("1/0") == 0.0

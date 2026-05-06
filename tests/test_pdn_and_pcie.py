@@ -9,8 +9,6 @@ Exercises:
 - Edge cases and expected failures
 """
 
-import json
-import math
 import os
 import sys
 

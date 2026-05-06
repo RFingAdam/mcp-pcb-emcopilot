@@ -7,12 +7,6 @@ import pytest
 
 from mcp_pcb_emcopilot.analyzers.emc.filter_design import (
     FilterDesigner,
-    FilterDesignResult,
-    FilterSpec,
-    InsertionLossResult,
-    _cmc_impedance,
-    _ferrite_bead_impedance,
-    _lc_lowpass_transfer,
     _pi_filter_transfer,
 )
 

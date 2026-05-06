@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Set
 
 # Component patterns for ICs that need decoupling
 _IC_PATTERNS = [

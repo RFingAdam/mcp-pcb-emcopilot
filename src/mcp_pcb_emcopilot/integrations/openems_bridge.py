@@ -1,12 +1,15 @@
 """Bridge to mcp-openems for full-wave validation of analytical results."""
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from ..analyzers.rf_si.rf_simulation_extractor import SimulationCandidate
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -640,7 +643,7 @@ print(f"Radiated power: {{nf2ff_res.Prad[0]:.6f}} W")
     # Dispatcher: SimulationCandidate -> OpenEMSModel
     # =================================================================
 
-    def generate_from_candidate(self, candidate: "SimulationCandidate") -> OpenEMSModel:
+    def generate_from_candidate(self, candidate: SimulationCandidate) -> OpenEMSModel:
         """Route a SimulationCandidate to the appropriate model generator."""
         st = candidate.structure_type
 
@@ -694,16 +697,33 @@ print(f"Radiated power: {{nf2ff_res.Prad[0]:.6f}} W")
             raise ValueError(f"Unknown structure_type '{st}'")
 
     def generate_batch(
-        self, candidates: list["SimulationCandidate"]
-    ) -> list[OpenEMSModel]:
-        """Generate OpenEMS models for a list of candidates."""
+        self, candidates: list[SimulationCandidate]
+    ) -> tuple[list[OpenEMSModel], list[dict]]:
+        """Generate OpenEMS models for a list of candidates.
+
+        Returns (models, failures). Each failure dict has keys
+        ``candidate_id``, ``structure_type``, ``error_type``, ``error``.
+        Callers that only need models can unpack the first element.
+        """
         models: list[OpenEMSModel] = []
+        failures: list[dict] = []
         for c in candidates:
             try:
                 models.append(self.generate_from_candidate(c))
-            except Exception:
-                pass  # skip candidates that fail
-        return models
+            except Exception as e:
+                candidate_id = getattr(c, "candidate_id", None) or getattr(c, "id", None)
+                structure_type = getattr(c, "structure_type", None)
+                failures.append({
+                    "candidate_id": candidate_id,
+                    "structure_type": structure_type,
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                })
+                logger.warning(
+                    "OpenEMS model generation failed for candidate %s (%s): %s: %s",
+                    candidate_id, structure_type, type(e).__name__, e,
+                )
+        return models, failures
 
     # =================================================================
     # Script generators for coupled-line models

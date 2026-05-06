@@ -357,7 +357,7 @@ class DifferentialPairAnalyzer:
             (1/18.7) * math.log(1 + (u/18.1)**3)
         b = 0.564 * ((er - 0.9) / (er + 3))**0.053
         er_eff = (er + 1) / 2 + ((er - 1) / 2) * (1 + 10/u)**(-a*b)
-        return er_eff  # type: ignore[no-any-return]
+        return float(er_eff)
 
     def _calculate_mode_conversion(
         self, geometry: DiffPairGeometry, z_odd: float, z_even: float
@@ -426,7 +426,7 @@ class DifferentialPairAnalyzer:
         min_spacing_mm: float = 0.1,
         max_spacing_mm: float = 0.5,
         copper_thickness_mm: float = 0.035,
-    ) -> Dict[str, float]:
+    ) -> Optional[Dict[str, float]]:
         """
         Find optimal trace width and spacing for target differential impedance.
 
@@ -479,7 +479,7 @@ class DifferentialPairAnalyzer:
                         "coupling_coefficient": round((z_even - z_odd) / (z_even + z_odd), 4),
                     }
 
-        return best_result  # type: ignore[return-value]
+        return best_result
 
     def analyze_routing_path(
         self,

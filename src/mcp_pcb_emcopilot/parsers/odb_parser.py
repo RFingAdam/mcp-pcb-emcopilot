@@ -10,7 +10,7 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .odb_models import (
     LayerType,
@@ -23,7 +23,6 @@ from .odb_models import (
     ODBLayer,
     ODBNet,
     ODBPad,
-    ODBPadStack,
     ODBPin,
     ODBTrace,
     ODBVia,
@@ -230,14 +229,18 @@ class ODBParser:
         """Extract ODB++ archive (tgz or zip) with path-traversal protection."""
         archive_str = str(archive_path).lower()
 
+        # ``filter='data'`` enforces Python 3.12+ safe tar extraction:
+        # rejects absolute paths, symlinks outside the destination, and
+        # device files. Python 3.14 requires an explicit filter; without
+        # one, extractall emits a DeprecationWarning.
         if archive_str.endswith(('.tgz', '.tar.gz')):
             with tarfile.open(archive_path, 'r:gz') as tar:
                 safe_members = self._validate_tar_members(tar, extract_dir)
-                tar.extractall(extract_dir, members=safe_members)
+                tar.extractall(extract_dir, members=safe_members, filter='data')
         elif archive_str.endswith('.tar'):
             with tarfile.open(archive_path, 'r') as tar:
                 safe_members = self._validate_tar_members(tar, extract_dir)
-                tar.extractall(extract_dir, members=safe_members)
+                tar.extractall(extract_dir, members=safe_members, filter='data')
         elif archive_str.endswith('.zip'):
             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                 self._validate_zip_members(zip_ref, extract_dir)
@@ -1015,9 +1018,9 @@ class ODBParser:
                 elif line.startswith('PIN'):
                     # Pin definition
                     if current_comp:
-                        pin_data = self._parse_pin_line(line)  # type: ignore[assignment]
-                        if pin_data:
-                            current_comp['pins'].append(pin_data)
+                        parsed_pin = self._parse_pin_line(line)
+                        if parsed_pin:
+                            current_comp['pins'].append(parsed_pin)
 
             # Handle last component
             if current_comp:
@@ -1925,5 +1928,5 @@ class ODBParser:
             return self.parse(str(temp_path))
 
         finally:
-            if temp_path.exists():  # type: ignore[attr-defined]
+            if temp_path.exists():
                 temp_path.unlink()

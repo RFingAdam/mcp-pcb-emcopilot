@@ -3,19 +3,27 @@
 These tests use the mixed_signal_4layer KiCad fixture (always available)
 and optionally the real ODB++ test file when present.
 """
-import math
 import os
-import pytest
 from pathlib import Path
 
-from src.mcp_pcb_emcopilot.parsers import parse_pcb_file
-from src.mcp_pcb_emcopilot.classifiers.net_classifier import NetClassifier
-from src.mcp_pcb_emcopilot.classifiers.interface_detector import InterfaceDetector
-from src.mcp_pcb_emcopilot.classifiers.design_classifier import DesignClassifier
-from src.mcp_pcb_emcopilot.orchestrator import run_design_review
+import pytest
+
+from mcp_pcb_emcopilot.classifiers.design_classifier import DesignClassifier
+from mcp_pcb_emcopilot.classifiers.interface_detector import InterfaceDetector
+from mcp_pcb_emcopilot.classifiers.net_classifier import NetClassifier
+from mcp_pcb_emcopilot.orchestrator import run_design_review
+from mcp_pcb_emcopilot.parsers import parse_pcb_file
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
-REAL_ODB = Path("/home/swamp/Downloads/Test/Test_ODB.zip")
+# Optional: point MCP_PCB_REAL_ODB at a real ODB++ .zip to exercise the
+# production parser end-to-end. Falls back to a known dev-workstation path
+# so local runs keep working without config; set it to an empty string to
+# force-skip the class. CI should leave it unset — the path check below
+# will not find the file and the class will skip cleanly.
+_REAL_ODB_ENV = os.environ.get(
+    "MCP_PCB_REAL_ODB", "/home/swamp/Downloads/Test/Test_ODB.zip",
+)
+REAL_ODB = Path(_REAL_ODB_ENV) if _REAL_ODB_ENV else None
 
 
 # =============================================================================
@@ -79,8 +87,8 @@ class TestKiCadFixtureParsing:
 # =============================================================================
 
 @pytest.mark.skipif(
-    not REAL_ODB.exists(),
-    reason="Real ODB++ test file not available at /home/swamp/Downloads/Test/Test_ODB.zip"
+    REAL_ODB is None or not REAL_ODB.exists(),
+    reason="Set MCP_PCB_REAL_ODB to a real ODB++ .zip to enable this class.",
 )
 class TestRealODBParsing:
     """Integration tests using real Trimble Porpoise ODB++ design."""
@@ -230,55 +238,55 @@ class TestAnalyzerImports:
     """Verify all new analyzers can be imported."""
 
     def test_import_emmc(self):
-        from src.mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer import EMMCAnalyzer
+        from mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer import EMMCAnalyzer
         assert EMMCAnalyzer
 
     def test_import_sdio(self):
-        from src.mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer import SDIOAnalyzer
+        from mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer import SDIOAnalyzer
         assert SDIOAnalyzer
 
     def test_import_halow(self):
-        from src.mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer import HaLowAnalyzer
+        from mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer import HaLowAnalyzer
         assert HaLowAnalyzer
 
     def test_import_gnss(self):
-        from src.mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer import GNSSAnalyzer
+        from mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer import GNSSAnalyzer
         assert GNSSAnalyzer
 
     def test_import_coexistence(self):
-        from src.mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer import CoexistenceAnalyzer
+        from mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer import CoexistenceAnalyzer
         assert CoexistenceAnalyzer
 
     def test_import_impedance_validator(self):
-        from src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import ImpedanceValidator
+        from mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import ImpedanceValidator
         assert ImpedanceValidator
 
     def test_import_trace_current(self):
-        from src.mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator import TraceCurrentValidator
+        from mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator import TraceCurrentValidator
         assert TraceCurrentValidator
 
     def test_import_decap_checker(self):
-        from src.mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker import DecapAdequacyChecker
+        from mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker import DecapAdequacyChecker
         assert DecapAdequacyChecker
 
     def test_import_current_profiler(self):
-        from src.mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler import CurrentProfiler
+        from mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler import CurrentProfiler
         assert CurrentProfiler
 
     def test_import_diff_pair_checker(self):
-        from src.mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker import DiffPairWidthChecker
+        from mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker import DiffPairWidthChecker
         assert DiffPairWidthChecker
 
     def test_import_copper_pour(self):
-        from src.mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker import CopperPourChecker
+        from mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker import CopperPourChecker
         assert CopperPourChecker
 
     def test_import_smps_loop(self):
-        from src.mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer import SMPSLoopAnalyzer
+        from mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer import SMPSLoopAnalyzer
         assert SMPSLoopAnalyzer
 
     def test_import_review_context(self):
-        from src.mcp_pcb_emcopilot.review_context import get_review_questions, ReviewContext
+        from mcp_pcb_emcopilot.review_context import ReviewContext, get_review_questions
         assert get_review_questions
         assert ReviewContext
 
@@ -306,40 +314,40 @@ class TestAnalyzersOnFixture:
         return findings
 
     def test_emmc_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer", "EMMCAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer", "EMMCAnalyzer", design, net_cls)
 
     def test_sdio_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer", "SDIOAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer", "SDIOAnalyzer", design, net_cls)
 
     def test_halow_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer", "HaLowAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer", "HaLowAnalyzer", design, net_cls)
 
     def test_gnss_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer", "GNSSAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer", "GNSSAnalyzer", design, net_cls)
 
     def test_coexistence_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer", design, net_cls)
 
     def test_impedance_validator(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator", design, net_cls)
 
     def test_trace_current_validator(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator", design, net_cls)
 
     def test_decap_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker", "DecapAdequacyChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker", "DecapAdequacyChecker", design, net_cls)
 
     def test_current_profiler(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler", design, net_cls)
 
     def test_diff_pair_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker", "DiffPairWidthChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker", "DiffPairWidthChecker", design, net_cls)
 
     def test_copper_pour_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker", design, net_cls)
 
     def test_smps_loop_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer", "SMPSLoopAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer", "SMPSLoopAnalyzer", design, net_cls)
 
 
 class TestImpedanceCalculations:
@@ -347,21 +355,19 @@ class TestImpedanceCalculations:
 
     def test_microstrip_50ohm(self):
         """Standard 50Ω microstrip: w=0.12mm, h=0.1mm, Er=4.3 → ~50Ω"""
-        from src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import _microstrip_z0
+        from mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import _microstrip_z0
         z = _microstrip_z0(0.12, 0.1, 4.3)
         assert 45 < z < 55, f"Expected ~50Ω, got {z:.1f}Ω"
 
     def test_microstrip_high_impedance(self):
         """Narrow trace over thick dielectric → high impedance"""
-        from src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import _microstrip_z0
+        from mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import _microstrip_z0
         z = _microstrip_z0(0.05, 0.2, 4.3)
         assert z > 80, f"Expected >80Ω for narrow trace, got {z:.1f}Ω"
 
     def test_diff_microstrip_coupling(self):
         """Tighter spacing → lower Z_diff (more coupling)"""
-        from src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import (
-            _diff_microstrip_z0, _microstrip_z0
-        )
+        from mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import _diff_microstrip_z0, _microstrip_z0
         z_se = _microstrip_z0(0.1, 0.1, 4.3)
         z_tight = _diff_microstrip_z0(0.1, 0.15, 0.1, 4.3)  # 0.15mm spacing
         z_loose = _diff_microstrip_z0(0.1, 0.5, 0.1, 4.3)   # 0.5mm spacing
@@ -374,7 +380,7 @@ class TestReviewContext:
     """Test the interactive review context system."""
 
     def test_get_questions(self):
-        from src.mcp_pcb_emcopilot.review_context import get_review_questions
+        from mcp_pcb_emcopilot.review_context import get_review_questions
         design = parse_pcb_file(str(FIXTURE_DIR / "mixed_signal_4layer.kicad_pcb"))
         net_cls = NetClassifier().classify(design)
         ifaces = InterfaceDetector().detect(design, net_cls)
@@ -387,7 +393,7 @@ class TestReviewContext:
             assert "category" in q
 
     def test_review_context_defaults(self):
-        from src.mcp_pcb_emcopilot.review_context import ReviewContext
+        from mcp_pcb_emcopilot.review_context import ReviewContext
         ctx = ReviewContext({})
         assert ctx.get_emmc_mode() in ("HS200", "HS400", "legacy")
         assert ctx.get_impedance_target("rf") > 0

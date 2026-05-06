@@ -10,7 +10,7 @@ import cmath
 import math
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import numpy as np
 
@@ -61,7 +61,7 @@ class SParameterResult:
         max_s21 = max(self.s21_db)
         threshold = max_s21 - 3.0
         # Find frequency range where S21 > threshold
-        in_band = [f for f, s in zip(self.frequencies_hz, self.s21_db) if s > threshold]
+        in_band = [f for f, s in zip(self.frequencies_hz, self.s21_db, strict=False) if s > threshold]
         if in_band:
             return max(in_band) - min(in_band)
         return None
@@ -425,7 +425,8 @@ class SParameterCalculator:
         abcd_C = np.array([[1, 0], [1j * omega * C, 1]], dtype=complex)
 
         # Cascade
-        return abcd_L @ abcd_C  # type: ignore[no-any-return]
+        cascade: np.ndarray = abcd_L @ abcd_C
+        return cascade
 
     def _abcd_to_s(self, abcd: np.ndarray, z0: float = 50.0) -> np.ndarray:
         """
@@ -455,7 +456,7 @@ class HighSpeedInterfaceDetector:
     """
 
     # Interface patterns and specifications
-    INTERFACE_SPECS = {
+    INTERFACE_SPECS: dict[str, dict[str, Any]] = {
         "ddr4": {
             "patterns": [
                 r"DQ\d+", r"DQS\d*[PN]?", r"DM\d+", r"DDR.*CLK",
@@ -573,7 +574,7 @@ class HighSpeedInterfaceDetector:
         for iface_type, spec in self.INTERFACE_SPECS.items():
             matched_nets = []
             for net in net_names:
-                for pattern in spec["patterns"]:  # type: ignore[attr-defined]
+                for pattern in spec["patterns"]:
                     if re.search(pattern, net, re.IGNORECASE):
                         matched_nets.append(net)
                         break
@@ -592,8 +593,9 @@ class HighSpeedInterfaceDetector:
                     "target_impedance_ohm": spec["z0_target"],
                 })
 
-        # Sort by confidence
-        detected.sort(key=lambda x: x["confidence"], reverse=True)  # type: ignore[arg-type, return-value]
+        # Sort by confidence (confidence is a float; cast to satisfy the
+        # object-valued dict typing).
+        detected.sort(key=lambda x: float(x["confidence"]), reverse=True)
         return detected
 
     def get_interface_spec(self, interface_type: str) -> Optional[dict]:

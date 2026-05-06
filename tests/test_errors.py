@@ -1,5 +1,4 @@
 """Tests for structured error types and validation helpers."""
-import math
 
 import pytest
 

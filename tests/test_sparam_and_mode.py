@@ -8,9 +8,7 @@ Validates against known physics:
 - 10% impedance mismatch → ~0.04 dB mismatch loss, ~26 dB return loss
 """
 
-import math
 
-import pytest
 
 from mcp_pcb_emcopilot.analyzers.rf_si.mode_conversion import (
     analyze_mode_conversion,

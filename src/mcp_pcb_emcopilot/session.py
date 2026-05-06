@@ -29,7 +29,7 @@ class DesignSessionManager:
         """Store a parsed design and return a new session ID."""
         self._evict_stale()
         if len(self._sessions) >= MAX_SESSIONS:
-            oldest = min(self._timestamps, key=self._timestamps.get)  # type: ignore[arg-type]
+            oldest = min(self._timestamps, key=lambda k: self._timestamps[k])
             self.close_session(oldest)
             logger.warning("Evicted oldest session %s (max %d reached)", oldest, MAX_SESSIONS)
         while True:
