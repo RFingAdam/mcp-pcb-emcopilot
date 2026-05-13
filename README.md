@@ -1,253 +1,78 @@
-<p align="center">
-  <img src="assets/logo.svg" alt="MCP PCB EMCopilot" width="480">
-</p>
+<div align="center">
 
-<p align="center">
-  <strong>AI-powered PCB design review, EMC analysis, and signal integrity via MCP</strong>
-</p>
+<img src="assets/logo-banner.svg" alt="mcp-pcb-emcopilot — PCB EMC + signal-integrity analysis (return paths, decoupling, DDR/PCIe/USB)" width="100%"/>
 
-<p align="center">
-  <a href="#installation">Installation</a> •
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#tool-reference">93 Tools</a> •
-  <a href="#supported-formats">Formats</a> •
-  <a href="#reports">Reports</a>
-</p>
+<br/>
 
-<p align="center">
-  <img alt="Tools" src="https://img.shields.io/badge/MCP_Tools-93-22d3ee?style=flat-square">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-3776ab?style=flat-square">
-  <img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-green?style=flat-square">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-Compatible-a855f7?style=flat-square">
-</p>
+[![License](https://img.shields.io/badge/License-Apache--2.0-1E40AF.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/downloads/)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-93-22D3EE.svg)](#tools)
+[![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
+[![eng-mcp-suite](https://img.shields.io/badge/eng--mcp--suite-member-22D3EE.svg)](https://github.com/RFingAdam/eng-mcp-suite)
+
+**AI-powered PCB design review — EMC, signal integrity, power integrity, thermal, and DFM in one MCP server.**
+**Catch return-path breaks, decoupling gaps, and DDR/PCIe topology errors before fabrication, from your terminal or AI agent.**
+
+[Quick start](#quick-start) ·
+[Tools](#tools) ·
+[Workflows](#workflows) ·
+[Documentation](#documentation)
+
+</div>
 
 ---
 
-## Overview
+## What is mcp-pcb-emcopilot?
 
-MCP PCB EMCopilot is a Model Context Protocol server that provides **93 tools** for AI-assisted PCB design review. It analyzes designs for EMC compliance, signal integrity, power integrity, thermal management, and manufacturing readiness — catching critical issues before prototype fabrication.
+mcp-pcb-emcopilot is a Model Context Protocol server that provides
+**93 tools** for AI-assisted PCB design review. It parses layouts from
+KiCad / ODB++ / Gerber / IPC-2581 / Altium / STEP, runs physics-based
+analyzers across eight engineering domains, and emits annotated DOCX
+reports with embedded board renders and per-finding severity.
 
-### What it does
+Drive it from any MCP client. The orchestrator (`pcb_run_design_review`)
+walks parsers → classifiers → analyzers → reports in one call; each
+underlying step is also a standalone tool an agent can call directly
+when you want to debug one net or revalidate one DDR byte-lane.
 
-- **Parses** PCB layouts from KiCad, ODB++, Gerber, IPC-2581, Altium, and STEP files
-- **Analyzes** designs across 8 engineering domains with physics-based calculations
-- **Predicts** EMC compliance against FCC, CISPR, and IEC standards
-- **Generates** professional DOCX reports with embedded board renders and annotated findings
-- **Visualizes** board layouts, net routing, stackups, and EMI hotspots as SVG/PNG
+**What mcp-pcb-emcopilot does well:**
 
-## Features
+- 🤖 **AI-native via MCP.** First-class [Model Context Protocol](https://modelcontextprotocol.io)
+  server with 93 tools across parsing, calculation, analysis, and
+  reporting. Any Claude / LLM agent can drive a full design review.
+- 🧱 **Multi-format layout parsing.** KiCad `.kicad_pcb`, ODB++, Gerber
+  RS-274X, IPC-2581, Altium `.PcbDoc`, 3D STEP — same downstream
+  analyzers regardless of source.
+- 📐 **IPC-grounded impedance.** Microstrip / stripline / differential /
+  CPWG via IPC-2141 (Hammerstad-Jensen, Cohn, coupled-line). Plus
+  IPC-2221 trace-width / current capacity.
+- 🛰️ **EMC + SI in one pass.** Return-path analysis, decoupling
+  effectiveness, current-loop radiation, FCC / CISPR / IEC compliance
+  prediction, DDR / PCIe / USB topology validation.
+- 📑 **Audit-grade reports.** DOCX + HTML with embedded board renders,
+  net highlights, annotated findings, executive summary, and Go/No-Go
+  recommendation.
+- 🔒 **Apache-2.0.**
 
-### Parsers & Data Extraction (15 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_parse_layout` | Parse KiCad, ODB++, Gerber, IPC-2581, Altium files |
-| `pcb_parse_schematic_pdf` | Extract schematic pages from PDF |
-| `pcb_parse_step` | Parse 3D STEP models |
-| `pcb_get_components` | List all components with positions |
-| `pcb_get_nets` | Get net list with filtering |
-| `pcb_get_traces` | Extract trace routing data |
-| `pcb_get_vias` | Get via locations and dimensions |
-| `pcb_get_board_outline` | Board dimensions and shape |
-| `pcb_get_stackup` | Layer stackup information |
-| `pcb_get_copper_pours` | Copper fill/zone data |
-| `pcb_get_drill_table` | Drill sizes and counts |
-| `pcb_get_design_rules` | Design rule constraints |
-| `pcb_get_manufacturing_notes` | DFM notes and constraints |
-| `pcb_list_sessions` | Manage parser sessions |
-| `pcb_close_session` | Close parser session |
+---
 
-### Impedance Calculators (7 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_calc_microstrip_impedance` | Surface trace impedance (IPC-2141) |
-| `pcb_calc_stripline_impedance` | Buried trace impedance |
-| `pcb_calc_differential_impedance` | Differential pair impedance |
-| `pcb_calc_cpw_impedance` | Coplanar waveguide impedance |
-| `pcb_calc_trace_width` | Current capacity (IPC-2221) |
-| `pcb_calc_via_stitching` | Via stitching spacing calculator |
-| `pcb_calc_pdn_impedance` | PDN target impedance profiling |
+## Quick start
 
-### Signal Integrity (14 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_timing` | Setup/hold margin analysis |
-| `pcb_analyze_crosstalk` | NEXT/FEXT estimation |
-| `pcb_analyze_via` | Via impedance discontinuity |
-| `pcb_analyze_differential_pair` | Diff pair quality |
-| `pcb_analyze_length_matching` | Length match verification |
-| `pcb_analyze_mode_conversion` | Differential mode conversion |
-| `pcb_analyze_return_paths` | Return current path analysis |
-| `pcb_analyze_return_current` | Return current density profile |
-| `pcb_analyze_return_current_density` | Current density mapping |
-| `pcb_calc_insertion_loss` | Channel insertion loss |
-| `pcb_calc_return_loss` | Impedance match quality |
-| `pcb_calc_skin_effect` | Skin effect resistance |
-| `pcb_calc_dielectric_loss` | Dielectric loss tangent |
-| `pcb_calc_eye_diagram` | Eye diagram estimation |
+### Install
 
-### EMC / EMI Analysis (14 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_current_loop` | Loop radiation estimation |
-| `pcb_analyze_clock_emi` | Clock harmonic analysis |
-| `pcb_analyze_smps_emi` | Switching converter EMI |
-| `pcb_analyze_emi_risk` | Board-level EMI risk scoring |
-| `pcb_analyze_shielding` | Shield effectiveness |
-| `pcb_analyze_grounding` | Grounding quality assessment |
-| `pcb_analyze_ground_stitch` | Via stitching adequacy |
-| `pcb_analyze_common_mode` | Common-mode noise |
-| `pcb_analyze_cable_coupling` | Cable-to-cable coupling |
-| `pcb_analyze_slot_antenna` | Ground slot radiation |
-| `pcb_analyze_trace_antenna` | Trace as antenna risk |
-| `pcb_estimate_bandwidth` | Bandwidth from rise time |
-| `pcb_predict_emissions` | Radiated emission prediction |
-| `pcb_predict_compliance` | FCC/CISPR compliance prediction |
-
-### Power Integrity (5 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_pdn` | PDN impedance analysis |
-| `pcb_analyze_decoupling` | Decap effectiveness |
-| `pcb_analyze_vrm` | VRM output assessment |
-| `pcb_analyze_copper_spreading` | Copper spreading thermal |
-| `pcb_calc_plane_resonance` | Plane pair resonance |
-
-### High-Speed Digital (8 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_ddr` | DDR memory interface |
-| `pcb_analyze_ddr_timing_budget` | DDR timing margins |
-| `pcb_validate_ddr_topology` | DDR routing topology |
-| `pcb_analyze_usb` | USB 2.0/3.x analysis |
-| `pcb_analyze_ethernet` | Ethernet PHY interface |
-| `pcb_analyze_pcie` | PCIe lane analysis |
-| `pcb_validate_pcie_lanes` | PCIe routing validation |
-| `pcb_calc_pcie_link_budget` | PCIe link budget |
-
-### Thermal (2 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_thermal` | Component thermal analysis |
-| `pcb_analyze_thermal_via` | Thermal via effectiveness |
-
-### DFM / Manufacturing (4 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_placement` | Component placement review |
-| `pcb_analyze_assembly` | Assembly feasibility |
-| `pcb_analyze_solder_paste` | Solder paste analysis |
-| `pcb_analyze_tolerance` | Manufacturing tolerances |
-
-### ESD Protection (1 tool)
-| Tool | Description |
-|------|-------------|
-| `pcb_analyze_esd` | ESD protection assessment |
-
-### Classification & Detection (4 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_classify_design` | Design type classification |
-| `pcb_classify_nets` | Net type classification |
-| `pcb_detect_interfaces` | Interface auto-detection |
-| `pcb_cross_reference_schematic` | Schematic-layout cross-check |
-
-### Visualization (5 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_render_board` | Full board SVG render |
-| `pcb_render_net` | Individual net highlight |
-| `pcb_render_stackup` | Stackup cross-section |
-| `pcb_annotate_board` | Annotated board with findings |
-| `pcb_get_emi_hotspots` | EMI hotspot identification |
-
-### Export & Reporting (7 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_export_render_png` | SVG to PNG conversion |
-| `pcb_export_all_renders` | Batch export renders |
-| `pcb_generate_report` | Generate markdown report |
-| `pcb_generate_docx_report` | Generate DOCX with images |
-| `pcb_get_schematic_page` | Extract schematic page |
-| `pcb_set_review_context` | Set review context |
-| `pcb_run_design_review` | Orchestrated full review |
-
-### 3D & Enclosure (3 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_get_3d_clearances` | 3D clearance analysis |
-| `pcb_check_enclosure_fit` | Enclosure fit check |
-| `pcb_find_split_crossings` | Split plane crossing detection |
-
-### Utility (4 tools)
-| Tool | Description |
-|------|-------------|
-| `pcb_get_stackup_templates` | Standard stackup templates |
-| `pcb_get_material_properties` | Dielectric material data |
-| `pcb_trace_return_path` | Return current path tracing |
-| `pcb_optimize_ground_stitching` | Stitch via optimization |
-
-## Tool Reference
-
-### Impedance Formulas
-
-The impedance calculators use industry-standard IPC-2141 formulas:
-
-| Trace Type | Typical Applications | Formula Basis |
-|------------|---------------------|---------------|
-| Microstrip | Top/bottom layer signals | Hammerstad & Jensen |
-| Stripline | Inner layer signals | Cohn |
-| Differential | USB, HDMI, LVDS, DDR | Coupled line theory |
-| CPW/GCPW | RF, mmWave | Conformal mapping |
-
-### Supported Standards
-
-- **IPC-2221** — Generic PCB design standard (current capacity)
-- **IPC-2141** — Controlled impedance design
-- **FCC Part 15** — Radiated and conducted emission limits
-- **CISPR 22/32** — Information technology equipment emissions
-- **IEC 61000-4** — ESD, surge, and immunity testing
-- **JEDEC** — DDR timing and topology constraints
-- **PCIe CEM** — Lane routing and loss budget specifications
-
-### Material Database
-
-Built-in properties for:
-- FR4 (standard and high-Tg)
-- Rogers RO4003C, RO4350B
-- Isola I-Speed, I-Tera
-- Panasonic Megtron 6
-- Polyimide (flex circuits)
-
-## Supported Formats
-
-| Format | Extension | Parse | Notes |
-|--------|-----------|-------|-------|
-| KiCad | `.kicad_pcb` | Yes | Full support |
-| ODB++ | `.zip`, `.tgz` | Yes | Full support |
-| Gerber | `.gbr`, `.ger` | Yes | RS-274X |
-| IPC-2581 | `.xml` | Yes | Standard XML |
-| Altium | `.PcbDoc` | Yes | Via export |
-| STEP | `.step`, `.stp` | Yes | 3D model |
-| PDF Schematic | `.pdf` | Yes | Page extraction |
-
-## Installation
-
-### Quick Install
 ```bash
 git clone https://github.com/RFingAdam/mcp-pcb-emcopilot.git
 cd mcp-pcb-emcopilot
 uv pip install -e .
 ```
 
-### Optional Dependencies
+Optional extras (PNG export, DOCX reports, enhanced PDF parsing):
+
 ```bash
-pip install cairosvg    # PNG export
-pip install python-docx # DOCX reports
-pip install pymupdf     # Enhanced PDF schematic parsing
+pip install cairosvg python-docx pymupdf
 ```
 
-### Add to MCP Client
+### Wire it into your MCP client
 
 **Claude Code:**
 ```bash
@@ -259,80 +84,225 @@ claude mcp add pcb-emcopilot -- uv run --directory /path/to/mcp-pcb-emcopilot mc
 codex mcp add pcb-emcopilot -- uv run --directory /path/to/mcp-pcb-emcopilot mcp-pcb-emcopilot
 ```
 
-**Config JSON:**
+**Raw config (Claude Desktop):**
+
 ```json
 {
-  "command": "uv",
-  "args": ["run", "--directory", "/path/to/mcp-pcb-emcopilot", "mcp-pcb-emcopilot"]
+  "mcpServers": {
+    "pcb-emcopilot": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/mcp-pcb-emcopilot", "mcp-pcb-emcopilot"]
+    }
+  }
 }
 ```
 
-## Quick Start
+Then ask your assistant:
 
-### Run a full design review
+> *"Parse design.kicad_pcb, run a comprehensive design review, and generate a DOCX report with annotated findings."*
+
+The agent walks `pcb_parse_layout` → `pcb_classify_design` →
+`pcb_run_design_review` → `pcb_generate_docx_report` and hands you a
+fabrication-grade document.
+
+---
+
+## Tools
+
+93 tools across 14 categories. Full table is below — full reference
+with arguments in [`docs/tools.md`](docs/tools.md).
+
+### Parsers & data extraction (15)
+| Tool | Description |
+|------|-------------|
+| `pcb_parse_layout` | Parse KiCad, ODB++, Gerber, IPC-2581, Altium |
+| `pcb_parse_schematic_pdf` | Extract schematic pages from PDF |
+| `pcb_parse_step` | Parse 3D STEP models |
+| `pcb_get_components` / `_nets` / `_traces` / `_vias` / `_board_outline` / `_stackup` / `_copper_pours` / `_drill_table` / `_design_rules` / `_manufacturing_notes` | Layout query tools |
+| `pcb_list_sessions` / `pcb_close_session` | Session management |
+
+### Impedance calculators (7)
+`pcb_calc_microstrip_impedance`, `pcb_calc_stripline_impedance`,
+`pcb_calc_differential_impedance`, `pcb_calc_cpw_impedance`,
+`pcb_calc_trace_width`, `pcb_calc_via_stitching`,
+`pcb_calc_pdn_impedance`.
+
+### Signal integrity (14)
+`pcb_analyze_timing`, `pcb_analyze_crosstalk`, `pcb_analyze_via`,
+`pcb_analyze_differential_pair`, `pcb_analyze_length_matching`,
+`pcb_analyze_mode_conversion`, `pcb_analyze_return_paths`,
+`pcb_analyze_return_current`, `pcb_analyze_return_current_density`,
+`pcb_calc_insertion_loss`, `pcb_calc_return_loss`,
+`pcb_calc_skin_effect`, `pcb_calc_dielectric_loss`,
+`pcb_calc_eye_diagram`.
+
+### EMC / EMI analysis (14)
+`pcb_analyze_current_loop`, `pcb_analyze_clock_emi`,
+`pcb_analyze_smps_emi`, `pcb_analyze_emi_risk`,
+`pcb_analyze_shielding`, `pcb_analyze_grounding`,
+`pcb_analyze_ground_stitch`, `pcb_analyze_common_mode`,
+`pcb_analyze_cable_coupling`, `pcb_analyze_slot_antenna`,
+`pcb_analyze_trace_antenna`, `pcb_estimate_bandwidth`,
+`pcb_predict_emissions`, `pcb_predict_compliance`.
+
+### Power integrity (5)
+`pcb_analyze_pdn`, `pcb_analyze_decoupling`, `pcb_analyze_vrm`,
+`pcb_analyze_copper_spreading`, `pcb_calc_plane_resonance`.
+
+### High-speed digital (8)
+`pcb_analyze_ddr`, `pcb_analyze_ddr_timing_budget`,
+`pcb_validate_ddr_topology`, `pcb_analyze_usb`,
+`pcb_analyze_ethernet`, `pcb_analyze_pcie`,
+`pcb_validate_pcie_lanes`, `pcb_calc_pcie_link_budget`.
+
+### Thermal (2), DFM / manufacturing (4), ESD (1)
+`pcb_analyze_thermal`, `pcb_analyze_thermal_via`,
+`pcb_analyze_placement`, `pcb_analyze_assembly`,
+`pcb_analyze_solder_paste`, `pcb_analyze_tolerance`,
+`pcb_analyze_esd`.
+
+### Classification & detection (4)
+`pcb_classify_design`, `pcb_classify_nets`, `pcb_detect_interfaces`,
+`pcb_cross_reference_schematic`.
+
+### Visualization (5)
+`pcb_render_board`, `pcb_render_net`, `pcb_render_stackup`,
+`pcb_annotate_board`, `pcb_get_emi_hotspots`.
+
+### Export & reporting (7)
+`pcb_export_render_png`, `pcb_export_all_renders`,
+`pcb_generate_report`, `pcb_generate_docx_report`,
+`pcb_get_schematic_page`, `pcb_set_review_context`,
+`pcb_run_design_review` (orchestrated full review).
+
+### 3D & enclosure (3), utility (4)
+`pcb_get_3d_clearances`, `pcb_check_enclosure_fit`,
+`pcb_find_split_crossings`, `pcb_get_stackup_templates`,
+`pcb_get_material_properties`, `pcb_trace_return_path`,
+`pcb_optimize_ground_stitching`.
+
+Full per-tool argument reference in [`docs/tools.md`](docs/tools.md).
+
+---
+
+## What it solves
+
+| Domain | Standards         | Headline tools                                           |
+| ------ | ----------------- | -------------------------------------------------------- |
+| Impedance | IPC-2141, IPC-2221 | microstrip / stripline / differential / CPW calculators |
+| EMC    | FCC Part 15, CISPR 22/32 | `pcb_predict_emissions`, `pcb_predict_compliance`  |
+| Immunity | IEC 61000-4    | `pcb_analyze_esd`                                        |
+| Digital | JEDEC, PCIe CEM  | `pcb_validate_ddr_topology`, `pcb_validate_pcie_lanes`   |
+
+### Material database
+
+Built-in dielectric properties: FR4 (standard + high-Tg), Rogers
+RO4003C / RO4350B, Isola I-Speed / I-Tera, Panasonic Megtron 6,
+polyimide (flex). Query via `pcb_get_material_properties`.
+
+### Supported formats
+
+| Format            | Extension       | Notes              |
+| ----------------- | --------------- | ------------------ |
+| KiCad             | `.kicad_pcb`    | Full support       |
+| ODB++             | `.zip`, `.tgz`  | Full support       |
+| Gerber RS-274X    | `.gbr`, `.ger`  |                    |
+| IPC-2581          | `.xml`          | Standard XML       |
+| Altium            | `.PcbDoc`       | Via export         |
+| STEP              | `.step`, `.stp` | 3D model           |
+| PDF schematic     | `.pdf`          | Page extraction    |
+
+---
+
+## Workflows
+
+mcp-pcb-emcopilot fits in the following [eng-mcp-suite](https://github.com/RFingAdam/eng-mcp-suite)
+workflow bundles:
+
+- **`pcb-review`** — full layout intake, EMC + SI + PI + thermal +
+  DFM analysis, audit-grade DOCX report.
+- **`coexistence-review`** — multi-radio band selection
+  (mcp-ltspice-qucs / mcp-emc-regulations) followed by layout-level
+  shielding + return-path check (this server).
+
+See the [suite manifest](https://github.com/RFingAdam/eng-mcp-suite/blob/main/manifest.yaml)
+for the full list of sibling MCPs and bundle definitions.
+
+---
+
+## Documentation
+
+- 📘 **[Quick Start](docs/index.md)** — install through first call.
+- 🛠️ **[Tool reference](docs/tools.md)** — every MCP tool, every argument.
+- 📐 **[Usage examples](docs/usage.md)** — practical end-to-end walkthroughs.
+- 🏗️ **[Architecture](docs/architecture.md)** — how this MCP fits in eng-mcp-suite.
+
+---
+
+## Common design targets
+
+| Interface       | Single-ended Z₀ | Differential Z_diff |
+| --------------- | --------------- | ------------------- |
+| General purpose | 50 Ω            | —                   |
+| USB 2.0         | —               | 90 Ω                |
+| USB 3.x         | —               | 85 Ω                |
+| HDMI            | —               | 100 Ω               |
+| DDR4 / LPDDR4   | 40 Ω            | 80 Ω                |
+| PCIe            | —               | 85 Ω                |
+| Ethernet        | —               | 100 Ω               |
+
+---
+
+## Part of eng-mcp-suite
+
+<sub>This MCP server is part of</sub>
+
+[![eng-mcp-suite](https://img.shields.io/badge/eng--mcp--suite-engineering%20MCP%20catalog-22D3EE?style=for-the-badge)](https://github.com/RFingAdam/eng-mcp-suite)
+
+<sub>An open umbrella for engineering MCP servers across RF, EMC, PCB,
+signal integrity, EM simulation, and lab test. Same brand, same docs
+structure, designed to compose. See the
+[full catalog](https://github.com/RFingAdam/eng-mcp-suite#whats-included)
+or jump to a sibling:</sub>
+
+| Domain                      | Sibling MCPs                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| **RF / Transmission lines** | [lineforge](https://github.com/RFingAdam/lineforge)                          |
+| **Antennas**                | [mcp-nec2-antenna](https://github.com/RFingAdam/mcp-nec2-antenna)            |
+| **Circuit + filter sim**    | [mcp-ltspice-qucs](https://github.com/RFingAdam/mcp-ltspice-qucs)            |
+| **EMC regulatory**          | [mcp-emc-regulations](https://github.com/RFingAdam/mcp-emc-regulations)      |
+| **EM simulation (3D)**      | [mcp-openems](https://github.com/RFingAdam/mcp-openems)                      |
+| **Diagrams**                | [drawio-engineering-mcp](https://github.com/RFingAdam/drawio-engineering-mcp) |
+| **Lab gear**                | [copper-mountain-vna-mcp](https://github.com/RFingAdam/copper-mountain-vna-mcp) |
+
+---
+
+## Contributing
+
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for
+the contributor guide.
+
+```bash
+uv pip install -e ".[dev]"
+uv run pytest -q
 ```
-Parse my PCB layout from design.kicad_pcb, then run a comprehensive design review
-and generate a DOCX report with all findings.
-```
 
-### Check USB impedance
-```
-Calculate differential impedance for USB 2.0 traces: 0.15mm width, 0.2mm spacing,
-0.1mm dielectric height, FR4 (Er=4.3)
-```
-
-### Predict EMC compliance
-```
-I have a 100MHz clock with 0.5ns rise time on a 25mm trace. Will it pass FCC Class B?
-```
-
-### Analyze DDR4 timing
-```
-Check DDR4-3200 timing budget with 40mm data trace, 35mm strobe, 200ps driver skew
-```
-
-### Estimate PCIe link budget
-```
-Calculate PCIe Gen4 link budget: 150mm trace on Megtron 6, two connectors,
-four via transitions
-```
-
-## Reports
-
-MCP PCB EMCopilot generates comprehensive DOCX design review reports with:
-
-- Executive summary with domain score dashboard
-- Go/No-Go recommendation with gating criteria
-- Embedded board renders, net highlights, and annotated findings
-- Per-domain analysis (EMC, SI, PI, Thermal, DFM, ESD, RF)
-- Priority action items with severity classification
-- Appendices with component summary and tool coverage
-
-## Companion MCP Servers
-
-| Server | Purpose |
-|--------|---------|
-| [mcp-emc-regulations](https://github.com/RFingAdam/mcp-emc-regulations) | FCC/CISPR/IEC emission limits |
-| [mcp-nec2-antenna](https://github.com/RFingAdam/mcp-nec2-antenna) | Antenna simulation (NEC2) |
-| [mcp-openems](https://github.com/RFingAdam/mcp-openems) | Full-wave EM simulation |
-| [mcp-drawio-engineering](https://github.com/RFingAdam/mcp-drawio-engineering) | Engineering diagrams |
-
-## Common Design Targets
-
-| Interface | Single-Ended | Differential |
-|-----------|------------------|------------------|
-| General purpose | 50 | — |
-| USB 2.0 | — | 90 |
-| USB 3.x | — | 85 |
-| HDMI | — | 100 |
-| DDR4/LPDDR4 | 40 | 80 |
-| PCIe | — | 85 |
-| Ethernet | — | 100 |
+---
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE).
 
-## Author
+## Acknowledgments
 
-Adam Engelbrecht — [@RFingAdam](https://github.com/RFingAdam)
+- **The KiCad project**, **ODB++**, **IPC** — the open layout standards
+  this server parses.
+- **IPC-2141A** — controlled-impedance reference behind the trace
+  calculators.
+- **The MCP working group** — for the [Model Context Protocol](https://modelcontextprotocol.io) specification.
+
+<div align="center">
+
+<sub>Part of <a href="https://github.com/RFingAdam/eng-mcp-suite">eng-mcp-suite</a> — built for PCB designers, EMC labs, and AI agents.</sub>
+
+</div>
