@@ -4,7 +4,7 @@
 
 <br/>
 
-[![License](https://img.shields.io/badge/License-Apache--2.0-1E40AF.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-1E40AF.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/downloads/)
 [![MCP Tools](https://img.shields.io/badge/MCP_Tools-93-22D3EE.svg)](#tools)
 [![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
@@ -52,7 +52,7 @@ when you want to debug one net or revalidate one DDR byte-lane.
 - 📑 **Audit-grade reports.** DOCX + HTML with embedded board renders,
   net highlights, annotated findings, executive summary, and Go/No-Go
   recommendation.
-- 🔒 **Apache-2.0.**
+- 🔒 **AGPL-3.0-or-later.**
 
 ---
 
@@ -291,7 +291,11 @@ uv run pytest -q
 
 ## License
 
-[Apache-2.0](LICENSE).
+[AGPL-3.0-or-later](LICENSE). Relicensed from Apache-2.0 in v0.3.0 to
+ensure modifications shared back when this MCP is wrapped in a network-
+accessible service. See the
+[eng-mcp-suite LICENSE_SUMMARY](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md)
+for the toolkit-wide rationale.
 
 ## Acknowledgments
 
