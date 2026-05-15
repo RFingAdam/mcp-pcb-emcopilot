@@ -1099,7 +1099,35 @@ async def list_tools() -> list[Tool]:
             "confidentiality": {"type": "string", "default": "CONFIDENTIAL", "description": "Confidentiality marking for header/footer"},
             "run_analysis": {"type": "boolean", "default": False, "description": "If true, runs pcb_run_design_review first"},
             "auto_render": {"type": "boolean", "default": True, "description": "Auto-generate board/net renders for findings"},
+            "force": {"type": "boolean", "default": False, "description": "If true, bypass the cross-MCP gate and emit a PRELIMINARY-stamped report even when pending external actions are unresolved."},
         }, ["session_id"]),
+
+        # =====================================================================
+        # CROSS-MCP COORDINATION (Phase 3 — sibling-MCP intent queue)
+        # =====================================================================
+        _make_tool("pcb_suggest_next_actions", "Return the prioritised list of sibling-MCP calls (openEMS / NEC2 / emc-regulations / drawio) Claude should execute to verify or enrich the current findings. Populated by pcb_run_design_review. Drained as Claude calls each suggested tool then feeds the result back via pcb_attach_external_result.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "domains": {"type": "array", "items": {"type": "string"}, "description": "Optional domain filter (e.g. ['signal_integrity','emc'])."},
+            "max_actions": {"type": "integer", "default": 20, "description": "Cap on the number of actions returned."},
+            "include_completed": {"type": "boolean", "default": False, "description": "If true, also include actions already completed (for audit)."},
+        }, ["session_id"]),
+        _make_tool("pcb_attach_external_result", "Feed a sibling-MCP result back to the session. The orchestrator marks the matching action complete and updates the linked finding's verified/confidence/source fields based on the result.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "action_id": {"type": "string", "description": "Action id from pcb_suggest_next_actions."},
+            "result": {"type": "object", "description": "Raw result returned by the sibling MCP."},
+            "error": {"type": "string", "description": "Optional error string if the sibling MCP failed; mutually exclusive with a real result."},
+        }, ["session_id", "action_id"]),
+        _make_tool("pcb_finalize_review", "Close out the multi-pass review. Refuses to succeed if any pending critical-priority action remains unresolved (unless force=true). Returns a finalisation summary that includes the action backlog status, confidence audit, and self-critique pointer.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "require_critical_verified": {"type": "boolean", "default": True, "description": "If true, refuse to finalize while any pending critical-priority action remains."},
+        }, ["session_id"]),
+        _make_tool("pcb_lookup_limit_live", "Look up a regulatory limit from the emc-regulations sibling MCP. Returns either a cached/fallback value (with a 'pending_refresh' flag) or a deferred next-action Claude should execute against mcp__emc-regulations__*.", {
+            "standard": {"type": "string", "description": "Standard id (e.g. CISPR_25, FCC_PART_15_B, ISO_11452_4, IEC_60601_1_2)."},
+            "class_or_level": {"type": "string", "description": "Class or level token (e.g. '3', 'B', 'II')."},
+            "frequency_mhz": {"type": "number", "description": "Frequency in MHz at which to evaluate the limit."},
+            "detector": {"type": "string", "default": "QP", "description": "Detector: QP (quasi-peak), AVG, PK."},
+            "fallback": {"type": "boolean", "default": True, "description": "If true, return a local-table fallback when the sibling MCP isn't reachable."},
+        }, ["standard", "class_or_level", "frequency_mhz"]),
 
         # =====================================================================
         # RETURN CURRENT / GROUND STITCHING (2 tools)
@@ -2562,10 +2590,200 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         # Known limitation: _dispatch is sync, so run_in_executor cannot be
         # used here without refactoring the dispatch architecture.
         # TODO: wrap in asyncio.to_thread() once _dispatch is made async-aware.
-        from .orchestrator import run_design_review
+        from .orchestrator import _emit_next_actions, run_design_review
         data = _get_session(args["session_id"])
         result = run_design_review(data, args["session_id"])
-        return result.to_dict()
+        # Phase 3: emit sibling-MCP escalation suggestions and enqueue them
+        # on the session for Claude to drain via pcb_suggest_next_actions.
+        try:
+            actions = _emit_next_actions(data, result)
+            if actions:
+                sessions.enqueue_actions(args["session_id"], actions)
+        except Exception:  # pragma: no cover — escalation never blocks the review
+            actions = []
+        out = result.to_dict()
+        out["next_actions"] = [a.to_dict() for a in actions]
+        return out
+
+    if name == "pcb_suggest_next_actions":
+        from .integrations.external_actions import (
+            STATUS_PENDING,
+            sort_by_priority,
+        )
+        sid = args["session_id"]
+        # Ensure session exists (raises SessionError if not).
+        _get_session(sid)
+        actions = sessions.get_pending_actions(sid)
+        include_completed = bool(args.get("include_completed", False))
+        if not include_completed:
+            actions = [a for a in actions if a.status == STATUS_PENDING]
+        domain_filter = args.get("domains") or []
+        if domain_filter:
+            wanted = {str(d).lower() for d in domain_filter}
+            # Domain isn't on ExternalAction directly — it's on the linked
+            # findings. Use the finding-id prefix as a coarse proxy.
+            def _matches(a: Any) -> bool:
+                for fid in a.linked_finding_ids:
+                    prefix = fid.split("-", 1)[0].lower()
+                    if any(prefix.startswith(w[:3]) for w in wanted):
+                        return True
+                return False
+            actions = [a for a in actions if _matches(a)]
+        max_actions = int(args.get("max_actions") or 20)
+        actions = sort_by_priority(actions)[:max_actions]
+        return {
+            "session_id": sid,
+            "count": len(actions),
+            "actions": [a.to_dict() for a in actions],
+        }
+
+    if name == "pcb_attach_external_result":
+        from .integrations.external_actions import ExternalResult
+        sid = args["session_id"]
+        _get_session(sid)
+        action_id = args["action_id"]
+        action = sessions.find_action(sid, action_id)
+        if action is None:
+            raise ValidationError(
+                "UNKNOWN_ACTION",
+                f"No pending action with id '{action_id}' in session '{sid}'.",
+                {"action_id": action_id, "session_id": sid},
+            )
+        result_payload = args.get("result") or {}
+        if isinstance(result_payload, str):
+            import json as _json
+            result_payload = _json.loads(result_payload)
+        err = args.get("error")
+        ext_result = ExternalResult(
+            action_id=action_id,
+            result=dict(result_payload),
+            error=err if err else None,
+            received_at=time.time(),
+        )
+        sessions.record_result(sid, ext_result)
+        # Update the linked finding(s) on the cached review_results, if present.
+        data = _get_session(sid)
+        updated_findings: list[str] = []
+        if data.review_results:
+            verified_ok = ext_result.succeeded
+            for dr in data.review_results.get("domain_results", []):
+                for f in dr.get("findings", []):
+                    if f.get("finding_id") in action.linked_finding_ids:
+                        if verified_ok:
+                            f["verified"] = True
+                            f["confidence"] = max(float(f.get("confidence", 0.8)), 0.95)
+                            f["source"] = action.mcp_server
+                        else:
+                            # Failure doesn't void the analytical finding; just
+                            # records that simulation could not corroborate.
+                            f["source"] = f.get("source", "analytical") + "+sim_failed"
+                        updated_findings.append(f["finding_id"])
+        return {
+            "session_id": sid,
+            "action_id": action_id,
+            "status": action.status,
+            "updated_findings": updated_findings,
+        }
+
+    if name == "pcb_finalize_review":
+        from .integrations.external_actions import (
+            STATUS_PENDING,
+            has_pending_critical,
+        )
+        sid = args["session_id"]
+        data = _get_session(sid)
+        require_critical = bool(args.get("require_critical_verified", True))
+        actions = sessions.get_pending_actions(sid)
+        pending = [a for a in actions if a.status == STATUS_PENDING]
+        critical_pending = [a for a in pending if a.priority <= 1]
+        if require_critical and has_pending_critical(actions):
+            return {
+                "session_id": sid,
+                "status": "deferred",
+                "reason": "critical-priority actions still pending",
+                "pending_critical_actions": [a.to_dict() for a in critical_pending],
+                "total_pending": len(pending),
+            }
+        # Summarise confidence and verification state.
+        confidence_buckets = {"<0.5": 0, "0.5-0.7": 0, "0.7-0.9": 0, ">=0.9": 0}
+        verified_count = 0
+        finding_count = 0
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                for f in dr.get("findings", []):
+                    finding_count += 1
+                    c = float(f.get("confidence", 0.8))
+                    if c < 0.5:
+                        confidence_buckets["<0.5"] += 1
+                    elif c < 0.7:
+                        confidence_buckets["0.5-0.7"] += 1
+                    elif c < 0.9:
+                        confidence_buckets["0.7-0.9"] += 1
+                    else:
+                        confidence_buckets[">=0.9"] += 1
+                    if f.get("verified"):
+                        verified_count += 1
+        return {
+            "session_id": sid,
+            "status": "finalised",
+            "total_findings": finding_count,
+            "verified_findings": verified_count,
+            "confidence_distribution": confidence_buckets,
+            "total_pending_actions": len(pending),
+            "self_critique_pointer": "docs/SELF_CRITIQUE_CHECKLIST.md",
+        }
+
+    if name == "pcb_lookup_limit_live":
+        # Phase 3a stub. Returns a "deferred" envelope pointing Claude at the
+        # appropriate mcp__emc-regulations__* tool. The Phase 3b regulations
+        # bridge will replace this with cached / on-the-fly lookups + a real
+        # local-table fallback path.
+        standard = str(args.get("standard") or "").upper()
+        class_or_level = str(args.get("class_or_level") or "")
+        frequency_mhz = float(args.get("frequency_mhz") or 0.0)
+        detector = str(args.get("detector") or "QP")
+        fallback = bool(args.get("fallback", True))
+        # Map standard -> emc-regulations tool name.
+        std_to_tool = {
+            "CISPR_25": "cispr25_limit",
+            "FCC_PART_15_B": "fcc_part15_limit",
+            "FCC_PART_15_A": "fcc_part15_limit",
+            "ISO_11452_2": "iso11452_levels",
+            "ISO_11452_4": "iso11452_levels",
+            "ISO_11452_5": "iso11452_levels",
+            "IEC_60601_1_2": "medical_immunity_levels",
+            "IEC_60601_1_2_ED_4_1": "medical_immunity_levels",
+            "CISPR_32": "cispr_limit",
+            "EN_55032": "cispr_limit",
+        }
+        tool_name = std_to_tool.get(standard)
+        deferred_action = {
+            "mcp_server": "emc-regulations",
+            "tool_name": tool_name or "source_search",
+            "fully_qualified_tool_name": (
+                f"mcp__emc-regulations__{tool_name}" if tool_name else "mcp__emc-regulations__source_search"
+            ),
+            "params": {
+                "standard": standard,
+                "class_or_level": class_or_level,
+                "frequency_mhz": frequency_mhz,
+                "detector": detector,
+            },
+        }
+        return {
+            "status": "deferred",
+            "standard": standard,
+            "class_or_level": class_or_level,
+            "frequency_mhz": frequency_mhz,
+            "detector": detector,
+            "next_action": deferred_action,
+            "fallback_available": fallback,
+            "note": (
+                "Phase 3a stub: live lookups require the emc-regulations sibling "
+                "MCP. Phase 3b will add cached + fallback values via "
+                "analyzers/emc/limits_provider.py."
+            ),
+        }
 
     if name == "pcb_generate_report":
         from .orchestrator import generate_report
@@ -2586,12 +2804,41 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return {"success": True, "output_path": path, "session_id": args["session_id"]}
 
     if name == "pcb_generate_design_review_report":
+        from .integrations.external_actions import has_pending_critical
         from .reports.report_builder import ReportBuilder
-        data = _get_session(args["session_id"])
+        sid = args["session_id"]
+        data = _get_session(sid)
 
         if args.get("run_analysis", False):
-            from .orchestrator import run_design_review
-            run_design_review(data, args["session_id"])
+            from .orchestrator import _emit_next_actions, run_design_review
+            result = run_design_review(data, sid)
+            # Re-emit actions in case the caller chained run_analysis=True.
+            try:
+                emitted = _emit_next_actions(data, result)
+                if emitted:
+                    sessions.enqueue_actions(sid, emitted)
+            except Exception:  # pragma: no cover
+                pass
+
+        # Cross-MCP gate: refuse to generate the final report while a
+        # critical-priority sibling action is still pending, unless the
+        # caller passes force=True (which stamps the report PRELIMINARY).
+        force = bool(args.get("force", False))
+        pending_actions = sessions.get_pending_actions(sid)
+        if has_pending_critical(pending_actions) and not force:
+            return {
+                "status": "deferred",
+                "session_id": sid,
+                "reason": (
+                    "Critical-priority sibling-MCP actions are still pending. "
+                    "Run them via the suggested mcp__* tools and feed results "
+                    "back through pcb_attach_external_result, or pass "
+                    "force=true to emit a PRELIMINARY-stamped report."
+                ),
+                "pending_actions": [
+                    a.to_dict() for a in pending_actions if a.status == "pending"
+                ],
+            }
 
         builder = ReportBuilder(
             design=data,
@@ -2600,7 +2847,14 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             output_dir=args.get("output_dir", "/tmp/pcb_reports"),
             auto_render=args.get("auto_render", True),
         )
-        return builder.generate(format=args.get("format", "both"))
+        out = builder.generate(format=args.get("format", "both"))
+        if isinstance(out, dict) and force and pending_actions:
+            out["preliminary"] = True
+            out["preliminary_reason"] = (
+                "Generated with force=True while critical sibling-MCP "
+                "actions were unresolved. Treat findings unverified."
+            )
+        return out
 
     # === RETURN CURRENT / GROUND STITCHING ===
     if name == "pcb_analyze_return_current":
