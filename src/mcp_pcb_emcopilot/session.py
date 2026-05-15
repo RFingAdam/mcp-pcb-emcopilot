@@ -52,6 +52,24 @@ class DesignSessionManager:
             return True
         return False
 
+    def replace_session(self, session_id: str, design_data: PCBDesignData) -> bool:
+        """Replace the design data for an existing session in-place.
+
+        Used by ``pcb_parse_layout`` when it is asked to write parsed data
+        into an existing session (e.g. one created by
+        ``pcb_start_professional_review``). The caller is responsible for
+        copying any prior ``review_context`` / ``review_results`` from the
+        old session onto ``design_data`` before calling.
+
+        Returns ``True`` if the session existed and was replaced, ``False``
+        otherwise.
+        """
+        if session_id not in self._sessions:
+            return False
+        self._sessions[session_id] = design_data
+        self._timestamps[session_id] = time.time()
+        return True
+
     def list_sessions(self) -> list[dict[str, str | int | float]]:
         """Return summary metadata for all active sessions."""
         result: list[dict[str, str | int | float]] = []

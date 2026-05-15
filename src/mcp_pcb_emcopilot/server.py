@@ -46,6 +46,7 @@ from .errors import (
 )
 from .models.pcb_data import PCBDesignData
 from .parsers import detect_format, parse_pcb_file
+from .review_playbook import SERVER_INSTRUCTIONS, start_professional_review
 from .session import DesignSessionManager
 
 # Physical constants
@@ -53,7 +54,7 @@ C0 = 299792458.0
 MU0 = 4 * math.pi * 1e-7
 EPS0 = 8.854e-12
 
-server = Server("mcp-pcb-emcopilot")
+server = Server("mcp-pcb-emcopilot", instructions=SERVER_INSTRUCTIONS)
 sessions = DesignSessionManager()
 
 
@@ -538,9 +539,10 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         # FILE PARSING (6 tools)
         # =====================================================================
-        _make_tool("pcb_parse_layout", "Parse a PCB layout file (KiCad, ODB++, Gerber, Altium, IPC-2581). Returns session_id for subsequent queries.", {
+        _make_tool("pcb_parse_layout", "Parse a PCB layout file (KiCad, ODB++, Gerber, Altium, IPC-2581). Returns session_id for subsequent queries. If a session_id from pcb_start_professional_review is supplied, parsed data is written into that existing session (preserves playbook state).", {
             "file_path": {"type": "string", "description": "Path to PCB file"},
             "format": {"type": "string", "description": "Force format: kicad, odb, gerber, altium, ipc2581"},
+            "session_id": {"type": "string", "description": "Optional. Reuse an existing session (e.g. returned by pcb_start_professional_review) instead of creating a new one. Preserves review_context and playbook state."},
         }, ["file_path"]),
         _make_tool("pcb_get_stackup", "Get layer stackup from a parsed design.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
@@ -1054,6 +1056,12 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         # DESIGN REVIEW ORCHESTRATION (5 tools)
         # =====================================================================
+        _make_tool("pcb_start_professional_review", "ENTRY POINT for a meticulous senior-consulting-engineer design review. Call this FIRST, before any parser or analyzer. Classifies the user's input files (schematic, layout, stackup, BOM, STEP, etc.), selects the per-market question pack and standards shortlist, and returns the binding 8-pass playbook (P0-P8) that Claude must follow. See docs/CLAUDE_REVIEW_PLAYBOOK.md.", {
+            "input_files": {"type": "array", "items": {"type": "string"}, "description": "List of file paths the user has provided for the review (any combination of layout, schematic, stackup, BOM, STEP, datasheets)."},
+            "declared_market": {"type": "string", "enum": ["automotive", "medical", "wireless", "commercial", "industrial", "unknown"], "description": "Declared product market. Drives question pack + standards shortlist. Use 'unknown' if not yet known.", "default": "unknown"},
+            "product_description": {"type": "string", "description": "Short free-text product description (optional)."},
+            "extra_markets": {"type": "array", "items": {"type": "string"}, "description": "Additional markets that apply (e.g. wireless+medical for a connected medical device)."},
+        }, ["input_files"]),
         _make_tool("pcb_set_review_context", "Set design review context: requirements, standards, known issues, operating conditions. Call before pcb_run_design_review.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
             "design_intent": {"type": "string", "description": "Free-text description of the design purpose"},
@@ -1380,7 +1388,20 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     # === FILE PARSING ===
     if name == "pcb_parse_layout":
         data = parse_pcb_file(args["file_path"], args.get("format"))
-        sid = sessions.create_session(data)
+        existing_sid = args.get("session_id")
+        if existing_sid and sessions.get_session(existing_sid) is not None:
+            # Preserve any review_context (playbook state, market, answers) from
+            # the existing session and write the freshly parsed data in place.
+            prior = sessions.get_session(existing_sid)
+            assert prior is not None  # narrowed by the check above
+            if prior.review_context:
+                data.review_context = dict(prior.review_context)
+            if prior.review_results:
+                data.review_results = dict(prior.review_results)
+            sessions.replace_session(existing_sid, data)
+            sid = existing_sid
+        else:
+            sid = sessions.create_session(data)
         return {"success": True, "session_id": sid, **data.to_summary()}
 
     if name == "pcb_get_stackup":
@@ -2356,7 +2377,6 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             data.schematic_pages = page_dicts
             data.schematic_pdf_path = pdf_result.file_path
         else:
-            from .models.pcb_data import PCBDesignData
             data = PCBDesignData(
                 source_file=args["file_path"],
                 source_format="schematic_pdf",
@@ -2441,6 +2461,45 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
 
     # === DESIGN REVIEW ORCHESTRATION ===
+    if name == "pcb_start_professional_review":
+        input_files = args.get("input_files") or []
+        if not input_files:
+            raise ValidationError("INVALID_INPUT", "input_files must be a non-empty list", {})
+        declared_market = (args.get("declared_market") or "unknown").strip().lower()
+        product_description = args.get("product_description")
+        extra_markets = args.get("extra_markets") or []
+        # Build a stub session so subsequent tool calls share the same id.
+        # The first input file becomes the placeholder source_file; the real
+        # parsed data is written later by pcb_parse_layout(session_id=...).
+        first_path = (
+            input_files[0]["path"] if isinstance(input_files[0], dict) else input_files[0]
+        )
+        stub = PCBDesignData(source_file=str(first_path), source_format="pending-parse")
+        sid = sessions.create_session(stub)
+        payload = start_professional_review(
+            session_id=sid,
+            input_files=input_files,
+            declared_market=declared_market,
+            product_description=product_description,
+            extra_markets=extra_markets,
+        )
+        # Persist the playbook state into the session's review_context so the
+        # rest of the workflow can read it back.
+        stub.review_context = {
+            "playbook": {
+                "input_manifest": payload.input_manifest,
+                "gaps": payload.gaps,
+                "interview_pack": payload.interview_pack,
+                "standards_shortlist": payload.standards_shortlist,
+                "analyzer_shortlist": payload.analyzer_shortlist,
+                "pass_checklist": payload.pass_checklist,
+                "declared_market": payload.declared_market,
+                "product_description": payload.product_description,
+                "notes": payload.notes,
+            },
+        }
+        return payload.to_dict()
+
     if name == "pcb_set_review_context":
         from .orchestrator import set_review_context
         data = _get_session(args["session_id"])
