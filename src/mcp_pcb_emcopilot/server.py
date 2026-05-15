@@ -1062,6 +1062,18 @@ async def list_tools() -> list[Tool]:
             "product_description": {"type": "string", "description": "Short free-text product description (optional)."},
             "extra_markets": {"type": "array", "items": {"type": "string"}, "description": "Additional markets that apply (e.g. wireless+medical for a connected medical device)."},
         }, ["input_files"]),
+        _make_tool("pcb_set_market", "Set or add a market on an existing review session (e.g. switching from commercial to automotive, or adding wireless on top of medical for a connected device). Updates the session's question pack and standards shortlist. Call before pcb_get_review_questions to receive the merged pack.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "market_id": {"type": "string", "enum": ["automotive", "medical", "wireless", "commercial", "industrial"], "description": "Market preset to activate."},
+            "replace": {"type": "boolean", "default": False, "description": "If true, replace the current market list; if false (default), append to it."},
+            "sub_options": {"type": "object", "description": "Optional sub-market options (e.g. {'vehicle_class':'passenger'} pre-fills automotive answers)."},
+        }, ["session_id", "market_id"]),
+        _make_tool("pcb_get_standards_coverage", "Return the per-standard coverage report for the session: which analyzers ran, which are still required, which standards are stub or unimplemented. Surfaces gaps the human reviewer should resolve before final sign-off.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
+        _make_tool("pcb_validate_review_complete", "Run the preflight gate. Refuses to advance unless the active markets' required questions are answered, at least one standard is selected, and no stub/unimplemented standards lack a human-review note. Returns a ValidationGate breakdown.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
         _make_tool("pcb_set_review_context", "Set design review context: requirements, standards, known issues, operating conditions. Call before pcb_run_design_review.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
             "design_intent": {"type": "string", "description": "Free-text description of the design purpose"},
@@ -2528,6 +2540,102 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
         return payload.to_dict()
 
+    if name == "pcb_set_market":
+        from . import market_packs
+        from .review_playbook import (
+            build_interview_pack,
+            compute_analyzer_shortlist,
+            compute_standards_shortlist,
+        )
+        sid = args["session_id"]
+        data = _get_session(sid)
+        market_id = str(args["market_id"]).strip().lower()
+        if market_id not in market_packs.KNOWN_MARKETS:
+            raise ValidationError(
+                "INVALID_MARKET",
+                f"Unknown market '{market_id}'. Known: {sorted(market_packs.KNOWN_MARKETS)}",
+                {"market_id": market_id},
+            )
+        replace = bool(args.get("replace", False))
+        sub_options = args.get("sub_options") or {}
+        # Initialise review_context buckets.
+        if not data.review_context:
+            data.review_context = {}
+        if "markets" not in data.review_context or not isinstance(data.review_context["markets"], list):
+            data.review_context["markets"] = []
+        markets: list[str] = list(data.review_context["markets"])
+        if replace:
+            markets = [market_id]
+        elif market_id not in markets:
+            markets.append(market_id)
+        data.review_context["markets"] = markets
+        # Pre-fill sub_options into interactive_answers.
+        if "interactive_answers" not in data.review_context:
+            data.review_context["interactive_answers"] = {}
+        for k, v in sub_options.items():
+            data.review_context["interactive_answers"][k] = v
+        # Update the playbook state so subsequent get_review_questions /
+        # standards_shortlist calls see the merged view.
+        pb = data.review_context.setdefault("playbook", {})
+        pb["active_markets"] = list(markets)
+        pb["declared_market"] = markets[0] if markets else "unknown"
+        # Recompute the shortlists + interview pack at the playbook level.
+        manifest = pb.get("input_manifest", [])
+        pb["interview_pack"] = build_interview_pack(manifest, markets[0] if markets else "unknown",
+                                                    extra_markets=markets[1:])
+        pb["standards_shortlist"] = compute_standards_shortlist(
+            markets[0] if markets else "unknown", manifest, extra_markets=markets[1:]
+        )
+        pb["analyzer_shortlist"] = compute_analyzer_shortlist(
+            markets[0] if markets else "unknown", manifest, extra_markets=markets[1:]
+        )
+        # Reflect the merged standards onto target_standards too.
+        existing_targets = list(data.review_context.get("target_standards") or [])
+        for s in pb["standards_shortlist"]:
+            if s not in existing_targets:
+                existing_targets.append(s)
+        data.review_context["target_standards"] = existing_targets
+        return {
+            "session_id": sid,
+            "markets": markets,
+            "standards_shortlist": pb["standards_shortlist"],
+            "analyzer_shortlist": pb["analyzer_shortlist"],
+            "interview_pack_count": len(pb["interview_pack"]),
+        }
+
+    if name == "pcb_get_standards_coverage":
+        from .standards.preflight import coverage_summary
+        sid = args["session_id"]
+        data = _get_session(sid)
+        # Derive the set of analyzers that ran from the orchestrator's stored
+        # review_results — domain names there map 1:1 to the analyzer ids in
+        # standards/coverage.py.
+        ran: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran.append(dom)
+        summary = coverage_summary(data, ran_analyzers=ran)
+        summary["session_id"] = sid
+        summary["ran_analyzers"] = ran
+        return summary
+
+    if name == "pcb_validate_review_complete":
+        from .standards.preflight import validate_review_complete
+        sid = args["session_id"]
+        data = _get_session(sid)
+        ran: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran.append(dom)
+        gate = validate_review_complete(data, ran_analyzers=ran)
+        out = gate.to_dict()
+        out["session_id"] = sid
+        return out
+
     if name == "pcb_set_review_context":
         from .orchestrator import set_review_context
         data = _get_session(args["session_id"])
@@ -2874,6 +2982,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     if name == "pcb_generate_design_review_report":
         from .integrations.external_actions import has_pending_critical
         from .reports.report_builder import ReportBuilder
+        from .standards.preflight import (
+            coverage_summary,
+            validate_review_complete,
+        )
         sid = args["session_id"]
         data = _get_session(sid)
 
@@ -2888,10 +3000,32 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             except Exception:  # pragma: no cover
                 pass
 
-        # Cross-MCP gate: refuse to generate the final report while a
-        # critical-priority sibling action is still pending, unless the
-        # caller passes force=True (which stamps the report PRELIMINARY).
         force = bool(args.get("force", False))
+
+        # Preflight gate (Phase 4): refuse to render when intake state is
+        # incomplete unless the caller forces it.
+        ran_for_gate: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran_for_gate.append(dom)
+        gate = validate_review_complete(data, ran_analyzers=ran_for_gate)
+        if not gate.ready and not force:
+            return {
+                "status": "deferred",
+                "session_id": sid,
+                "reason": (
+                    "Preflight gate failed: required intake fields are "
+                    "missing or no standard is selected. Run "
+                    "pcb_validate_review_complete for the full breakdown, "
+                    "or pass force=true to emit a PRELIMINARY-stamped report."
+                ),
+                "preflight": gate.to_dict(),
+            }
+
+        # Cross-MCP gate (Phase 3a): refuse to render while critical-priority
+        # sibling actions remain unresolved, unless force=True.
         pending_actions = sessions.get_pending_actions(sid)
         if has_pending_critical(pending_actions) and not force:
             return {
@@ -2916,12 +3050,21 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             auto_render=args.get("auto_render", True),
         )
         out = builder.generate(format=args.get("format", "both"))
-        if isinstance(out, dict) and force and pending_actions:
-            out["preliminary"] = True
-            out["preliminary_reason"] = (
-                "Generated with force=True while critical sibling-MCP "
-                "actions were unresolved. Treat findings unverified."
-            )
+        if isinstance(out, dict):
+            if force and (pending_actions or not gate.ready):
+                out["preliminary"] = True
+                reasons = []
+                if not gate.ready:
+                    reasons.append("preflight intake incomplete")
+                if pending_actions:
+                    reasons.append("critical sibling-MCP actions unresolved")
+                out["preliminary_reason"] = (
+                    "Generated with force=True; " + " and ".join(reasons) + "."
+                )
+            # Attach preflight + standards coverage so the caller has a
+            # one-shot view of the gate state alongside the report files.
+            out["preflight"] = gate.to_dict()
+            out["standards_coverage"] = coverage_summary(data, ran_analyzers=ran_for_gate)
         return out
 
     # === RETURN CURRENT / GROUND STITCHING ===
