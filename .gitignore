@@ -61,10 +61,16 @@ htmlcov/
 
 # Design review outputs (customer-specific, do not commit)
 /*.docx
+/*.html
 DESIGN_REVIEW_REPORT.md
 generate_docx_report.py
 # Allow framework documentation DOCX in docs/
 !docs/*.docx
+# Allow framework documentation HTML in docs/
+!docs/*.html
+
+# Generated simulation plots
+sim_plots/
 
 # ODB++ and layout files
 *.tgz
