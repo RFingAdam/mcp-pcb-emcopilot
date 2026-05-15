@@ -1535,20 +1535,28 @@ def _emit_next_actions(
 ) -> list:
     """Build the list of suggested sibling-MCP actions from a finished review.
 
-    Today this emits openEMS-bound actions only — one per HIGH/CRITICAL or
-    low-confidence finding that falls in an EM-addressable domain. The
-    bridge layer (Phase 3b) will add live-regs lookups, NEC2 antenna runs,
-    and drawio diagram intents alongside these.
+    Emits four flavours of intent:
+
+    1. openEMS — one per HIGH/CRITICAL or low-confidence finding in an
+       EM-addressable domain.
+    2. NEC2 antenna — one per finding tagged as intentional/unintentional
+       antenna at ≥ NEC2_MIN_FREQ_MHZ.
+    3. emc-regulations — one per standard in the review_context's
+       ``target_standards`` that does not yet have a cached lookup.
+    4. drawio diagrams — stackup (always), RF chain (if RF interfaces
+       detected), one EMC test setup per market, schematic markup (if a
+       schematic was parsed).
 
     The actions are returned *without* being enqueued; the caller (the
-    server's ``pcb_run_design_review`` handler) attaches them to the session
-    via ``sessions.enqueue_actions``.
+    server's ``pcb_run_design_review`` handler) attaches them to the
+    session via :meth:`DesignSessionManager.enqueue_actions`.
     """
     # Local imports to keep top-of-module clean and avoid circular refs.
     from .analyzers.rf_si.rf_simulation_extractor import (
         RFSimulationExtractor,
         SimulationCandidate,
     )
+    from .integrations.drawio_bridge import build_diagram_intents
     from .integrations.external_actions import (
         PRIORITY_CRITICAL,
         PRIORITY_HIGH,
@@ -1556,19 +1564,24 @@ def _emit_next_actions(
         ExternalAction,
         dedupe_actions,
     )
+    from .integrations.nec2_bridge import (
+        NEC2_MIN_FREQ_MHZ as NEC2_FLOOR,
+        build_antenna_intent,
+        is_antenna_finding,
+    )
+    from .integrations.regulations_bridge import build_intents_for_standards
 
-    # 1. Collect the findings that warrant escalation.
+    ctx = design.review_context or {}
+
+    # ------------------------------------------------------------------
+    # 1. openEMS — drive off finding severity / confidence
+    # ------------------------------------------------------------------
     escalation_targets: list[ReviewFinding] = []
     for dr in review_result.domain_results:
         for f in dr.findings:
             if _needs_em_verification(f):
                 escalation_targets.append(f)
-    if not escalation_targets:
-        return []
 
-    # 2. Use the existing extractor to derive candidate geometries from the
-    # design. Candidates are independent of findings — we pair them up by
-    # signal name / interface category below.
     try:
         net_cls = NetClassifier().classify(design)
         candidates: list[SimulationCandidate] = RFSimulationExtractor().to_candidates(
@@ -1576,16 +1589,11 @@ def _emit_next_actions(
         )
     except Exception:  # pragma: no cover — extractor may fail on stub data
         candidates = []
-
     candidates_by_net: dict[str, SimulationCandidate] = {}
     for cand in candidates:
         for net in cand.net_names:
             candidates_by_net.setdefault(net, cand)
 
-    # 3. For each escalation target, find a matching candidate and build an
-    # ExternalAction. If no candidate matches (e.g. EMC finding without a
-    # specific net), fall back to a generic "manual extraction needed"
-    # action that flags the gap for the user.
     actions: list[ExternalAction] = []
     for f in escalation_targets:
         cand = (
@@ -1596,13 +1604,14 @@ def _emit_next_actions(
         priority = _priority_for_finding(f, PRIORITY_CRITICAL, PRIORITY_HIGH, PRIORITY_NORMAL)
         if cand is not None:
             tool, params = _openems_call_for_candidate(cand)
+            # Pass the analytical value through so compare_results can use it.
+            if cand.z0_analytical:
+                params["analytical_value"] = cand.z0_analytical
             rationale = (
                 f"Verify {f.title} with full-wave EM "
                 f"(severity={f.severity}, confidence={f.confidence:.2f})."
             )
         else:
-            # Generic stub — Claude can either run pcb_extract_simulation_candidates
-            # to refine, or surface this as a human-review item.
             tool = "openems_list_antenna_types"
             params = {"_note": "no automatic candidate match; user to select geometry"}
             rationale = (
@@ -1618,9 +1627,90 @@ def _emit_next_actions(
             priority=priority,
         )
         actions.append(action)
-        # Link the action back to the finding for traceability.
         if action.action_id not in f.linked_actions:
             f.linked_actions.append(action.action_id)
+
+    # ------------------------------------------------------------------
+    # 2. NEC2 antenna validation
+    # ------------------------------------------------------------------
+    rf_freqs: list[float] = list(ctx.get("rf_frequencies_mhz") or [])
+    answers = ctx.get("interactive_answers", {}) or {}
+    raw_freq = answers.get("rf_operating_freq", "")
+    if isinstance(raw_freq, str) and raw_freq:
+        import re
+        rf_freqs.extend(
+            float(tok) for tok in re.split(r"[,;\s]+", raw_freq.strip())
+            if tok and tok.replace(".", "").isdigit()
+        )
+
+    for dr in review_result.domain_results:
+        for f in dr.findings:
+            if not is_antenna_finding(f.domain, f.signal_name, f.title, f.description):
+                continue
+            # Use the strongest-evidence frequency available: RF context, then
+            # the candidate's frequency, then a default.
+            cand = candidates_by_net.get(f.signal_name or "")
+            freq_mhz = (cand.frequency_ghz * 1000.0) if cand else (rf_freqs[0] if rf_freqs else 0.0)
+            if freq_mhz < NEC2_FLOOR:
+                continue
+            trace_len_mm = cand.trace_length_mm if cand else 25.0
+            antenna_action = build_antenna_intent(
+                finding_id=f.finding_id,
+                title=f.title,
+                description=f.description,
+                trace_length_mm=trace_len_mm,
+                frequency_mhz=freq_mhz,
+                priority=PRIORITY_HIGH,
+            )
+            if antenna_action is not None:
+                actions.append(antenna_action)
+                if antenna_action.action_id not in f.linked_actions:
+                    f.linked_actions.append(antenna_action.action_id)
+
+    # ------------------------------------------------------------------
+    # 3. emc-regulations live limit lookups
+    # ------------------------------------------------------------------
+    target_standards: list[str] = list(ctx.get("target_standards") or [])
+    # The Phase 2 playbook stores its own shortlist under review_context["playbook"].
+    pb = ctx.get("playbook") or {}
+    for s in pb.get("standards_shortlist") or []:
+        if s not in target_standards:
+            target_standards.append(s)
+    if target_standards:
+        reg_actions = build_intents_for_standards(
+            standards=target_standards,
+            sample_frequencies_mhz=(0.5, 30.0, 150.0, 1000.0),
+            priority=PRIORITY_NORMAL,
+        )
+        actions.extend(reg_actions)
+
+    # ------------------------------------------------------------------
+    # 4. drawio diagrams (always emitted; report builder reads results back)
+    # ------------------------------------------------------------------
+    stackup_layers = [
+        {
+            "name": layer.name,
+            "type": layer.layer_type,
+            "thickness_mm": layer.thickness_mm,
+            "er": getattr(layer, "dielectric_constant", None),
+            "copper_oz": getattr(layer, "copper_weight_oz", None),
+        }
+        for layer in getattr(design, "layers", []) or []
+    ]
+    detected_interfaces = list(getattr(review_result, "detected_interfaces", []) or [])
+    target_markets = list(pb.get("active_markets") or [])
+    if not target_markets and pb.get("declared_market") and pb["declared_market"] != "unknown":
+        target_markets = [pb["declared_market"]]
+    schematic_path = getattr(design, "schematic_pdf_path", None)
+    diagram_intents = build_diagram_intents(
+        stackup_layers=stackup_layers,
+        board_thickness_mm=getattr(design, "board_thickness_mm", None),
+        detected_interfaces=detected_interfaces,
+        target_markets=target_markets,
+        schematic_path=schematic_path,
+        rf_frequencies_mhz=rf_freqs or None,
+    )
+    actions.extend(diagram_intents)
 
     return dedupe_actions(actions)
 
