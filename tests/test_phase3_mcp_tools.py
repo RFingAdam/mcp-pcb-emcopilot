@@ -230,7 +230,23 @@ def test_finalize_review_force_bypasses_critical_gate(fresh_session):
 
 # --- Report gate ------------------------------------------------------------
 
+def _satisfy_preflight_commercial(sid: str) -> None:
+    """Helper — satisfy the Phase 4 preflight gate so we can test the
+    Phase 3a cross-MCP gate downstream."""
+    srv._dispatch("pcb_set_market", {
+        "session_id": sid,
+        "market_id": "commercial",
+        "sub_options": {
+            "operating_environment": "consumer",
+            "fab_stackup_spec": "no_use_extracted",
+            "cispr32_class": "B",
+            "target_regions": ["US", "EU"],
+        },
+    })
+
+
 def test_report_gate_defers_when_critical_pending(fresh_session):
+    _satisfy_preflight_commercial(fresh_session)
     action = ExternalAction(
         mcp_server="openems",
         tool_name="t",
@@ -245,9 +261,12 @@ def test_report_gate_defers_when_critical_pending(fresh_session):
     )
     assert out["status"] == "deferred"
     assert "pending_actions" in out
+    # And the reason mentions the cross-MCP gate, not preflight
+    assert "sibling-MCP" in out["reason"]
 
 
 def test_report_gate_force_emits_preliminary(fresh_session):
+    _satisfy_preflight_commercial(fresh_session)
     action = ExternalAction(
         mcp_server="openems",
         tool_name="t",
