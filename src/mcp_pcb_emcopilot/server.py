@@ -2661,6 +2661,49 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             received_at=time.time(),
         )
         sessions.record_result(sid, ext_result)
+
+        # Bridge-specific post-processing -----------------------------------
+        # (a) emc-regulations → write the resolved limit into the runtime
+        # cache so subsequent get_limit calls return the live value.
+        live_limit_cached = False
+        if action.mcp_server == "emc-regulations" and ext_result.succeeded:
+            try:
+                from .integrations.regulations_bridge import apply_limit_result
+                live_limit_cached = apply_limit_result(action, ext_result.result) is not None
+            except Exception:  # pragma: no cover — never block on bridge errors
+                live_limit_cached = False
+
+        # (b) openEMS → run compare_results against the linked finding's
+        # analytical value and update verified/confidence/severity per
+        # SIM_TOLERANCE_PCT.
+        sim_status: str | None = None
+        sim_diff_pct: float | None = None
+        if action.mcp_server == "openems" and ext_result.succeeded:
+            from .integrations.openems_bridge import OpenEMSBridge
+            from .orchestrator import SIM_TOLERANCE_PCT
+            simulated_value = (
+                ext_result.result.get("simulated_value")
+                or ext_result.result.get("z0_ohm")
+                or ext_result.result.get("value")
+            )
+            analytical_value = (
+                action.params.get("analytical_value")
+                or ext_result.result.get("analytical_value")
+            )
+            if simulated_value is not None and analytical_value is not None:
+                try:
+                    vr = OpenEMSBridge().compare_results(
+                        parameter=str(ext_result.result.get("parameter", "impedance")),
+                        analytical_value=float(analytical_value),
+                        simulated_value=float(simulated_value),
+                        unit=str(ext_result.result.get("unit", "ohms")),
+                        tolerance_percent=SIM_TOLERANCE_PCT,
+                    )
+                    sim_status = vr.status
+                    sim_diff_pct = vr.difference_percent
+                except Exception:  # pragma: no cover
+                    sim_status = None
+
         # Update the linked finding(s) on the cached review_results, if present.
         data = _get_session(sid)
         updated_findings: list[str] = []
@@ -2671,18 +2714,43 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
                     if f.get("finding_id") in action.linked_finding_ids:
                         if verified_ok:
                             f["verified"] = True
-                            f["confidence"] = max(float(f.get("confidence", 0.8)), 0.95)
-                            f["source"] = action.mcp_server
+                            # openEMS-specific severity / confidence updates
+                            if sim_status == "pass":
+                                f["confidence"] = 0.95
+                                f["source"] = "openems"
+                            elif sim_status == "warning":
+                                f["confidence"] = max(float(f.get("confidence", 0.8)), 0.6)
+                                f["source"] = "openems"
+                            elif sim_status == "fail":
+                                f["confidence"] = 0.95
+                                f["source"] = "openems"
+                                f["severity"] = "critical"
+                                # Append an explanatory note rather than overwriting
+                                note = (
+                                    f"Full-wave simulation invalidates analytical "
+                                    f"model (Δ {sim_diff_pct}% > tolerance)."
+                                )
+                                desc = f.get("description", "")
+                                if note not in desc:
+                                    f["description"] = f"{desc} {note}".strip()
+                            else:
+                                f["confidence"] = max(
+                                    float(f.get("confidence", 0.8)), 0.95
+                                )
+                                f["source"] = action.mcp_server
                         else:
-                            # Failure doesn't void the analytical finding; just
-                            # records that simulation could not corroborate.
-                            f["source"] = f.get("source", "analytical") + "+sim_failed"
+                            f["source"] = (
+                                f.get("source", "analytical") + "+sim_failed"
+                            )
                         updated_findings.append(f["finding_id"])
         return {
             "session_id": sid,
             "action_id": action_id,
             "status": action.status,
             "updated_findings": updated_findings,
+            "sim_status": sim_status,
+            "sim_diff_pct": sim_diff_pct,
+            "live_limit_cached": live_limit_cached,
         }
 
     if name == "pcb_finalize_review":

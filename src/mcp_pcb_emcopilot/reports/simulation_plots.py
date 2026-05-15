@@ -473,15 +473,22 @@ class SimulationPlotter:
         fig, ax = plt.subplots(figsize=self.figsize)
         _apply_theme(ax, t)
 
-        from ..analyzers.emc.automotive_emc import (
-            CISPR25_RADIATED_LIMITS,
-            AutomotiveEMCAnalyzer,
-        )
+        from ..analyzers.emc.automotive_emc import AutomotiveEMCAnalyzer
+        from ..analyzers.emc.limits_provider import get_limit
         analyzer = AutomotiveEMCAnalyzer()
 
-        # Draw limit mask
+        # Draw limit mask. The band edges still come from the legacy
+        # CISPR25_RADIATED_LIMITS list for plot geometry, but each band's
+        # limit value is fetched through the provider so a live regs override
+        # (cached via cache_live_result) automatically redraws the mask.
+        from ..analyzers.emc.automotive_emc import CISPR25_RADIATED_LIMITS
         for band in CISPR25_RADIATED_LIMITS:
-            lim = band["limits"].get(cispr_class)
+            band_mid_mhz = (band["freq_min_mhz"] + band["freq_max_mhz"]) / 2
+            point = get_limit("CISPR_25", str(cispr_class), band_mid_mhz, detector="QP")
+            if point is not None:
+                lim = point.limit_value
+            else:
+                lim = band["limits"].get(cispr_class)
             if lim is None:
                 continue
             ax.fill_between(
@@ -494,7 +501,6 @@ class SimulationPlotter:
                 [lim, lim],
                 color=t["limit"], linewidth=2, linestyle="--",
             )
-            # Band label
             mid = (band["freq_min_mhz"] + band["freq_max_mhz"]) / 2
             ax.text(mid, lim + 2, f"{lim} dB", color=t["limit"],
                     fontsize=6, ha="center", va="bottom")
