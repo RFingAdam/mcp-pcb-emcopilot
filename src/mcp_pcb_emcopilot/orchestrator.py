@@ -24,6 +24,35 @@ from .models.pcb_data import PCBDesignData
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "warning": 2, "medium": 2, "low": 3, "info": 4}
 
+# =============================================================================
+# Phase 3 escalation policy — applied by `_emit_next_actions` below.
+# A finding triggers escalation to a sibling MCP (openEMS / NEC2 / live regs)
+# when EITHER its severity rank is <= ESCALATE_SEVERITY_MAX OR its analyzer
+# confidence is below ESCALATE_CONFIDENCE_BELOW. Domains outside the
+# *_ESCALATION_DOMAINS sets short-circuit (no escalation needed).
+# =============================================================================
+ESCALATE_SEVERITY_MAX = SEVERITY_ORDER["high"]      # severity rank <= 1 -> escalate
+ESCALATE_CONFIDENCE_BELOW = 0.7                    # confidence < 0.7 -> escalate
+SIM_TOLERANCE_PCT = 5.0                            # passing match tolerance for openEMS
+NEC2_MIN_FREQ_MHZ = 30.0                           # below this skip antenna sim
+OPENEMS_ESCALATION_DOMAINS: frozenset[str] = frozenset({
+    "signal_integrity",
+    "rf_si",
+    "high_speed",
+    "high_speed_ddr",
+    "high_speed_pcie",
+    "high_speed_usb",
+    "high_speed_ethernet",
+    "emc",
+    "antenna",
+    "power_integrity",
+    "power_integrity_resonance",
+})
+NEC2_ESCALATION_DOMAINS: frozenset[str] = frozenset({
+    "antenna",
+    "rf_si",
+})
+
 
 @dataclass
 class ReviewFinding:
@@ -41,6 +70,20 @@ class ReviewFinding:
     location_layer: Optional[str] = None
     related_findings: list[str] = field(default_factory=list)
 
+    # ---- Phase 3 schema upgrade ------------------------------------------
+    # First-class confidence + verification status fields. Analyzers default
+    # to 0.8 (typical analytical heuristic); openEMS / NEC2 / live-regs
+    # corroboration writes higher values and flips ``verified=True``.
+    confidence: float = 0.8
+    verified: bool = False
+    source: str = "analytical"  # analytical | openems | nec2 | live_regs
+    finding_id: str = ""
+    linked_actions: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.finding_id:
+            self.finding_id = _generate_finding_id(self.domain, self.title)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize finding to a JSON-safe dictionary."""
         d: dict[str, Any] = {
@@ -49,6 +92,10 @@ class ReviewFinding:
             "title": self.title,
             "description": self.description,
             "recommendation": self.recommendation,
+            "finding_id": self.finding_id,
+            "confidence": round(self.confidence, 3),
+            "verified": self.verified,
+            "source": self.source,
         }
         if self.measured_value is not None:
             d["measured_value"] = self.measured_value
@@ -64,7 +111,34 @@ class ReviewFinding:
             }
         if self.related_findings:
             d["related_findings"] = self.related_findings
+        if self.linked_actions:
+            d["linked_actions"] = list(self.linked_actions)
         return d
+
+
+# Counter for finding-id generation per (domain, prefix). Module-level so ids
+# are unique across a process lifetime but stable within a run.
+_FINDING_ID_COUNTERS: dict[str, int] = {}
+
+
+def _generate_finding_id(domain: str, _title: str) -> str:
+    """Generate a stable per-process finding id like ``EMC-001``.
+
+    Uses the same prefix mapping as :func:`reports.report_builder._prefix_for`
+    so finding ids match the report's section ids.
+    """
+    # Local import to avoid a top-of-module cycle with reports/report_builder.
+    from .reports.report_builder import _prefix_for
+
+    prefix = _prefix_for(domain)
+    nxt = _FINDING_ID_COUNTERS.get(prefix, 0) + 1
+    _FINDING_ID_COUNTERS[prefix] = nxt
+    return f"{prefix}-{nxt:03d}"
+
+
+def reset_finding_id_counters() -> None:
+    """Reset the per-process finding-id counter. Test helper only."""
+    _FINDING_ID_COUNTERS.clear()
 
 
 @dataclass
@@ -254,7 +328,7 @@ def _select_analyzers(
         analyzers.append("usb")
     if any("pcie" in t for t in iface_types):
         analyzers.append("pcie")
-    if any(t in ("gbe", "100base-tx", "sgmii", "ethernet") for t in iface_types):
+    if any(any(tok in t for tok in ("gbe", "100base", "sgmii", "ethernet", "base-t")) for t in iface_types):
         analyzers.append("ethernet")
 
     # eMMC/SDIO (Phase 4 integration)
@@ -1104,7 +1178,7 @@ def _run_ethernet_analysis(
         eth_iface = None
         for iface in interfaces.interfaces:
             itype = iface.interface_type.lower()
-            if itype in ("gbe", "100base-tx", "sgmii", "ethernet"):
+            if any(tok in itype for tok in ("gbe", "100base", "sgmii", "ethernet", "base-t")):
                 eth_iface = iface
                 break
 
@@ -1435,6 +1509,191 @@ def _build_recommendations(
     # Sort by risk_score descending
     recs.sort(key=lambda r: r["risk_score"], reverse=True)
     return recs
+
+
+# =============================================================================
+# Cross-MCP escalation — Phase 3 sibling-MCP intent queue
+# =============================================================================
+
+def _needs_em_verification(f: "ReviewFinding") -> bool:
+    """Decide whether *f* warrants an openEMS escalation.
+
+    A finding escalates when its severity rank meets ESCALATE_SEVERITY_MAX
+    or its confidence drops below ESCALATE_CONFIDENCE_BELOW, *and* its
+    domain is one openEMS can address.
+    """
+    severity_rank = SEVERITY_ORDER.get(f.severity, 4)
+    severity_triggers = severity_rank <= ESCALATE_SEVERITY_MAX
+    confidence_triggers = f.confidence < ESCALATE_CONFIDENCE_BELOW
+    domain_matches = f.domain in OPENEMS_ESCALATION_DOMAINS
+    return domain_matches and (severity_triggers or confidence_triggers)
+
+
+def _emit_next_actions(
+    design: PCBDesignData,
+    review_result: "ReviewResult",
+) -> list:
+    """Build the list of suggested sibling-MCP actions from a finished review.
+
+    Today this emits openEMS-bound actions only — one per HIGH/CRITICAL or
+    low-confidence finding that falls in an EM-addressable domain. The
+    bridge layer (Phase 3b) will add live-regs lookups, NEC2 antenna runs,
+    and drawio diagram intents alongside these.
+
+    The actions are returned *without* being enqueued; the caller (the
+    server's ``pcb_run_design_review`` handler) attaches them to the session
+    via ``sessions.enqueue_actions``.
+    """
+    # Local imports to keep top-of-module clean and avoid circular refs.
+    from .analyzers.rf_si.rf_simulation_extractor import (
+        RFSimulationExtractor,
+        SimulationCandidate,
+    )
+    from .integrations.external_actions import (
+        PRIORITY_CRITICAL,
+        PRIORITY_HIGH,
+        PRIORITY_NORMAL,
+        ExternalAction,
+        dedupe_actions,
+    )
+
+    # 1. Collect the findings that warrant escalation.
+    escalation_targets: list[ReviewFinding] = []
+    for dr in review_result.domain_results:
+        for f in dr.findings:
+            if _needs_em_verification(f):
+                escalation_targets.append(f)
+    if not escalation_targets:
+        return []
+
+    # 2. Use the existing extractor to derive candidate geometries from the
+    # design. Candidates are independent of findings — we pair them up by
+    # signal name / interface category below.
+    try:
+        net_cls = NetClassifier().classify(design)
+        candidates: list[SimulationCandidate] = RFSimulationExtractor().to_candidates(
+            design, net_cls, max_candidates=20
+        )
+    except Exception:  # pragma: no cover — extractor may fail on stub data
+        candidates = []
+
+    candidates_by_net: dict[str, SimulationCandidate] = {}
+    for cand in candidates:
+        for net in cand.net_names:
+            candidates_by_net.setdefault(net, cand)
+
+    # 3. For each escalation target, find a matching candidate and build an
+    # ExternalAction. If no candidate matches (e.g. EMC finding without a
+    # specific net), fall back to a generic "manual extraction needed"
+    # action that flags the gap for the user.
+    actions: list[ExternalAction] = []
+    for f in escalation_targets:
+        cand = (
+            candidates_by_net.get(f.signal_name)
+            if f.signal_name and f.signal_name in candidates_by_net
+            else None
+        )
+        priority = _priority_for_finding(f, PRIORITY_CRITICAL, PRIORITY_HIGH, PRIORITY_NORMAL)
+        if cand is not None:
+            tool, params = _openems_call_for_candidate(cand)
+            rationale = (
+                f"Verify {f.title} with full-wave EM "
+                f"(severity={f.severity}, confidence={f.confidence:.2f})."
+            )
+        else:
+            # Generic stub — Claude can either run pcb_extract_simulation_candidates
+            # to refine, or surface this as a human-review item.
+            tool = "openems_list_antenna_types"
+            params = {"_note": "no automatic candidate match; user to select geometry"}
+            rationale = (
+                f"Finding {f.finding_id} ({f.title}) warrants EM verification but "
+                f"no automatic geometry extraction matched. Manual selection needed."
+            )
+        action = ExternalAction(
+            mcp_server="openems",
+            tool_name=tool,
+            params=params,
+            rationale=rationale,
+            linked_finding_ids=[f.finding_id],
+            priority=priority,
+        )
+        actions.append(action)
+        # Link the action back to the finding for traceability.
+        if action.action_id not in f.linked_actions:
+            f.linked_actions.append(action.action_id)
+
+    return dedupe_actions(actions)
+
+
+def _priority_for_finding(
+    f: "ReviewFinding",
+    p_critical: int,
+    p_high: int,
+    p_normal: int,
+) -> int:
+    """Map a finding's severity to an action priority bucket."""
+    if f.severity == "critical":
+        return p_critical
+    if f.severity == "high":
+        return p_high
+    return p_normal
+
+
+def _openems_call_for_candidate(cand) -> tuple[str, dict]:
+    """Return ``(tool_name, params)`` for a SimulationCandidate.
+
+    Mirrors :meth:`OpenEMSBridge.generate_from_candidate` but emits the
+    sibling-MCP tool call form Claude will execute.
+    """
+    st = cand.structure_type
+    base = {
+        "frequency_ghz": cand.frequency_ghz,
+        "trace_length_mm": cand.trace_length_mm,
+        "dielectric_er": cand.dielectric_er,
+    }
+    if st == "microstrip":
+        return "openems_create_microstrip", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "copper_thickness_mm": cand.copper_thickness_mm,
+        }
+    if st == "stripline":
+        return "openems_create_microstrip", {  # openems MCP exposes stripline via the microstrip helper
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "copper_thickness_mm": cand.copper_thickness_mm,
+            "_structure_hint": "stripline",
+        }
+    if st == "coupled_microstrip":
+        return "openems_create_coupled_lines", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "spacing_mm": cand.spacing_mm or 0.2,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+        }
+    if st == "coupled_stripline":
+        return "openems_create_coupled_lines", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "spacing_mm": cand.spacing_mm or 0.2,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "_structure_hint": "stripline",
+        }
+    if st == "via_transition":
+        return "openems_create_via", {
+            **base,
+            "drill_mm": cand.via_drill_mm or 0.3,
+            "pad_mm": cand.via_pad_mm or 0.6,
+            "board_thickness_mm": cand.dielectric_height_mm,
+        }
+    # Fallback — at least carry the metadata over so Claude can inspect.
+    return "openems_list_antenna_types", {
+        **base,
+        "structure_type": st,
+        "_note": "unknown structure_type; user to select model",
+    }
 
 
 # =============================================================================
