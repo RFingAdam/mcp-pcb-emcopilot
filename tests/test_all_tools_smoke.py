@@ -179,7 +179,7 @@ def dispatch_branch_names() -> set[str]:
 
 class TestToolSurfaceParity:
     def test_registered_tool_count(self, registered_tool_names):
-        assert len(registered_tool_names) == 124
+        assert len(registered_tool_names) == 130
 
     def test_every_registered_tool_has_dispatch_branch(
         self, registered_tool_names, dispatch_branch_names

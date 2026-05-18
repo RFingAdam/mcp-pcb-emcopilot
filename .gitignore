@@ -72,6 +72,9 @@ generate_docx_report.py
 # Generated simulation plots
 sim_plots/
 
+# Auto-generated session notes (not part of the project)
+.session-notes/
+
 # ODB++ and layout files
 *.tgz
 Test_ODB*
