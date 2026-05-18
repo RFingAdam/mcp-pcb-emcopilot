@@ -404,6 +404,17 @@ def _select_analyzers(
     if hasattr(design, 'schematic_data') and design.schematic_data:
         analyzers.append("bom_cross_ref")
 
+    # Phase 4b schematic-aware analyzers — enabled when the session has
+    # any schematic content attached (PDF text, KiCad native, or Altium).
+    if getattr(design, "schematic_components", None):
+        analyzers.append("sch_power_topology")
+        analyzers.append("sch_protection")
+        analyzers.append("sch_decoupling_per_ic")
+        analyzers.append("sch_component_rating")
+        # Three-way cross-ref runs whenever sch is present; degrades cleanly
+        # if BOM or layout is missing (see analyze_three_way_xref).
+        analyzers.append("three_way_xref")
+
     # Reference design comparison
     analyzers.append("reference_design")
 
@@ -1163,6 +1174,84 @@ def _run_generic_analyzer(
     return result
 
 
+def _run_schematic_callable(
+    design: PCBDesignData,
+    domain_name: str,
+    module_path: str,
+    callable_name: str,
+    schematic_only: bool = False,
+    pass_bom: bool = False,
+) -> DomainResult:
+    """Runner for Phase 4b schematic analyzers (module-level functions).
+
+    The Phase 4b analyzers expose plain functions rather than classes, so
+    this helper imports + invokes them with the appropriate argument set
+    drawn from ``design``. Each function already returns ``ReviewFinding``
+    objects directly, so we append them as-is.
+    """
+    import importlib
+
+    result = DomainResult(domain=domain_name, analyzer_name=callable_name)
+    try:
+        mod = importlib.import_module(module_path)
+        fn = getattr(mod, callable_name)
+        sc = list(getattr(design, "schematic_components", []) or [])
+        sn = list(getattr(design, "schematic_nets", []) or [])
+        if not sc and not sn and schematic_only:
+            result.status = "skipped"
+            return result
+        if pass_bom:
+            findings = fn(sc, sn, list(getattr(design, "bom_items", []) or []))
+        else:
+            findings = fn(sc, sn)
+        result.findings.extend(findings or [])
+        result.status = (
+            "fail" if result.critical_count > 0
+            else "warning" if result.warning_count > 0
+            else "pass"
+        )
+    except Exception as e:
+        result.status = "error"
+        result.error = str(e)
+        result.findings.append(ReviewFinding(
+            domain=domain_name,
+            severity="info",
+            title=f"{callable_name} error",
+            description=str(e),
+            recommendation="",
+        ))
+    return result
+
+
+def _run_three_way_xref(design: PCBDesignData) -> DomainResult:
+    """Runner for the three-way (sch ↔ BOM ↔ layout) cross-reference."""
+    from .analyzers.validation.three_way_xref import analyze_three_way_xref
+    result = DomainResult(domain="three_way_xref", analyzer_name="analyze_three_way_xref")
+    try:
+        findings = analyze_three_way_xref(
+            schematic_components=list(getattr(design, "schematic_components", []) or []),
+            bom_items=list(getattr(design, "bom_items", []) or []),
+            layout_components=list(getattr(design, "components", []) or []),
+        )
+        result.findings.extend(findings or [])
+        result.status = (
+            "fail" if result.critical_count > 0
+            else "warning" if result.warning_count > 0
+            else "pass"
+        )
+    except Exception as e:
+        result.status = "error"
+        result.error = str(e)
+        result.findings.append(ReviewFinding(
+            domain="three_way_xref",
+            severity="info",
+            title="three_way_xref error",
+            description=str(e),
+            recommendation="",
+        ))
+    return result
+
+
 def _run_ethernet_analysis(
     design: PCBDesignData,
     interfaces: InterfaceDetectionResult,
@@ -1869,6 +1958,32 @@ def run_design_review(
                 design, net_cls, "bom_cross_reference",
                 "mcp_pcb_emcopilot.analyzers.validation.bom_cross_reference", "BOMCrossReferenceAnalyzer"
             ))
+        elif key == "sch_power_topology":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_power",
+                "mcp_pcb_emcopilot.analyzers.schematic.power_topology", "analyze_power_topology",
+                schematic_only=True,
+            ))
+        elif key == "sch_protection":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_protection",
+                "mcp_pcb_emcopilot.analyzers.schematic.protection_circuits", "analyze_protection_circuits",
+                pass_bom=False,
+            ))
+        elif key == "sch_decoupling_per_ic":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_decoupling",
+                "mcp_pcb_emcopilot.analyzers.schematic.decoupling_per_ic", "analyze_decoupling_per_ic",
+                pass_bom=False,
+            ))
+        elif key == "sch_component_rating":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_rating",
+                "mcp_pcb_emcopilot.analyzers.schematic.component_rating", "analyze_component_rating",
+                pass_bom=True,
+            ))
+        elif key == "three_way_xref":
+            domain_results.append(_run_three_way_xref(design))
         elif key == "reference_design":
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "reference_design",
