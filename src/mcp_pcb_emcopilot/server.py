@@ -1052,6 +1052,29 @@ async def list_tools() -> list[Tool]:
         _make_tool("pcb_cross_reference_schematic", "Cross-reference schematic components/nets against layout. Finds missing components, extra components, value mismatches, and unrouted nets. Requires both schematic and layout data in the session.", {
             "session_id": {"type": "string", "description": "Session ID with both schematic and layout data loaded"},
         }, ["session_id"]),
+        _make_tool("pcb_parse_schematic", "Parse a schematic file with auto format detection (.kicad_sch, .SchDoc, .pdf, .net). Populates schematic_components and schematic_nets on the session. Use over pcb_parse_schematic_pdf when you want format-agnostic parsing.", {
+            "file_path": {"type": "string", "description": "Path to schematic file."},
+            "session_id": {"type": "string", "description": "Existing session id (reuses session if provided)."},
+            "format": {"type": "string", "enum": ["auto", "kicad", "altium", "pdf", "netlist"], "default": "auto", "description": "Force a specific parser."},
+        }, ["file_path"]),
+        _make_tool("pcb_parse_bom", "Parse a BOM (CSV or Excel) and attach the items to the session for downstream cross-reference and rating analyzers.", {
+            "file_path": {"type": "string", "description": "Path to BOM file (.csv or .xlsx)."},
+            "session_id": {"type": "string", "description": "Existing session id."},
+        }, ["file_path", "session_id"]),
+        _make_tool("pcb_analyze_power_topology", "Walk the schematic's power nets and report missing bulk/bypass caps, ungrounded rails, and rails without an identified regulator/input source. Requires schematic data via pcb_parse_schematic.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data loaded."},
+            "min_decaps_per_rail": {"type": "integer", "default": 2, "description": "Minimum capacitor count per power rail."},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_protection_circuits", "Identify external-facing nets (USB, Ethernet, antenna ports, GPIO headers, CAN/LIN buses, etc.) and check for TVS/ESD diodes, common-mode chokes on differential pairs, and fuses on power inputs.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_decoupling_per_ic", "For each IC in the schematic, count capacitors on its Vdd-class nets and flag ICs under-decoupled relative to the 1-cap-per-Vdd-pin guideline.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+            "min_caps_per_vdd_pin": {"type": "number", "default": 1.0, "description": "Required cap-to-Vdd-pin ratio."},
+        }, ["session_id"]),
+        _make_tool("pcb_three_way_cross_reference", "Compare schematic, BOM, and layout component lists in one pass. Detects missing components, footprint mismatches, value mismatches, DNP flag inconsistencies, MPN divergence, and manufacturer differences. Severity-graded per the playbook.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
 
         # =====================================================================
         # DESIGN REVIEW ORCHESTRATION (5 tools)
@@ -2498,6 +2521,143 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             "warnings": validation.warnings,
             "component_mismatches": [_serialize(m) for m in validation.component_mismatches],
             "net_mismatches": [_serialize(m) for m in validation.net_mismatches],
+        }
+
+    if name == "pcb_parse_schematic":
+        from .parsers.schematic_dispatch import detect_format, parse_schematic_auto
+        file_path = args["file_path"]
+        forced_format = args.get("format", "auto")
+        if forced_format != "auto":
+            # Caller wants a specific parser — emulate detect_format and run.
+            pass
+        else:
+            forced_format = detect_format(file_path)
+            if forced_format == "unknown":
+                raise ValidationError(
+                    "UNSUPPORTED_FORMAT",
+                    f"Could not detect schematic format for {file_path!r}",
+                    {"file_path": file_path},
+                )
+        try:
+            parsed = parse_schematic_auto(file_path)
+        except ValueError as e:
+            raise ValidationError("PARSE_FAILED", str(e), {"file_path": file_path}) from e
+        existing_sid = args.get("session_id")
+        if existing_sid and sessions.get_session(existing_sid) is not None:
+            data = sessions.get_session(existing_sid)
+            assert data is not None
+            data.schematic_components = parsed["components"]
+            data.schematic_nets = parsed["nets"]
+            if parsed["source_format"] == "pdf":
+                data.schematic_pdf_path = parsed.get("file_path")
+                data.schematic_pages = parsed.get("pages", [])
+            sid = existing_sid
+        else:
+            data = PCBDesignData(
+                source_file=file_path,
+                source_format=f"schematic_{parsed['source_format']}",
+                schematic_components=parsed["components"],
+                schematic_nets=parsed["nets"],
+            )
+            if parsed["source_format"] == "pdf":
+                data.schematic_pdf_path = parsed.get("file_path")
+                data.schematic_pages = parsed.get("pages", [])
+            sid = sessions.create_session(data)
+        return {
+            "success": True,
+            "session_id": sid,
+            "source_format": parsed["source_format"],
+            "component_count": len(parsed["components"]),
+            "net_count": len(parsed["nets"]),
+            "title": parsed.get("title"),
+            "warnings": parsed.get("warnings", []),
+        }
+
+    if name == "pcb_parse_bom":
+        from .parsers.bom_parser import BOMParser
+        file_path = args["file_path"]
+        sid = args["session_id"]
+        data = _get_session(sid)
+        parser = BOMParser()
+        bom_data = parser.parse(file_path)
+        data.bom_items = list(bom_data.items)
+        # Build a quick refdes index for the cross-ref tool.
+        ref_count = 0
+        for item in bom_data.items:
+            refs = (item.references or "").split(",") if isinstance(item.references, str) else item.references
+            ref_count += sum(1 for r in refs if r and str(r).strip())
+        return {
+            "success": True,
+            "session_id": sid,
+            "total_line_items": bom_data.total_items,
+            "total_references": ref_count,
+            "title": bom_data.title,
+            "revision": bom_data.revision,
+            "warnings": list(bom_data.warnings or []),
+        }
+
+    if name == "pcb_analyze_power_topology":
+        from .analyzers.schematic.power_topology import analyze_power_topology
+        data = _get_session(args["session_id"])
+        findings = analyze_power_topology(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+            bom_items=data.bom_items or [],
+            min_decaps_per_rail=int(args.get("min_decaps_per_rail", 2)),
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_power",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_analyze_protection_circuits":
+        from .analyzers.schematic.protection_circuits import (
+            analyze_protection_circuits,
+        )
+        data = _get_session(args["session_id"])
+        findings = analyze_protection_circuits(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_protection",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_analyze_decoupling_per_ic":
+        from .analyzers.schematic.decoupling_per_ic import (
+            analyze_decoupling_per_ic,
+        )
+        data = _get_session(args["session_id"])
+        findings = analyze_decoupling_per_ic(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+            min_caps_per_vdd_pin=float(args.get("min_caps_per_vdd_pin", 1.0)),
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_decoupling",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_three_way_cross_reference":
+        from .analyzers.validation.three_way_xref import analyze_three_way_xref
+        data = _get_session(args["session_id"])
+        findings = analyze_three_way_xref(
+            schematic_components=data.schematic_components or [],
+            bom_items=data.bom_items or [],
+            layout_components=data.components or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "three_way_xref",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
         }
 
     # === DESIGN REVIEW ORCHESTRATION ===
