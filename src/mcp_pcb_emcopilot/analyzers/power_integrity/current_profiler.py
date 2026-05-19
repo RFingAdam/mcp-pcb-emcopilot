@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-
 # =============================================================================
 # Part current consumption database
 # =============================================================================
@@ -336,7 +335,7 @@ PART_DATABASE: Dict[str, Dict[str, Any]] = {
 }
 
 # Pre-compile the regex patterns for efficient matching
-_COMPILED_PATTERNS: List[tuple] = []
+_COMPILED_PATTERNS: List[tuple[re.Pattern[str], Dict[str, Any]]] = []
 for _pattern_str, _profile in PART_DATABASE.items():
     if _pattern_str == "DEFAULT_IC":
         continue
@@ -462,117 +461,117 @@ def _current_for_mode(profile: Dict[str, Any], mode: str) -> float:
 
     if mode == "deep_sleep":
         # Everything in lowest-power state
-        ua = profile.get("sleep_ua", 0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0  # uA → mA
 
     if mode == "light_sleep":
         # RAM retained: memory at self-refresh, MCU at sleep, radios off
         if ptype == "memory":
-            return profile.get("self_refresh_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("self_refresh_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "idle":
-        return profile.get("idle_ma", 0) or profile.get("active_ma", 0) * 0.3
+        return float(profile.get("idle_ma", 0) or 0.0) or profile.get("active_ma", 0) * 0.3
 
     if mode == "active":
-        return profile.get("active_ma", 0) or profile.get("idle_ma", 0) * 2
+        return float(profile.get("active_ma", 0) or 0.0) or profile.get("idle_ma", 0) * 2
 
     # Radio TX modes
     if mode in ("ble_advertising", "ble_connected"):
         if ptype in ("ble",):
-            return profile.get("tx_ma", 0)
+            return float(profile.get("tx_ma", 0) or 0.0)
         if ptype in ("mcu",):
-            return profile.get("idle_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("idle_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode in ("wifi_tx",):
         if ptype == "wifi":
-            return profile.get("tx_ma", 0)
+            return float(profile.get("tx_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "wifi_idle":
         if ptype == "wifi":
-            return profile.get("idle_ma", 0)
+            return float(profile.get("idle_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("idle_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("idle_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode in ("cellular_tx",):
         if ptype == "cellular":
-            return profile.get("tx_ma", 0)
+            return float(profile.get("tx_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "gnss_acquisition":
         if ptype == "gnss":
-            return profile.get("acquisition_ma", 0)
+            return float(profile.get("acquisition_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "gnss_tracking":
         if ptype == "gnss":
-            return profile.get("tracking_ma", 0)
+            return float(profile.get("tracking_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("idle_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("idle_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "sensor_read":
         if ptype == "sensor":
-            return profile.get("active_ma", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "halow_tx":
         if ptype == "halow":
-            return profile.get("tx_ma", 0)
+            return float(profile.get("tx_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     if mode == "lora_tx":
         if ptype == "lora":
-            return profile.get("tx_ma", 0)
+            return float(profile.get("tx_ma", 0) or 0.0)
         if ptype == "mcu":
-            return profile.get("active_ma", 0)
-        ua = profile.get("sleep_ua", 0)
+            return float(profile.get("active_ma", 0) or 0.0)
+        ua = float(profile.get("sleep_ua") or 0)
         return ua / 1000.0
 
     # PMIC / regulator quiescent always present
     if ptype in ("pmic", "regulator"):
-        ua = profile.get("quiescent_ua", 0)
+        ua = float(profile.get("quiescent_ua") or 0)
         return ua / 1000.0
 
     # Ethernet PHY
     if ptype == "ethernet_phy":
         if mode in ("deep_sleep", "light_sleep"):
-            return profile.get("sleep_ma", 0)
-        return profile.get("active_ma", 0)
+            return float(profile.get("sleep_ma", 0) or 0.0)
+        return float(profile.get("active_ma", 0) or 0.0)
 
     # USB hub/controller
     if ptype in ("usb_hub", "usb_controller"):
         if mode in ("deep_sleep", "light_sleep"):
-            return profile.get("sleep_ma", 0)
-        return profile.get("active_ma", 0)
+            return float(profile.get("sleep_ma", 0) or 0.0)
+        return float(profile.get("active_ma", 0) or 0.0)
 
     # Storage
     if ptype == "storage":
         if mode in ("deep_sleep", "light_sleep"):
-            return profile.get("idle_ma", 0)
-        return profile.get("active_ma", 0) if mode == "active" else profile.get("idle_ma", 0)
+            return float(profile.get("idle_ma", 0) or 0.0)
+        return float(profile.get("active_ma", 0) or 0.0) if mode == "active" else profile.get("idle_ma", 0)
 
     return 0.0
 
@@ -580,7 +579,7 @@ def _current_for_mode(profile: Dict[str, Any], mode: str) -> float:
 def _quiescent_current_ma(profile: Dict[str, Any]) -> float:
     """Get always-on quiescent current for PMICs/regulators."""
     if profile.get("type") in ("pmic", "regulator"):
-        return profile.get("quiescent_ua", 0) / 1000.0
+        return float(profile.get("quiescent_ua", 0) or 0.0) / 1000.0
     return 0.0
 
 

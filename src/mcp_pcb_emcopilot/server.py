@@ -46,6 +46,7 @@ from .errors import (
 )
 from .models.pcb_data import PCBDesignData
 from .parsers import detect_format, parse_pcb_file
+from .review_playbook import SERVER_INSTRUCTIONS, start_professional_review
 from .session import DesignSessionManager
 
 # Physical constants
@@ -53,7 +54,7 @@ C0 = 299792458.0
 MU0 = 4 * math.pi * 1e-7
 EPS0 = 8.854e-12
 
-server = Server("mcp-pcb-emcopilot")
+server = Server("mcp-pcb-emcopilot", instructions=SERVER_INSTRUCTIONS)
 sessions = DesignSessionManager()
 
 
@@ -538,9 +539,10 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         # FILE PARSING (6 tools)
         # =====================================================================
-        _make_tool("pcb_parse_layout", "Parse a PCB layout file (KiCad, ODB++, Gerber, Altium, IPC-2581). Returns session_id for subsequent queries.", {
+        _make_tool("pcb_parse_layout", "Parse a PCB layout file (KiCad, ODB++, Gerber, Altium, IPC-2581). Returns session_id for subsequent queries. If a session_id from pcb_start_professional_review is supplied, parsed data is written into that existing session (preserves playbook state).", {
             "file_path": {"type": "string", "description": "Path to PCB file"},
             "format": {"type": "string", "description": "Force format: kicad, odb, gerber, altium, ipc2581"},
+            "session_id": {"type": "string", "description": "Optional. Reuse an existing session (e.g. returned by pcb_start_professional_review) instead of creating a new one. Preserves review_context and playbook state."},
         }, ["file_path"]),
         _make_tool("pcb_get_stackup", "Get layer stackup from a parsed design.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
@@ -1050,10 +1052,54 @@ async def list_tools() -> list[Tool]:
         _make_tool("pcb_cross_reference_schematic", "Cross-reference schematic components/nets against layout. Finds missing components, extra components, value mismatches, and unrouted nets. Requires both schematic and layout data in the session.", {
             "session_id": {"type": "string", "description": "Session ID with both schematic and layout data loaded"},
         }, ["session_id"]),
+        _make_tool("pcb_parse_schematic", "Parse a schematic file with auto format detection (.kicad_sch, .SchDoc, .pdf, .net). Populates schematic_components and schematic_nets on the session. Use over pcb_parse_schematic_pdf when you want format-agnostic parsing.", {
+            "file_path": {"type": "string", "description": "Path to schematic file."},
+            "session_id": {"type": "string", "description": "Existing session id (reuses session if provided)."},
+            "format": {"type": "string", "enum": ["auto", "kicad", "altium", "pdf", "netlist"], "default": "auto", "description": "Force a specific parser."},
+        }, ["file_path"]),
+        _make_tool("pcb_parse_bom", "Parse a BOM (CSV or Excel) and attach the items to the session for downstream cross-reference and rating analyzers.", {
+            "file_path": {"type": "string", "description": "Path to BOM file (.csv or .xlsx)."},
+            "session_id": {"type": "string", "description": "Existing session id."},
+        }, ["file_path", "session_id"]),
+        _make_tool("pcb_analyze_power_topology", "Walk the schematic's power nets and report missing bulk/bypass caps, ungrounded rails, and rails without an identified regulator/input source. Requires schematic data via pcb_parse_schematic.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data loaded."},
+            "min_decaps_per_rail": {"type": "integer", "default": 2, "description": "Minimum capacitor count per power rail."},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_protection_circuits", "Identify external-facing nets (USB, Ethernet, antenna ports, GPIO headers, CAN/LIN buses, etc.) and check for TVS/ESD diodes, common-mode chokes on differential pairs, and fuses on power inputs.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_decoupling_per_ic", "For each IC in the schematic, count capacitors on its Vdd-class nets and flag ICs under-decoupled relative to the 1-cap-per-Vdd-pin guideline.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+            "min_caps_per_vdd_pin": {"type": "number", "default": 1.0, "description": "Required cap-to-Vdd-pin ratio."},
+        }, ["session_id"]),
+        _make_tool("pcb_analyze_signal_flow", "Trace clock distribution, reset distribution, and JTAG/SWD accessibility through the schematic. Flags clock fan-out > 4 unbuffered loads, multi-driver reset contention, ICs without debug headers, and reset nets missing a supervisor IC.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+        }, ["session_id"]),
+        _make_tool("pcb_three_way_cross_reference", "Compare schematic, BOM, and layout component lists in one pass. Detects missing components, footprint mismatches, value mismatches, DNP flag inconsistencies, MPN divergence, and manufacturer differences. Severity-graded per the playbook.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
 
         # =====================================================================
         # DESIGN REVIEW ORCHESTRATION (5 tools)
         # =====================================================================
+        _make_tool("pcb_start_professional_review", "ENTRY POINT for a meticulous senior-consulting-engineer design review. Call this FIRST, before any parser or analyzer. Classifies the user's input files (schematic, layout, stackup, BOM, STEP, etc.), selects the per-market question pack and standards shortlist, and returns the binding 8-pass playbook (P0-P8) that Claude must follow. See docs/CLAUDE_REVIEW_PLAYBOOK.md.", {
+            "input_files": {"type": "array", "items": {"type": "string"}, "description": "List of file paths the user has provided for the review (any combination of layout, schematic, stackup, BOM, STEP, datasheets)."},
+            "declared_market": {"type": "string", "enum": ["automotive", "medical", "wireless", "commercial", "industrial", "unknown"], "description": "Declared product market. Drives question pack + standards shortlist. Use 'unknown' if not yet known.", "default": "unknown"},
+            "product_description": {"type": "string", "description": "Short free-text product description (optional)."},
+            "extra_markets": {"type": "array", "items": {"type": "string"}, "description": "Additional markets that apply (e.g. wireless+medical for a connected medical device)."},
+        }, ["input_files"]),
+        _make_tool("pcb_set_market", "Set or add a market on an existing review session (e.g. switching from commercial to automotive, or adding wireless on top of medical for a connected device). Updates the session's question pack and standards shortlist. Call before pcb_get_review_questions to receive the merged pack.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "market_id": {"type": "string", "enum": ["automotive", "medical", "wireless", "commercial", "industrial"], "description": "Market preset to activate."},
+            "replace": {"type": "boolean", "default": False, "description": "If true, replace the current market list; if false (default), append to it."},
+            "sub_options": {"type": "object", "description": "Optional sub-market options (e.g. {'vehicle_class':'passenger'} pre-fills automotive answers)."},
+        }, ["session_id", "market_id"]),
+        _make_tool("pcb_get_standards_coverage", "Return the per-standard coverage report for the session: which analyzers ran, which are still required, which standards are stub or unimplemented. Surfaces gaps the human reviewer should resolve before final sign-off.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
+        _make_tool("pcb_validate_review_complete", "Run the preflight gate. Refuses to advance unless the active markets' required questions are answered, at least one standard is selected, and no stub/unimplemented standards lack a human-review note. Returns a ValidationGate breakdown.", {
+            "session_id": {"type": "string", "description": "Session id."},
+        }, ["session_id"]),
         _make_tool("pcb_set_review_context", "Set design review context: requirements, standards, known issues, operating conditions. Call before pcb_run_design_review.", {
             "session_id": {"type": "string", "description": "Session ID from pcb_parse_layout"},
             "design_intent": {"type": "string", "description": "Free-text description of the design purpose"},
@@ -1091,7 +1137,35 @@ async def list_tools() -> list[Tool]:
             "confidentiality": {"type": "string", "default": "CONFIDENTIAL", "description": "Confidentiality marking for header/footer"},
             "run_analysis": {"type": "boolean", "default": False, "description": "If true, runs pcb_run_design_review first"},
             "auto_render": {"type": "boolean", "default": True, "description": "Auto-generate board/net renders for findings"},
+            "force": {"type": "boolean", "default": False, "description": "If true, bypass the cross-MCP gate and emit a PRELIMINARY-stamped report even when pending external actions are unresolved."},
         }, ["session_id"]),
+
+        # =====================================================================
+        # CROSS-MCP COORDINATION (Phase 3 — sibling-MCP intent queue)
+        # =====================================================================
+        _make_tool("pcb_suggest_next_actions", "Return the prioritised list of sibling-MCP calls (openEMS / NEC2 / emc-regulations / drawio) Claude should execute to verify or enrich the current findings. Populated by pcb_run_design_review. Drained as Claude calls each suggested tool then feeds the result back via pcb_attach_external_result.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "domains": {"type": "array", "items": {"type": "string"}, "description": "Optional domain filter (e.g. ['signal_integrity','emc'])."},
+            "max_actions": {"type": "integer", "default": 20, "description": "Cap on the number of actions returned."},
+            "include_completed": {"type": "boolean", "default": False, "description": "If true, also include actions already completed (for audit)."},
+        }, ["session_id"]),
+        _make_tool("pcb_attach_external_result", "Feed a sibling-MCP result back to the session. The orchestrator marks the matching action complete and updates the linked finding's verified/confidence/source fields based on the result.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "action_id": {"type": "string", "description": "Action id from pcb_suggest_next_actions."},
+            "result": {"type": "object", "description": "Raw result returned by the sibling MCP."},
+            "error": {"type": "string", "description": "Optional error string if the sibling MCP failed; mutually exclusive with a real result."},
+        }, ["session_id", "action_id"]),
+        _make_tool("pcb_finalize_review", "Close out the multi-pass review. Refuses to succeed if any pending critical-priority action remains unresolved (unless force=true). Returns a finalisation summary that includes the action backlog status, confidence audit, and self-critique pointer.", {
+            "session_id": {"type": "string", "description": "Session id."},
+            "require_critical_verified": {"type": "boolean", "default": True, "description": "If true, refuse to finalize while any pending critical-priority action remains."},
+        }, ["session_id"]),
+        _make_tool("pcb_lookup_limit_live", "Look up a regulatory limit from the emc-regulations sibling MCP. Returns either a cached/fallback value (with a 'pending_refresh' flag) or a deferred next-action Claude should execute against mcp__emc-regulations__*.", {
+            "standard": {"type": "string", "description": "Standard id (e.g. CISPR_25, FCC_PART_15_B, ISO_11452_4, IEC_60601_1_2)."},
+            "class_or_level": {"type": "string", "description": "Class or level token (e.g. '3', 'B', 'II')."},
+            "frequency_mhz": {"type": "number", "description": "Frequency in MHz at which to evaluate the limit."},
+            "detector": {"type": "string", "default": "QP", "description": "Detector: QP (quasi-peak), AVG, PK."},
+            "fallback": {"type": "boolean", "default": True, "description": "If true, return a local-table fallback when the sibling MCP isn't reachable."},
+        }, ["standard", "class_or_level", "frequency_mhz"]),
 
         # =====================================================================
         # RETURN CURRENT / GROUND STITCHING (2 tools)
@@ -1380,7 +1454,20 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
     # === FILE PARSING ===
     if name == "pcb_parse_layout":
         data = parse_pcb_file(args["file_path"], args.get("format"))
-        sid = sessions.create_session(data)
+        existing_sid = args.get("session_id")
+        if existing_sid and sessions.get_session(existing_sid) is not None:
+            # Preserve any review_context (playbook state, market, answers) from
+            # the existing session and write the freshly parsed data in place.
+            prior = sessions.get_session(existing_sid)
+            assert prior is not None  # narrowed by the check above
+            if prior.review_context:
+                data.review_context = dict(prior.review_context)
+            if prior.review_results:
+                data.review_results = dict(prior.review_results)
+            sessions.replace_session(existing_sid, data)
+            sid = existing_sid
+        else:
+            sid = sessions.create_session(data)
         return {"success": True, "session_id": sid, **data.to_summary()}
 
     if name == "pcb_get_stackup":
@@ -2356,7 +2443,6 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             data.schematic_pages = page_dicts
             data.schematic_pdf_path = pdf_result.file_path
         else:
-            from .models.pcb_data import PCBDesignData
             data = PCBDesignData(
                 source_file=args["file_path"],
                 source_format="schematic_pdf",
@@ -2440,7 +2526,298 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             "net_mismatches": [_serialize(m) for m in validation.net_mismatches],
         }
 
+    if name == "pcb_parse_schematic":
+        from .parsers.schematic_dispatch import detect_format, parse_schematic_auto
+        file_path = args["file_path"]
+        forced_format = args.get("format", "auto")
+        if forced_format != "auto":
+            # Caller wants a specific parser — emulate detect_format and run.
+            pass
+        else:
+            forced_format = detect_format(file_path)
+            if forced_format == "unknown":
+                raise ValidationError(
+                    "UNSUPPORTED_FORMAT",
+                    f"Could not detect schematic format for {file_path!r}",
+                    {"file_path": file_path},
+                )
+        try:
+            parsed = parse_schematic_auto(file_path)
+        except ValueError as e:
+            raise ValidationError("PARSE_FAILED", str(e), {"file_path": file_path}) from e
+        existing_sid = args.get("session_id")
+        existing_session = sessions.get_session(existing_sid) if existing_sid else None
+        if existing_session is not None:
+            data = existing_session
+            data.schematic_components = parsed["components"]
+            data.schematic_nets = parsed["nets"]
+            if parsed["source_format"] == "pdf":
+                data.schematic_pdf_path = parsed.get("file_path")
+                data.schematic_pages = parsed.get("pages", [])
+            sid = existing_sid
+        else:
+            data = PCBDesignData(
+                source_file=file_path,
+                source_format=f"schematic_{parsed['source_format']}",
+                schematic_components=parsed["components"],
+                schematic_nets=parsed["nets"],
+            )
+            if parsed["source_format"] == "pdf":
+                data.schematic_pdf_path = parsed.get("file_path")
+                data.schematic_pages = parsed.get("pages", [])
+            sid = sessions.create_session(data)
+        return {
+            "success": True,
+            "session_id": sid,
+            "source_format": parsed["source_format"],
+            "component_count": len(parsed["components"]),
+            "net_count": len(parsed["nets"]),
+            "title": parsed.get("title"),
+            "warnings": parsed.get("warnings", []),
+        }
+
+    if name == "pcb_parse_bom":
+        from .parsers.bom_parser import BOMParser
+        file_path = args["file_path"]
+        sid = args["session_id"]
+        data = _get_session(sid)
+        bom_parser = BOMParser()
+        bom_data = bom_parser.parse(file_path)
+        # PCBDesignData.bom_items is typed as list[dict]; convert each
+        # ParsedBOMItem dataclass to a plain dict for storage. Downstream
+        # analyzers use ._normalise.coerce() which handles both forms,
+        # but the typed field needs concrete dicts.
+        from dataclasses import asdict as _asdict
+        data.bom_items = [_asdict(item) for item in bom_data.items]
+        # Build a quick refdes index for the cross-ref tool.
+        ref_count = 0
+        for item in bom_data.items:
+            refs = (item.references or "").split(",") if isinstance(item.references, str) else item.references
+            ref_count += sum(1 for r in refs if r and str(r).strip())
+        return {
+            "success": True,
+            "session_id": sid,
+            "total_line_items": bom_data.total_items,
+            "total_references": ref_count,
+            "title": bom_data.title,
+            "revision": bom_data.revision,
+            "warnings": list(bom_data.warnings or []),
+        }
+
+    if name == "pcb_analyze_power_topology":
+        from .analyzers.schematic.power_topology import analyze_power_topology
+        data = _get_session(args["session_id"])
+        findings = analyze_power_topology(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+            bom_items=data.bom_items or [],
+            min_decaps_per_rail=int(args.get("min_decaps_per_rail", 2)),
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_power",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_analyze_protection_circuits":
+        from .analyzers.schematic.protection_circuits import (
+            analyze_protection_circuits,
+        )
+        data = _get_session(args["session_id"])
+        findings = analyze_protection_circuits(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_protection",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_analyze_decoupling_per_ic":
+        from .analyzers.schematic.decoupling_per_ic import (
+            analyze_decoupling_per_ic,
+        )
+        data = _get_session(args["session_id"])
+        findings = analyze_decoupling_per_ic(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+            min_caps_per_vdd_pin=float(args.get("min_caps_per_vdd_pin", 1.0)),
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_decoupling",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_analyze_signal_flow":
+        from .analyzers.schematic.signal_flow import analyze_signal_flow
+        data = _get_session(args["session_id"])
+        findings = analyze_signal_flow(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_signal_flow",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
+    if name == "pcb_three_way_cross_reference":
+        from .analyzers.validation.three_way_xref import analyze_three_way_xref
+        data = _get_session(args["session_id"])
+        findings = analyze_three_way_xref(
+            schematic_components=data.schematic_components or [],
+            bom_items=data.bom_items or [],
+            layout_components=data.components or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "three_way_xref",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
     # === DESIGN REVIEW ORCHESTRATION ===
+    if name == "pcb_start_professional_review":
+        input_files = args.get("input_files") or []
+        if not input_files:
+            raise ValidationError("INVALID_INPUT", "input_files must be a non-empty list", {})
+        declared_market = (args.get("declared_market") or "unknown").strip().lower()
+        product_description = args.get("product_description")
+        extra_markets = args.get("extra_markets") or []
+        # Build a stub session so subsequent tool calls share the same id.
+        # The first input file becomes the placeholder source_file; the real
+        # parsed data is written later by pcb_parse_layout(session_id=...).
+        first_path = (
+            input_files[0]["path"] if isinstance(input_files[0], dict) else input_files[0]
+        )
+        stub = PCBDesignData(source_file=str(first_path), source_format="pending-parse")
+        sid = sessions.create_session(stub)
+        payload = start_professional_review(
+            session_id=sid,
+            input_files=input_files,
+            declared_market=declared_market,
+            product_description=product_description,
+            extra_markets=extra_markets,
+        )
+        # Persist the playbook state into the session's review_context so the
+        # rest of the workflow can read it back.
+        stub.review_context = {
+            "playbook": {
+                "input_manifest": payload.input_manifest,
+                "gaps": payload.gaps,
+                "interview_pack": payload.interview_pack,
+                "standards_shortlist": payload.standards_shortlist,
+                "analyzer_shortlist": payload.analyzer_shortlist,
+                "pass_checklist": payload.pass_checklist,
+                "declared_market": payload.declared_market,
+                "product_description": payload.product_description,
+                "notes": payload.notes,
+            },
+        }
+        return payload.to_dict()
+
+    if name == "pcb_set_market":
+        from . import market_packs
+        from .review_playbook import (
+            build_interview_pack,
+            compute_analyzer_shortlist,
+            compute_standards_shortlist,
+        )
+        sid = args["session_id"]
+        data = _get_session(sid)
+        market_id = str(args["market_id"]).strip().lower()
+        if market_id not in market_packs.KNOWN_MARKETS:
+            raise ValidationError(
+                "INVALID_MARKET",
+                f"Unknown market '{market_id}'. Known: {sorted(market_packs.KNOWN_MARKETS)}",
+                {"market_id": market_id},
+            )
+        replace = bool(args.get("replace", False))
+        sub_options = args.get("sub_options") or {}
+        # Initialise review_context buckets.
+        if not data.review_context:
+            data.review_context = {}
+        if "markets" not in data.review_context or not isinstance(data.review_context["markets"], list):
+            data.review_context["markets"] = []
+        markets: list[str] = list(data.review_context["markets"])
+        if replace:
+            markets = [market_id]
+        elif market_id not in markets:
+            markets.append(market_id)
+        data.review_context["markets"] = markets
+        # Pre-fill sub_options into interactive_answers.
+        if "interactive_answers" not in data.review_context:
+            data.review_context["interactive_answers"] = {}
+        for k, v in sub_options.items():
+            data.review_context["interactive_answers"][k] = v
+        # Update the playbook state so subsequent get_review_questions /
+        # standards_shortlist calls see the merged view.
+        pb = data.review_context.setdefault("playbook", {})
+        pb["active_markets"] = list(markets)
+        pb["declared_market"] = markets[0] if markets else "unknown"
+        # Recompute the shortlists + interview pack at the playbook level.
+        manifest = pb.get("input_manifest", [])
+        pb["interview_pack"] = build_interview_pack(manifest, markets[0] if markets else "unknown",
+                                                    extra_markets=markets[1:])
+        pb["standards_shortlist"] = compute_standards_shortlist(
+            markets[0] if markets else "unknown", manifest, extra_markets=markets[1:]
+        )
+        pb["analyzer_shortlist"] = compute_analyzer_shortlist(
+            markets[0] if markets else "unknown", manifest, extra_markets=markets[1:]
+        )
+        # Reflect the merged standards onto target_standards too.
+        existing_targets = list(data.review_context.get("target_standards") or [])
+        for s in pb["standards_shortlist"]:
+            if s not in existing_targets:
+                existing_targets.append(s)
+        data.review_context["target_standards"] = existing_targets
+        return {
+            "session_id": sid,
+            "markets": markets,
+            "standards_shortlist": pb["standards_shortlist"],
+            "analyzer_shortlist": pb["analyzer_shortlist"],
+            "interview_pack_count": len(pb["interview_pack"]),
+        }
+
+    if name == "pcb_get_standards_coverage":
+        from .standards.preflight import coverage_summary
+        sid = args["session_id"]
+        data = _get_session(sid)
+        # Derive the set of analyzers that ran from the orchestrator's stored
+        # review_results — domain names there map 1:1 to the analyzer ids in
+        # standards/coverage.py.
+        ran_coverage: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran_coverage.append(dom)
+        coverage_out: dict[str, Any] = coverage_summary(data, ran_analyzers=ran_coverage)
+        coverage_out["session_id"] = sid
+        coverage_out["ran_analyzers"] = ran_coverage
+        return coverage_out
+
+    if name == "pcb_validate_review_complete":
+        from .standards.preflight import validate_review_complete
+        sid = args["session_id"]
+        data = _get_session(sid)
+        ran_validate: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran_validate.append(dom)
+        gate = validate_review_complete(data, ran_analyzers=ran_validate)
+        out = gate.to_dict()
+        out["session_id"] = sid
+        return out
+
     if name == "pcb_set_review_context":
         from .orchestrator import set_review_context
         data = _get_session(args["session_id"])
@@ -2456,10 +2833,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return {"success": True, "session_id": args["session_id"], "review_context": ctx}
 
     if name == "pcb_get_review_questions":
-        from .review_context import get_review_questions
-        from .classifiers.net_classifier import NetClassifier
         from .classifiers.design_classifier import DesignClassifier
         from .classifiers.interface_detector import InterfaceDetector
+        from .classifiers.net_classifier import NetClassifier
+        from .review_context import get_review_questions
         data = _get_session(args["session_id"])
         net_cls = NetClassifier().classify(data)
         ifaces = InterfaceDetector().detect(data, net_cls)
@@ -2503,10 +2880,268 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         # Known limitation: _dispatch is sync, so run_in_executor cannot be
         # used here without refactoring the dispatch architecture.
         # TODO: wrap in asyncio.to_thread() once _dispatch is made async-aware.
-        from .orchestrator import run_design_review
+        from .orchestrator import _emit_next_actions, run_design_review
         data = _get_session(args["session_id"])
         result = run_design_review(data, args["session_id"])
-        return result.to_dict()
+        # Phase 3: emit sibling-MCP escalation suggestions and enqueue them
+        # on the session for Claude to drain via pcb_suggest_next_actions.
+        try:
+            actions = _emit_next_actions(data, result)
+            if actions:
+                sessions.enqueue_actions(args["session_id"], actions)
+        except Exception:  # pragma: no cover — escalation never blocks the review
+            actions = []
+        out = result.to_dict()
+        out["next_actions"] = [a.to_dict() for a in actions]
+        return out
+
+    if name == "pcb_suggest_next_actions":
+        from .integrations.external_actions import (
+            STATUS_PENDING,
+            sort_by_priority,
+        )
+        sid = args["session_id"]
+        # Ensure session exists (raises SessionError if not).
+        _get_session(sid)
+        actions = sessions.get_pending_actions(sid)
+        include_completed = bool(args.get("include_completed", False))
+        if not include_completed:
+            actions = [a for a in actions if a.status == STATUS_PENDING]
+        domain_filter = args.get("domains") or []
+        if domain_filter:
+            wanted = {str(d).lower() for d in domain_filter}
+            # Domain isn't on ExternalAction directly — it's on the linked
+            # findings. Use the finding-id prefix as a coarse proxy.
+            def _matches(a: Any) -> bool:
+                for fid in a.linked_finding_ids:
+                    prefix = fid.split("-", 1)[0].lower()
+                    if any(prefix.startswith(w[:3]) for w in wanted):
+                        return True
+                return False
+            actions = [a for a in actions if _matches(a)]
+        max_actions = int(args.get("max_actions") or 20)
+        actions = sort_by_priority(actions)[:max_actions]
+        return {
+            "session_id": sid,
+            "count": len(actions),
+            "actions": [a.to_dict() for a in actions],
+        }
+
+    if name == "pcb_attach_external_result":
+        from .integrations.external_actions import ExternalResult
+        sid = args["session_id"]
+        _get_session(sid)
+        action_id = args["action_id"]
+        action = sessions.find_action(sid, action_id)
+        if action is None:
+            raise ValidationError(
+                "UNKNOWN_ACTION",
+                f"No pending action with id '{action_id}' in session '{sid}'.",
+                {"action_id": action_id, "session_id": sid},
+            )
+        result_payload = args.get("result") or {}
+        if isinstance(result_payload, str):
+            import json as _json
+            result_payload = _json.loads(result_payload)
+        err = args.get("error")
+        ext_result = ExternalResult(
+            action_id=action_id,
+            result=dict(result_payload),
+            error=err if err else None,
+            received_at=time.time(),
+        )
+        sessions.record_result(sid, ext_result)
+
+        # Bridge-specific post-processing -----------------------------------
+        # (a) emc-regulations → write the resolved limit into the runtime
+        # cache so subsequent get_limit calls return the live value.
+        live_limit_cached = False
+        if action.mcp_server == "emc-regulations" and ext_result.succeeded:
+            try:
+                from .integrations.regulations_bridge import apply_limit_result
+                live_limit_cached = apply_limit_result(action, ext_result.result) is not None
+            except Exception:  # pragma: no cover — never block on bridge errors
+                live_limit_cached = False
+
+        # (b) openEMS → run compare_results against the linked finding's
+        # analytical value and update verified/confidence/severity per
+        # SIM_TOLERANCE_PCT.
+        sim_status: str | None = None
+        sim_diff_pct: float | None = None
+        if action.mcp_server == "openems" and ext_result.succeeded:
+            from .integrations.openems_bridge import OpenEMSBridge
+            from .orchestrator import SIM_TOLERANCE_PCT
+            simulated_value = (
+                ext_result.result.get("simulated_value")
+                or ext_result.result.get("z0_ohm")
+                or ext_result.result.get("value")
+            )
+            analytical_value = (
+                action.params.get("analytical_value")
+                or ext_result.result.get("analytical_value")
+            )
+            if simulated_value is not None and analytical_value is not None:
+                try:
+                    vr = OpenEMSBridge().compare_results(
+                        parameter=str(ext_result.result.get("parameter", "impedance")),
+                        analytical_value=float(analytical_value),
+                        simulated_value=float(simulated_value),
+                        unit=str(ext_result.result.get("unit", "ohms")),
+                        tolerance_percent=SIM_TOLERANCE_PCT,
+                    )
+                    sim_status = vr.status
+                    sim_diff_pct = vr.difference_percent
+                except Exception:  # pragma: no cover
+                    sim_status = None
+
+        # Update the linked finding(s) on the cached review_results, if present.
+        data = _get_session(sid)
+        updated_findings: list[str] = []
+        if data.review_results:
+            verified_ok = ext_result.succeeded
+            for dr in data.review_results.get("domain_results", []):
+                for f in dr.get("findings", []):
+                    if f.get("finding_id") in action.linked_finding_ids:
+                        if verified_ok:
+                            f["verified"] = True
+                            # openEMS-specific severity / confidence updates
+                            if sim_status == "pass":
+                                f["confidence"] = 0.95
+                                f["source"] = "openems"
+                            elif sim_status == "warning":
+                                f["confidence"] = max(float(f.get("confidence", 0.8)), 0.6)
+                                f["source"] = "openems"
+                            elif sim_status == "fail":
+                                f["confidence"] = 0.95
+                                f["source"] = "openems"
+                                f["severity"] = "critical"
+                                # Append an explanatory note rather than overwriting
+                                note = (
+                                    f"Full-wave simulation invalidates analytical "
+                                    f"model (Δ {sim_diff_pct}% > tolerance)."
+                                )
+                                desc = f.get("description", "")
+                                if note not in desc:
+                                    f["description"] = f"{desc} {note}".strip()
+                            else:
+                                f["confidence"] = max(
+                                    float(f.get("confidence", 0.8)), 0.95
+                                )
+                                f["source"] = action.mcp_server
+                        else:
+                            f["source"] = (
+                                f.get("source", "analytical") + "+sim_failed"
+                            )
+                        updated_findings.append(f["finding_id"])
+        return {
+            "session_id": sid,
+            "action_id": action_id,
+            "status": action.status,
+            "updated_findings": updated_findings,
+            "sim_status": sim_status,
+            "sim_diff_pct": sim_diff_pct,
+            "live_limit_cached": live_limit_cached,
+        }
+
+    if name == "pcb_finalize_review":
+        from .integrations.external_actions import (
+            STATUS_PENDING,
+            has_pending_critical,
+        )
+        sid = args["session_id"]
+        data = _get_session(sid)
+        require_critical = bool(args.get("require_critical_verified", True))
+        actions = sessions.get_pending_actions(sid)
+        pending = [a for a in actions if a.status == STATUS_PENDING]
+        critical_pending = [a for a in pending if a.priority <= 1]
+        if require_critical and has_pending_critical(actions):
+            return {
+                "session_id": sid,
+                "status": "deferred",
+                "reason": "critical-priority actions still pending",
+                "pending_critical_actions": [a.to_dict() for a in critical_pending],
+                "total_pending": len(pending),
+            }
+        # Summarise confidence and verification state.
+        confidence_buckets = {"<0.5": 0, "0.5-0.7": 0, "0.7-0.9": 0, ">=0.9": 0}
+        verified_count = 0
+        finding_count = 0
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                for f in dr.get("findings", []):
+                    finding_count += 1
+                    c = float(f.get("confidence", 0.8))
+                    if c < 0.5:
+                        confidence_buckets["<0.5"] += 1
+                    elif c < 0.7:
+                        confidence_buckets["0.5-0.7"] += 1
+                    elif c < 0.9:
+                        confidence_buckets["0.7-0.9"] += 1
+                    else:
+                        confidence_buckets[">=0.9"] += 1
+                    if f.get("verified"):
+                        verified_count += 1
+        return {
+            "session_id": sid,
+            "status": "finalised",
+            "total_findings": finding_count,
+            "verified_findings": verified_count,
+            "confidence_distribution": confidence_buckets,
+            "total_pending_actions": len(pending),
+            "self_critique_pointer": "docs/SELF_CRITIQUE_CHECKLIST.md",
+        }
+
+    if name == "pcb_lookup_limit_live":
+        # Phase 3a stub. Returns a "deferred" envelope pointing Claude at the
+        # appropriate mcp__emc-regulations__* tool. The Phase 3b regulations
+        # bridge will replace this with cached / on-the-fly lookups + a real
+        # local-table fallback path.
+        standard = str(args.get("standard") or "").upper()
+        class_or_level = str(args.get("class_or_level") or "")
+        frequency_mhz = float(args.get("frequency_mhz") or 0.0)
+        detector_name = str(args.get("detector") or "QP")
+        fallback = bool(args.get("fallback", True))
+        # Map standard -> emc-regulations tool name.
+        std_to_tool = {
+            "CISPR_25": "cispr25_limit",
+            "FCC_PART_15_B": "fcc_part15_limit",
+            "FCC_PART_15_A": "fcc_part15_limit",
+            "ISO_11452_2": "iso11452_levels",
+            "ISO_11452_4": "iso11452_levels",
+            "ISO_11452_5": "iso11452_levels",
+            "IEC_60601_1_2": "medical_immunity_levels",
+            "IEC_60601_1_2_ED_4_1": "medical_immunity_levels",
+            "CISPR_32": "cispr_limit",
+            "EN_55032": "cispr_limit",
+        }
+        tool_name = std_to_tool.get(standard)
+        deferred_action = {
+            "mcp_server": "emc-regulations",
+            "tool_name": tool_name or "source_search",
+            "fully_qualified_tool_name": (
+                f"mcp__emc-regulations__{tool_name}" if tool_name else "mcp__emc-regulations__source_search"
+            ),
+            "params": {
+                "standard": standard,
+                "class_or_level": class_or_level,
+                "frequency_mhz": frequency_mhz,
+                "detector": detector_name,
+            },
+        }
+        return {
+            "status": "deferred",
+            "standard": standard,
+            "class_or_level": class_or_level,
+            "frequency_mhz": frequency_mhz,
+            "detector": detector_name,
+            "next_action": deferred_action,
+            "fallback_available": fallback,
+            "note": (
+                "Phase 3a stub: live lookups require the emc-regulations sibling "
+                "MCP. Phase 3b will add cached + fallback values via "
+                "analyzers/emc/limits_provider.py."
+            ),
+        }
 
     if name == "pcb_generate_report":
         from .orchestrator import generate_report
@@ -2527,12 +3162,67 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return {"success": True, "output_path": path, "session_id": args["session_id"]}
 
     if name == "pcb_generate_design_review_report":
+        from .integrations.external_actions import has_pending_critical
         from .reports.report_builder import ReportBuilder
-        data = _get_session(args["session_id"])
+        from .standards.preflight import (
+            coverage_summary,
+            validate_review_complete,
+        )
+        sid = args["session_id"]
+        data = _get_session(sid)
 
         if args.get("run_analysis", False):
-            from .orchestrator import run_design_review
-            run_design_review(data, args["session_id"])
+            from .orchestrator import _emit_next_actions, run_design_review
+            result = run_design_review(data, sid)
+            # Re-emit actions in case the caller chained run_analysis=True.
+            try:
+                emitted = _emit_next_actions(data, result)
+                if emitted:
+                    sessions.enqueue_actions(sid, emitted)
+            except Exception:  # pragma: no cover
+                pass
+
+        force = bool(args.get("force", False))
+
+        # Preflight gate (Phase 4): refuse to render when intake state is
+        # incomplete unless the caller forces it.
+        ran_for_gate: list[str] = []
+        if data.review_results:
+            for dr in data.review_results.get("domain_results", []):
+                dom = dr.get("domain")
+                if dom and dr.get("status") != "skipped":
+                    ran_for_gate.append(dom)
+        gate = validate_review_complete(data, ran_analyzers=ran_for_gate)
+        if not gate.ready and not force:
+            return {
+                "status": "deferred",
+                "session_id": sid,
+                "reason": (
+                    "Preflight gate failed: required intake fields are "
+                    "missing or no standard is selected. Run "
+                    "pcb_validate_review_complete for the full breakdown, "
+                    "or pass force=true to emit a PRELIMINARY-stamped report."
+                ),
+                "preflight": gate.to_dict(),
+            }
+
+        # Cross-MCP gate (Phase 3a): refuse to render while critical-priority
+        # sibling actions remain unresolved, unless force=True.
+        pending_actions = sessions.get_pending_actions(sid)
+        if has_pending_critical(pending_actions) and not force:
+            return {
+                "status": "deferred",
+                "session_id": sid,
+                "reason": (
+                    "Critical-priority sibling-MCP actions are still pending. "
+                    "Run them via the suggested mcp__* tools and feed results "
+                    "back through pcb_attach_external_result, or pass "
+                    "force=true to emit a PRELIMINARY-stamped report."
+                ),
+                "pending_actions": [
+                    a.to_dict() for a in pending_actions if a.status == "pending"
+                ],
+            }
 
         builder = ReportBuilder(
             design=data,
@@ -2541,7 +3231,23 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             output_dir=args.get("output_dir", "/tmp/pcb_reports"),
             auto_render=args.get("auto_render", True),
         )
-        return builder.generate(format=args.get("format", "both"))
+        out = builder.generate(format=args.get("format", "both"))
+        if isinstance(out, dict):
+            if force and (pending_actions or not gate.ready):
+                out["preliminary"] = True
+                reasons = []
+                if not gate.ready:
+                    reasons.append("preflight intake incomplete")
+                if pending_actions:
+                    reasons.append("critical sibling-MCP actions unresolved")
+                out["preliminary_reason"] = (
+                    "Generated with force=True; " + " and ".join(reasons) + "."
+                )
+            # Attach preflight + standards coverage so the caller has a
+            # one-shot view of the gate state alongside the report files.
+            out["preflight"] = gate.to_dict()
+            out["standards_coverage"] = coverage_summary(data, ran_analyzers=ran_for_gate)
+        return out
 
     # === RETURN CURRENT / GROUND STITCHING ===
     if name == "pcb_analyze_return_current":
@@ -2633,24 +3339,31 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
 
     if name == "pcb_generate_em_simulation":
-        from .analyzers.rf_si.rf_simulation_extractor import RFSimulationExtractor
+        from .analyzers.rf_si.rf_simulation_extractor import (
+            RFSimulationExtractor,
+            SimulationCandidate,
+        )
         from .classifiers.net_classifier import NetClassifier
         from .integrations.openems_bridge import OpenEMSBridge
         data = _get_session(args["session_id"])
-        # Get or extract candidates
-        candidates = data.analysis_cache.get("_em_candidates")
-        if not candidates:
+        # Get or extract candidates. The cache stores list[SimulationCandidate]
+        # but is typed as dict[str, Any], so narrow with an explicit cast.
+        cached_candidates = data.analysis_cache.get("_em_candidates")
+        em_candidates: list[SimulationCandidate] = (
+            list(cached_candidates) if cached_candidates else []
+        )
+        if not em_candidates:
             classifier = NetClassifier()
             net_cls = classifier.classify(data)
             extractor = RFSimulationExtractor()
-            candidates = extractor.to_candidates(data, net_cls, max_candidates=20)
-            data.analysis_cache["_em_candidates"] = candidates
+            em_candidates = extractor.to_candidates(data, net_cls, max_candidates=20)
+            data.analysis_cache["_em_candidates"] = em_candidates
         idx = args.get("candidate_index", 0)
-        if not candidates:
+        if not em_candidates:
             raise ValueError("No simulation candidates found. Run pcb_extract_simulation_candidates first.")
-        if idx < 0 or idx >= len(candidates):
-            raise ValueError(f"candidate_index {idx} out of range (0-{len(candidates)-1})")
-        candidate = candidates[idx]
+        if idx < 0 or idx >= len(em_candidates):
+            raise ValueError(f"candidate_index {idx} out of range (0-{len(em_candidates)-1})")
+        candidate = em_candidates[idx]
         bridge = OpenEMSBridge()
         model = bridge.generate_from_candidate(candidate)
         # Cache the script
@@ -2918,7 +3631,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         session = _get_session(args["session_id"])
         accepted = getattr(session, '_accepted_findings', {})
         accepted[args["finding_hash"]] = {"reason": args["reason"], "timestamp": time.time()}
-        session._accepted_findings = accepted
+        # PCBDesignData doesn't declare _accepted_findings, so use setattr
+        # to attach the dict dynamically (this is dead-code-eliminated by
+        # mypy's strictness once the attribute is set).
+        setattr(session, "_accepted_findings", accepted)  # noqa: B010
         return _result({"accepted": True, "hash": args["finding_hash"]})
 
     if name == "pcb_list_accepted_findings":
