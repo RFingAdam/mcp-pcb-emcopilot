@@ -307,40 +307,40 @@ class TestAnalyzersOnFixture:
         return findings
 
     def test_emmc_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer", "EMMCAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.high_speed.emmc_analyzer", "EMMCAnalyzer", design, net_cls)
 
     def test_sdio_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer", "SDIOAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.high_speed.sdio_analyzer", "SDIOAnalyzer", design, net_cls)
 
     def test_halow_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer", "HaLowAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.halow_analyzer", "HaLowAnalyzer", design, net_cls)
 
     def test_gnss_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer", "GNSSAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.gnss_analyzer", "GNSSAnalyzer", design, net_cls)
 
     def test_coexistence_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.rf_si.coexistence_analyzer", "CoexistenceAnalyzer", design, net_cls)
 
     def test_impedance_validator(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator", "ImpedanceValidator", design, net_cls)
 
     def test_trace_current_validator(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.trace_current_validator", "TraceCurrentValidator", design, net_cls)
 
     def test_decap_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker", "DecapAdequacyChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.decap_adequacy_checker", "DecapAdequacyChecker", design, net_cls)
 
     def test_current_profiler(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.power_integrity.current_profiler", "CurrentProfiler", design, net_cls)
 
     def test_diff_pair_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker", "DiffPairWidthChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.signal_integrity.diff_pair_width_checker", "DiffPairWidthChecker", design, net_cls)
 
     def test_copper_pour_checker(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.validation.copper_pour_checker", "CopperPourChecker", design, net_cls)
 
     def test_smps_loop_analyzer(self, design, net_cls):
-        self._run_analyzer("src.mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer", "SMPSLoopAnalyzer", design, net_cls)
+        self._run_analyzer("mcp_pcb_emcopilot.analyzers.emc.smps_loop_analyzer", "SMPSLoopAnalyzer", design, net_cls)
 
 
 class TestImpedanceCalculations:
