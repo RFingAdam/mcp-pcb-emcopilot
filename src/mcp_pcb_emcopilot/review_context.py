@@ -325,21 +325,21 @@ class ReviewContext:
         """Return DDR standard (e.g. 'DDR4') or None if not specified."""
         val = self._answers.get("ddr_standard")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return None
 
     def get_emmc_mode(self) -> str:
         """Return eMMC speed mode, defaulting to 'HS200'."""
         val = self._answers.get("emmc_speed_mode")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "HS200"
 
     def get_usb_version(self) -> Optional[str]:
         """Return USB version (e.g. 'USB3.1') or None if not specified."""
         val = self._answers.get("usb_version")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return None
 
     def get_impedance_target(self, kind: str = "single_ended") -> float:
@@ -414,14 +414,14 @@ class ReviewContext:
         """Return operating environment, defaulting to 'consumer'."""
         val = self._answers.get("operating_environment")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "consumer"
 
     def get_fab_stackup_choice(self) -> str:
         """Return fab stackup choice: 'yes_upload' or 'no_use_extracted'."""
         val = self._answers.get("fab_stackup_spec")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "no_use_extracted"
 
     # -- Phase 4 market-specific typed getters -------------------------------
@@ -473,7 +473,7 @@ class ReviewContext:
         """Medical IEC 60601-1-2 edition target (defaults to 4.1)."""
         val = self._answers.get("iec60601_edition")
         if isinstance(val, str) and val:
-            return val
+            return str(val)
         return "4.1"
 
     def get_patient_contact(self) -> Optional[str]:
@@ -538,7 +538,7 @@ class ReviewContext:
         """Industrial hazardous-location class or None."""
         val = self._answers.get("hazloc_class")
         if isinstance(val, str) and val and val.lower() != "none":
-            return val
+            return str(val)
         return None
 
     def get_surge_target_kV(self) -> Optional[float]:  # noqa: N802 — match kV spelling

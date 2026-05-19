@@ -2546,9 +2546,9 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         except ValueError as e:
             raise ValidationError("PARSE_FAILED", str(e), {"file_path": file_path}) from e
         existing_sid = args.get("session_id")
-        if existing_sid and sessions.get_session(existing_sid) is not None:
-            data = sessions.get_session(existing_sid)
-            assert data is not None
+        existing_session = sessions.get_session(existing_sid) if existing_sid else None
+        if existing_session is not None:
+            data = existing_session
             data.schematic_components = parsed["components"]
             data.schematic_nets = parsed["nets"]
             if parsed["source_format"] == "pdf":
@@ -2581,9 +2581,14 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         file_path = args["file_path"]
         sid = args["session_id"]
         data = _get_session(sid)
-        parser = BOMParser()
-        bom_data = parser.parse(file_path)
-        data.bom_items = list(bom_data.items)
+        bom_parser = BOMParser()
+        bom_data = bom_parser.parse(file_path)
+        # PCBDesignData.bom_items is typed as list[dict]; convert each
+        # ParsedBOMItem dataclass to a plain dict for storage. Downstream
+        # analyzers use ._normalise.coerce() which handles both forms,
+        # but the typed field needs concrete dicts.
+        from dataclasses import asdict as _asdict
+        data.bom_items = [_asdict(item) for item in bom_data.items]
         # Build a quick refdes index for the cross-ref tool.
         ref_count = 0
         for item in bom_data.items:
@@ -2787,28 +2792,28 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         # Derive the set of analyzers that ran from the orchestrator's stored
         # review_results — domain names there map 1:1 to the analyzer ids in
         # standards/coverage.py.
-        ran: list[str] = []
+        ran_coverage: list[str] = []
         if data.review_results:
             for dr in data.review_results.get("domain_results", []):
                 dom = dr.get("domain")
                 if dom and dr.get("status") != "skipped":
-                    ran.append(dom)
-        summary = coverage_summary(data, ran_analyzers=ran)
-        summary["session_id"] = sid
-        summary["ran_analyzers"] = ran
-        return summary
+                    ran_coverage.append(dom)
+        coverage_out: dict[str, Any] = coverage_summary(data, ran_analyzers=ran_coverage)
+        coverage_out["session_id"] = sid
+        coverage_out["ran_analyzers"] = ran_coverage
+        return coverage_out
 
     if name == "pcb_validate_review_complete":
         from .standards.preflight import validate_review_complete
         sid = args["session_id"]
         data = _get_session(sid)
-        ran: list[str] = []
+        ran_validate: list[str] = []
         if data.review_results:
             for dr in data.review_results.get("domain_results", []):
                 dom = dr.get("domain")
                 if dom and dr.get("status") != "skipped":
-                    ran.append(dom)
-        gate = validate_review_complete(data, ran_analyzers=ran)
+                    ran_validate.append(dom)
+        gate = validate_review_complete(data, ran_analyzers=ran_validate)
         out = gate.to_dict()
         out["session_id"] = sid
         return out
@@ -3094,7 +3099,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         standard = str(args.get("standard") or "").upper()
         class_or_level = str(args.get("class_or_level") or "")
         frequency_mhz = float(args.get("frequency_mhz") or 0.0)
-        detector = str(args.get("detector") or "QP")
+        detector_name = str(args.get("detector") or "QP")
         fallback = bool(args.get("fallback", True))
         # Map standard -> emc-regulations tool name.
         std_to_tool = {
@@ -3120,7 +3125,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
                 "standard": standard,
                 "class_or_level": class_or_level,
                 "frequency_mhz": frequency_mhz,
-                "detector": detector,
+                "detector": detector_name,
             },
         }
         return {
@@ -3128,7 +3133,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             "standard": standard,
             "class_or_level": class_or_level,
             "frequency_mhz": frequency_mhz,
-            "detector": detector,
+            "detector": detector_name,
             "next_action": deferred_action,
             "fallback_available": fallback,
             "note": (
@@ -3334,24 +3339,31 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         }
 
     if name == "pcb_generate_em_simulation":
-        from .analyzers.rf_si.rf_simulation_extractor import RFSimulationExtractor
+        from .analyzers.rf_si.rf_simulation_extractor import (
+            RFSimulationExtractor,
+            SimulationCandidate,
+        )
         from .classifiers.net_classifier import NetClassifier
         from .integrations.openems_bridge import OpenEMSBridge
         data = _get_session(args["session_id"])
-        # Get or extract candidates
-        candidates = data.analysis_cache.get("_em_candidates")
-        if not candidates:
+        # Get or extract candidates. The cache stores list[SimulationCandidate]
+        # but is typed as dict[str, Any], so narrow with an explicit cast.
+        cached_candidates = data.analysis_cache.get("_em_candidates")
+        em_candidates: list[SimulationCandidate] = (
+            list(cached_candidates) if cached_candidates else []
+        )
+        if not em_candidates:
             classifier = NetClassifier()
             net_cls = classifier.classify(data)
             extractor = RFSimulationExtractor()
-            candidates = extractor.to_candidates(data, net_cls, max_candidates=20)
-            data.analysis_cache["_em_candidates"] = candidates
+            em_candidates = extractor.to_candidates(data, net_cls, max_candidates=20)
+            data.analysis_cache["_em_candidates"] = em_candidates
         idx = args.get("candidate_index", 0)
-        if not candidates:
+        if not em_candidates:
             raise ValueError("No simulation candidates found. Run pcb_extract_simulation_candidates first.")
-        if idx < 0 or idx >= len(candidates):
-            raise ValueError(f"candidate_index {idx} out of range (0-{len(candidates)-1})")
-        candidate = candidates[idx]
+        if idx < 0 or idx >= len(em_candidates):
+            raise ValueError(f"candidate_index {idx} out of range (0-{len(em_candidates)-1})")
+        candidate = em_candidates[idx]
         bridge = OpenEMSBridge()
         model = bridge.generate_from_candidate(candidate)
         # Cache the script
@@ -3619,7 +3631,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         session = _get_session(args["session_id"])
         accepted = getattr(session, '_accepted_findings', {})
         accepted[args["finding_hash"]] = {"reason": args["reason"], "timestamp": time.time()}
-        session._accepted_findings = accepted
+        # PCBDesignData doesn't declare _accepted_findings, so use setattr
+        # to attach the dict dynamically (this is dead-code-eliminated by
+        # mypy's strictness once the attribute is set).
+        setattr(session, "_accepted_findings", accepted)  # noqa: B010
         return _result({"accepted": True, "hash": args["finding_hash"]})
 
     if name == "pcb_list_accepted_findings":
