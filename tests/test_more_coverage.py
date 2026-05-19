@@ -236,6 +236,7 @@ class TestFindingIdPrefix:
 
     def test_generates_valid_finding_ids(self):
         import re
+
         from mcp_pcb_emcopilot.reports.report_builder import _prefix_for
 
         # Every prefix the helper can emit must satisfy the TrackedFinding regex.

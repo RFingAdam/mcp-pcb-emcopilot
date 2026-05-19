@@ -1,0 +1,67 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 407 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Sample Synthetic Schematic - Page 1) Tj
+0 -16 Td
+(Components) Tj
+0 -16 Td
+(R1 10k) Tj
+0 -16 Td
+(R2 4.7k) Tj
+0 -16 Td
+(C1 10uF/16V) Tj
+0 -16 Td
+(C2 100nF/50V) Tj
+0 -16 Td
+(U1 STM32F407VGT6) Tj
+0 -16 Td
+(D1 PESD5V0) Tj
+0 -16 Td
+(J1 USB-Type-C) Tj
+0 -16 Td
+(Net Labels) Tj
+0 -16 Td
+(VCC_3V3) Tj
+0 -16 Td
+(GND) Tj
+0 -16 Td
+(USB_DP) Tj
+0 -16 Td
+(USB_DM) Tj
+0 -16 Td
+(VBUS) Tj
+0 -16 Td
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000705 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+802
+%%EOF

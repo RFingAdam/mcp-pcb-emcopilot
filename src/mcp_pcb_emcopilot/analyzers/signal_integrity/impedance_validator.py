@@ -7,8 +7,8 @@ Also detects impedance discontinuities at via transitions between layers.
 """
 from __future__ import annotations
 
-import math
 import logging
+import math
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)

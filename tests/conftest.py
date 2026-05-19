@@ -36,6 +36,32 @@ def sample_allegro():
     return str(FIXTURES_DIR / "sample_allegro.txt")
 
 
+# Phase 4c schematic-corpus fixtures ----------------------------------------
+
+@pytest.fixture
+def sample_kicad_sch():
+    """Hierarchical KiCad schematic with 4 components, in_bom/on_board, MPN."""
+    return str(FIXTURES_DIR / "sample_2sheet.kicad_sch")
+
+
+@pytest.fixture
+def sample_schematic_pdf():
+    """Tiny text-layer PDF with refdes + net labels."""
+    return str(FIXTURES_DIR / "sample_schematic.pdf")
+
+
+@pytest.fixture
+def sample_netlist():
+    """ORCAD PSTXNET-style netlist with 7 parts and 5 nets."""
+    return str(FIXTURES_DIR / "sample_netlist.NET")
+
+
+@pytest.fixture
+def sample_schdoc():
+    """Minimal OLE2 .SchDoc stub for format-detection / smoke tests."""
+    return str(FIXTURES_DIR / "sample.SchDoc")
+
+
 @pytest.fixture
 def sample_design_data():
     """Create a minimal PCBDesignData for testing analyzers."""

@@ -411,6 +411,7 @@ def _select_analyzers(
         analyzers.append("sch_protection")
         analyzers.append("sch_decoupling_per_ic")
         analyzers.append("sch_component_rating")
+        analyzers.append("sch_signal_flow")
         # Three-way cross-ref runs whenever sch is present; degrades cleanly
         # if BOM or layout is missing (see analyze_three_way_xref).
         analyzers.append("three_way_xref")
@@ -1604,7 +1605,7 @@ def _build_recommendations(
 # Cross-MCP escalation — Phase 3 sibling-MCP intent queue
 # =============================================================================
 
-def _needs_em_verification(f: "ReviewFinding") -> bool:
+def _needs_em_verification(f: ReviewFinding) -> bool:
     """Decide whether *f* warrants an openEMS escalation.
 
     A finding escalates when its severity rank meets ESCALATE_SEVERITY_MAX
@@ -1620,7 +1621,7 @@ def _needs_em_verification(f: "ReviewFinding") -> bool:
 
 def _emit_next_actions(
     design: PCBDesignData,
-    review_result: "ReviewResult",
+    review_result: ReviewResult,
 ) -> list:
     """Build the list of suggested sibling-MCP actions from a finished review.
 
@@ -1655,6 +1656,8 @@ def _emit_next_actions(
     )
     from .integrations.nec2_bridge import (
         NEC2_MIN_FREQ_MHZ as NEC2_FLOOR,
+    )
+    from .integrations.nec2_bridge import (
         build_antenna_intent,
         is_antenna_finding,
     )
@@ -1805,7 +1808,7 @@ def _emit_next_actions(
 
 
 def _priority_for_finding(
-    f: "ReviewFinding",
+    f: ReviewFinding,
     p_critical: int,
     p_high: int,
     p_normal: int,
@@ -1981,6 +1984,12 @@ def run_design_review(
                 design, "schematic_rating",
                 "mcp_pcb_emcopilot.analyzers.schematic.component_rating", "analyze_component_rating",
                 pass_bom=True,
+            ))
+        elif key == "sch_signal_flow":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_signal_flow",
+                "mcp_pcb_emcopilot.analyzers.schematic.signal_flow", "analyze_signal_flow",
+                pass_bom=False,
             ))
         elif key == "three_way_xref":
             domain_results.append(_run_three_way_xref(design))

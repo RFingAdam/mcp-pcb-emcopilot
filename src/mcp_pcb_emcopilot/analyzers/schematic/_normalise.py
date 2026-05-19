@@ -13,7 +13,9 @@ def coerce(obj: Any) -> dict[str, Any]:
         return {}
     if isinstance(obj, dict):
         return obj
-    if is_dataclass(obj):
+    # ``is_dataclass(obj)`` returns True for the class itself too, but ``asdict``
+    # only accepts instances. Narrow to "instance, not class" before calling.
+    if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
     # Fallback — read public attributes.
     return {

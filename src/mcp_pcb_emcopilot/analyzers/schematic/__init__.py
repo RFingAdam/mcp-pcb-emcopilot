@@ -15,10 +15,12 @@ from .component_rating import analyze_component_rating
 from .decoupling_per_ic import analyze_decoupling_per_ic
 from .power_topology import analyze_power_topology
 from .protection_circuits import analyze_protection_circuits
+from .signal_flow import analyze_signal_flow
 
 __all__ = [
     "analyze_component_rating",
     "analyze_decoupling_per_ic",
     "analyze_power_topology",
     "analyze_protection_circuits",
+    "analyze_signal_flow",
 ]

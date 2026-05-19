@@ -5,14 +5,15 @@ and optionally the real ODB++ test file when present.
 """
 import math
 import os
-import pytest
 from pathlib import Path
 
-from src.mcp_pcb_emcopilot.parsers import parse_pcb_file
-from src.mcp_pcb_emcopilot.classifiers.net_classifier import NetClassifier
-from src.mcp_pcb_emcopilot.classifiers.interface_detector import InterfaceDetector
+import pytest
+
 from src.mcp_pcb_emcopilot.classifiers.design_classifier import DesignClassifier
+from src.mcp_pcb_emcopilot.classifiers.interface_detector import InterfaceDetector
+from src.mcp_pcb_emcopilot.classifiers.net_classifier import NetClassifier
 from src.mcp_pcb_emcopilot.orchestrator import run_design_review
+from src.mcp_pcb_emcopilot.parsers import parse_pcb_file
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 REAL_ODB = Path("/home/swamp/Downloads/Test/Test_ODB.zip")
@@ -278,7 +279,7 @@ class TestAnalyzerImports:
         assert SMPSLoopAnalyzer
 
     def test_import_review_context(self):
-        from src.mcp_pcb_emcopilot.review_context import get_review_questions, ReviewContext
+        from src.mcp_pcb_emcopilot.review_context import ReviewContext, get_review_questions
         assert get_review_questions
         assert ReviewContext
 
@@ -360,7 +361,8 @@ class TestImpedanceCalculations:
     def test_diff_microstrip_coupling(self):
         """Tighter spacing → lower Z_diff (more coupling)"""
         from src.mcp_pcb_emcopilot.analyzers.signal_integrity.impedance_validator import (
-            _diff_microstrip_z0, _microstrip_z0
+            _diff_microstrip_z0,
+            _microstrip_z0,
         )
         z_se = _microstrip_z0(0.1, 0.1, 4.3)
         z_tight = _diff_microstrip_z0(0.1, 0.15, 0.1, 4.3)  # 0.15mm spacing

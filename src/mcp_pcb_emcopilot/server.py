@@ -1072,6 +1072,9 @@ async def list_tools() -> list[Tool]:
             "session_id": {"type": "string", "description": "Session id with schematic data."},
             "min_caps_per_vdd_pin": {"type": "number", "default": 1.0, "description": "Required cap-to-Vdd-pin ratio."},
         }, ["session_id"]),
+        _make_tool("pcb_analyze_signal_flow", "Trace clock distribution, reset distribution, and JTAG/SWD accessibility through the schematic. Flags clock fan-out > 4 unbuffered loads, multi-driver reset contention, ICs without debug headers, and reset nets missing a supervisor IC.", {
+            "session_id": {"type": "string", "description": "Session id with schematic data."},
+        }, ["session_id"]),
         _make_tool("pcb_three_way_cross_reference", "Compare schematic, BOM, and layout component lists in one pass. Detects missing components, footprint mismatches, value mismatches, DNP flag inconsistencies, MPN divergence, and manufacturer differences. Severity-graded per the playbook.", {
             "session_id": {"type": "string", "description": "Session id."},
         }, ["session_id"]),
@@ -2645,6 +2648,20 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             "findings": [f.to_dict() for f in findings],
         }
 
+    if name == "pcb_analyze_signal_flow":
+        from .analyzers.schematic.signal_flow import analyze_signal_flow
+        data = _get_session(args["session_id"])
+        findings = analyze_signal_flow(
+            schematic_components=data.schematic_components or [],
+            schematic_nets=data.schematic_nets or [],
+        )
+        return {
+            "session_id": args["session_id"],
+            "domain": "schematic_signal_flow",
+            "count": len(findings),
+            "findings": [f.to_dict() for f in findings],
+        }
+
     if name == "pcb_three_way_cross_reference":
         from .analyzers.validation.three_way_xref import analyze_three_way_xref
         data = _get_session(args["session_id"])
@@ -2811,10 +2828,10 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         return {"success": True, "session_id": args["session_id"], "review_context": ctx}
 
     if name == "pcb_get_review_questions":
-        from .review_context import get_review_questions
-        from .classifiers.net_classifier import NetClassifier
         from .classifiers.design_classifier import DesignClassifier
         from .classifiers.interface_detector import InterfaceDetector
+        from .classifiers.net_classifier import NetClassifier
+        from .review_context import get_review_questions
         data = _get_session(args["session_id"])
         net_cls = NetClassifier().classify(data)
         ifaces = InterfaceDetector().detect(data, net_cls)
