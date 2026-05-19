@@ -1155,7 +1155,7 @@ wheels = [
 
 [[package]]
 name = "mcp-pcb-emcopilot"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -1171,6 +1171,7 @@ all = [
     { name = "olefile" },
     { name = "openpyxl" },
     { name = "pymupdf" },
+    { name = "sexpdata" },
 ]
 altium = [
     { name = "olefile" },
@@ -1183,6 +1184,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "python-docx" },
     { name = "ruff" },
+    { name = "sexpdata" },
 ]
 excel = [
     { name = "openpyxl" },
@@ -1197,6 +1199,9 @@ pdf = [
 report = [
     { name = "cairosvg" },
     { name = "python-docx" },
+]
+sexpdata = [
+    { name = "sexpdata" },
 ]
 sparams = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1225,9 +1230,12 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "python-docx", marker = "extra == 'dev'", specifier = ">=1.1" },
     { name = "python-docx", marker = "extra == 'report'", specifier = ">=1.1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9.0,<1.0" },
+    { name = "sexpdata", marker = "extra == 'all'", specifier = ">=1.0.0" },
+    { name = "sexpdata", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "sexpdata", marker = "extra == 'sexpdata'", specifier = ">=1.0.0" },
 ]
-provides-extras = ["altium", "excel", "sparams", "ground", "pdf", "all", "dev", "report"]
+provides-extras = ["altium", "excel", "sparams", "ground", "pdf", "sexpdata", "all", "dev", "report"]
 
 [[package]]
 name = "mypy"
@@ -2075,6 +2083,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6c/25/3fc9114abf979a41673ce877c08016f8e660ad6cf508c3957f537d2e9fa9/ruff-0.15.6-py3-none-win32.whl", hash = "sha256:bbf67d39832404812a2d23020dda68fee7f18ce15654e96fb1d3ad21a5fe436c", size = 10616872, upload-time = "2026-03-12T23:05:42.451Z" },
     { url = "https://files.pythonhosted.org/packages/89/7a/09ece68445ceac348df06e08bf75db72d0e8427765b96c9c0ffabc1be1d9/ruff-0.15.6-py3-none-win_amd64.whl", hash = "sha256:aee25bc84c2f1007ecb5037dff75cef00414fdf17c23f07dc13e577883dca406", size = 11787271, upload-time = "2026-03-12T23:05:20.168Z" },
     { url = "https://files.pythonhosted.org/packages/7f/d0/578c47dd68152ddddddf31cd7fc67dc30b7cdf639a86275fda821b0d9d98/ruff-0.15.6-py3-none-win_arm64.whl", hash = "sha256:c34de3dd0b0ba203be50ae70f5910b17188556630e2178fd7d79fc030eb0d837", size = 11060497, upload-time = "2026-03-12T23:05:25.968Z" },
+]
+
+[[package]]
+name = "sexpdata"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/7f/369a478863a39351be75e0a12602bc29196b31f87bf3432bed2be6379f8e/sexpdata-1.0.2.tar.gz", hash = "sha256:92b67b0361f6766f8f9e44b9519cf3fbcfafa755db85bbf893c3e1cf4ddac109", size = 8906, upload-time = "2024-01-09T07:09:59.096Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/f3/ec9f8cc20dc1f34c926f0ec3f43b73fa2da59cf08e432fb8ae5b666b2027/sexpdata-1.0.2-py3-none-any.whl", hash = "sha256:b39c918f055a85c5c35c1d4f7930aabb176bd29016e5ba5692e7e849914b2a1a", size = 10337, upload-time = "2024-01-09T07:09:57.185Z" },
 ]
 
 [[package]]

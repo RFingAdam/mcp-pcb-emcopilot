@@ -63,6 +63,9 @@ class AltiumComponent:
     unique_id: Optional[str] = None
     library_ref: Optional[str] = None
     source_library: Optional[str] = None
+    # Parameter-record extras: DNP flag, ComponentClass, tolerance, comment, etc.
+    # Populated by AltiumSchematicParser._parse_records when present.
+    properties: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -1581,6 +1584,27 @@ class AltiumSchematicParser:
                     comp.manufacturer = param_value
                 elif param_name == 'DESCRIPTION' and not comp.description:
                     comp.description = param_value
+                elif param_name in ['DNP', 'DONOTPLACE', 'DO_NOT_PLACE', 'NOSTUFF']:
+                    # Altium represents DNP as a string flag: 'True' / '1' / 'Yes'.
+                    flag = (param_value or '').strip().lower()
+                    if flag in ('true', '1', 'yes', 'y'):
+                        if not hasattr(comp, "properties") or comp.properties is None:
+                            comp.properties = {}
+                        comp.properties["dnp"] = True
+                elif param_name in ['COMPONENTCLASS', 'COMPONENT_CLASS', 'CLASS']:
+                    if not hasattr(comp, "properties") or comp.properties is None:
+                        comp.properties = {}
+                    comp.properties["component_class"] = param_value
+                elif param_name in ['COMMENT', 'NOTE']:
+                    if not hasattr(comp, "properties") or comp.properties is None:
+                        comp.properties = {}
+                    comp.properties.setdefault("comment", param_value)
+                else:
+                    # Stash unknown parameters under properties for downstream
+                    # analyzers that may inspect them (e.g. Tolerance, Voltage).
+                    if not hasattr(comp, "properties") or comp.properties is None:
+                        comp.properties = {}
+                    comp.properties.setdefault(param_name.lower(), param_value)
 
         # Add components with valid designators to result
         for comp in components_by_idx.values():
