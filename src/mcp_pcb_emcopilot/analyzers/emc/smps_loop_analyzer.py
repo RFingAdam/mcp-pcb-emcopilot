@@ -228,6 +228,11 @@ class SMPSLoopAnalyzer:
                 loop_description = f"Estimated: {ic_ref}->{nearest_inductor.reference} (no cap found)"
                 detail_distances = {"ic_to_inductor_mm": round(d, 2)}
             else:
+                # nearest_cap is guaranteed non-None on this branch (the
+                # outer condition rules out the both-None case); guard
+                # for mypy with a defensive check.
+                if nearest_cap is None:
+                    continue
                 cap_x = getattr(nearest_cap, "x_mm", 0.0)
                 cap_y = getattr(nearest_cap, "y_mm", 0.0)
                 d = _distance_mm(ic_x, ic_y, cap_x, cap_y)

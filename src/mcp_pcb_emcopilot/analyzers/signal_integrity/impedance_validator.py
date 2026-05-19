@@ -7,8 +7,8 @@ Also detects impedance discontinuities at via transitions between layers.
 """
 from __future__ import annotations
 
-import math
 import logging
+import math
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
@@ -538,7 +538,7 @@ class ImpedanceValidator:
         for l in all_layers:
             if l.layer_type == 'dielectric' and abs(getattr(l, 'number', getattr(l, 'row', 0)) - cu_row) <= 2:
                 if l.thickness_mm and l.thickness_mm > 0:
-                    return l.thickness_mm
+                    return float(l.thickness_mm)
         return 0.0
 
     def _find_adjacent_dielectric_er(self, copper_layer: Any, all_layers: list) -> float:
@@ -547,7 +547,7 @@ class ImpedanceValidator:
         for l in all_layers:
             if l.layer_type == 'dielectric' and abs(getattr(l, 'number', getattr(l, 'row', 0)) - cu_row) <= 2:
                 if l.dielectric_constant and l.dielectric_constant > 1:
-                    return l.dielectric_constant
+                    return float(l.dielectric_constant)
         return 4.2  # FR-4 default
 
     def _find_stripline_params(

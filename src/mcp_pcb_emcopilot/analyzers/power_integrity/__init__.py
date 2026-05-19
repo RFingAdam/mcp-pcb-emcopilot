@@ -11,11 +11,11 @@ Provides comprehensive power distribution network (PDN) analysis including:
 from __future__ import annotations
 
 from .cavity_resonance import analyze_cavity_resonance
+from .current_profiler import CurrentProfiler
 from .decap_placement import DecapAnalyzer, DecapRecommendation, DecapResult
 from .pdn_analyzer import PDNAnalyzer, PDNImpedancePoint, PDNResult
 from .pdn_impedance import calculate_pdn_impedance
 from .power_plane_analyzer import PlaneIssue, PowerPlaneAnalyzer, PowerPlaneResult
-from .current_profiler import CurrentProfiler
 from .vrm_analyzer import VRMAnalyzer, VRMIssue, VRMResult
 
 __all__ = [

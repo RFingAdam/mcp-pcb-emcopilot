@@ -3,6 +3,13 @@
 When the MCP tool runs a design review and encounters ambiguity or missing
 information, this module determines what questions need answering and provides
 typed access to the user-supplied answers.
+
+Phase 4 extension: multi-market intake. The 10-question CORE pack below stays
+the canonical legacy list, but ``get_review_questions`` now also merges the
+per-market packs from :mod:`market_packs` based on either the explicit
+``markets`` answer or the playbook's ``declared_market``. Typed getters for
+the new market-specific answers (vehicle_class, iso7637_pulses, fcc_part,
+iec60601_edition, device_class) are exposed alongside the legacy ones.
 """
 
 from __future__ import annotations
@@ -10,6 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from . import market_packs
 from .classifiers.design_classifier import DesignClassificationResult
 from .classifiers.net_classifier import NetClassificationResult
 from .models.pcb_data import PCBDesignData
@@ -180,6 +188,44 @@ _CONDITIONS: dict[str, Any] = {
 # Public API
 # =============================================================================
 
+def get_active_markets(
+    design: PCBDesignData,
+    classification: Optional[DesignClassificationResult] = None,
+    net_cls: Optional[NetClassificationResult] = None,
+) -> list[str]:
+    """Return the list of markets that apply to this session.
+
+    Sources, in order of authority:
+    1. Explicit ``markets`` list on ``review_context`` (Phase 4 — set via
+       ``pcb_set_market``).
+    2. The playbook's ``declared_market`` (from Phase 2 ``pcb_start_professional_review``).
+    3. Heuristic auto-inference: RF nets → ``wireless``, automotive bus tags →
+       ``automotive`` (deferred to net_cls when available).
+    """
+    ctx = design.review_context or {}
+    explicit: list[str] = []
+    if isinstance(ctx.get("markets"), list):
+        for m in ctx["markets"]:
+            m_l = str(m).strip().lower()
+            if m_l and m_l in market_packs.KNOWN_MARKETS and m_l not in explicit:
+                explicit.append(m_l)
+    if explicit:
+        return explicit
+
+    pb = ctx.get("playbook") or {}
+    declared = str(pb.get("declared_market") or "").strip().lower()
+    if declared and declared != "unknown" and declared in market_packs.KNOWN_MARKETS:
+        return [declared]
+
+    # Auto-inference fallback.
+    inferred: list[str] = []
+    if net_cls is not None:
+        has_rf = any(nc.category == "rf" for nc in net_cls.classified_nets)
+        if has_rf:
+            inferred.append("wireless")
+    return inferred
+
+
 def get_review_questions(
     design: PCBDesignData,
     classification: DesignClassificationResult,
@@ -187,15 +233,23 @@ def get_review_questions(
 ) -> list[dict[str, Any]]:
     """Return the list of applicable review questions for this design.
 
-    Only questions whose condition is met are returned.  Each question dict
-    is a copy of the definition (safe to serialise to JSON).
+    Merges:
+    1. The CORE legacy pack (``REVIEW_QUESTIONS``) — filtered by per-question
+       conditional predicates against the parsed design.
+    2. Per-market packs from :mod:`market_packs` for every market in
+       :func:`get_active_markets`.
+
+    Deduplicates by question id (CORE wins on collision). Strips callables
+    and other server-side metadata so the result is JSON-safe.
     """
     applicable: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    # CORE pack (legacy) — gated by per-question conditional predicates.
     for q in REVIEW_QUESTIONS:
         cond = _CONDITIONS.get(q["id"], _always)
         try:
             if cond(design, classification, net_cls):
-                # Return a serialisable copy (no callables)
                 applicable.append({
                     "id": q["id"],
                     "category": q["category"],
@@ -205,9 +259,36 @@ def get_review_questions(
                     "default": q.get("default"),
                     "why": q["why"],
                 })
+                seen.add(q["id"])
         except Exception:
             logger.debug("Condition check failed for question %s", q["id"], exc_info=True)
+
+    # Per-market packs.
+    for market in get_active_markets(design, classification, net_cls):
+        for q in market_packs.get_pack(market):
+            if q["id"] in seen:
+                continue
+            seen.add(q["id"])
+            applicable.append({
+                "id": q["id"],
+                "category": q.get("category", market),
+                "text": q["text"],
+                "type": q["type"],
+                "choices": q.get("choices"),
+                "default": q.get("default"),
+                "why": q.get("why", ""),
+            })
+
     return applicable
+
+
+def get_target_standards_for(
+    design: PCBDesignData,
+    classification: Optional[DesignClassificationResult] = None,
+    net_cls: Optional[NetClassificationResult] = None,
+) -> list[str]:
+    """Return the union of standards activated by all active markets."""
+    return market_packs.merge_standards(get_active_markets(design, classification, net_cls))
 
 
 class ReviewContext:
@@ -244,21 +325,21 @@ class ReviewContext:
         """Return DDR standard (e.g. 'DDR4') or None if not specified."""
         val = self._answers.get("ddr_standard")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return None
 
     def get_emmc_mode(self) -> str:
         """Return eMMC speed mode, defaulting to 'HS200'."""
         val = self._answers.get("emmc_speed_mode")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "HS200"
 
     def get_usb_version(self) -> Optional[str]:
         """Return USB version (e.g. 'USB3.1') or None if not specified."""
         val = self._answers.get("usb_version")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return None
 
     def get_impedance_target(self, kind: str = "single_ended") -> float:
@@ -333,12 +414,137 @@ class ReviewContext:
         """Return operating environment, defaulting to 'consumer'."""
         val = self._answers.get("operating_environment")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "consumer"
 
     def get_fab_stackup_choice(self) -> str:
         """Return fab stackup choice: 'yes_upload' or 'no_use_extracted'."""
         val = self._answers.get("fab_stackup_spec")
         if val and isinstance(val, str):
-            return val
+            return str(val)
         return "no_use_extracted"
+
+    # -- Phase 4 market-specific typed getters -------------------------------
+
+    def get_vehicle_class(self) -> Optional[str]:
+        """Automotive ``vehicle_class`` answer (passenger / commercial / ...)."""
+        val = self._answers.get("vehicle_class")
+        return val if isinstance(val, str) and val else None
+
+    def get_bus_voltage(self) -> Optional[str]:
+        """Automotive bus voltage answer (12V / 24V / 48V / HV-traction)."""
+        val = self._answers.get("bus_voltage")
+        return val if isinstance(val, str) and val else None
+
+    def get_iso26262_asil(self) -> Optional[str]:
+        """Automotive ASIL level (QM / A / B / C / D) or None."""
+        val = self._answers.get("iso26262_asil")
+        return val if isinstance(val, str) and val else None
+
+    def get_cispr25_class(self) -> Optional[int]:
+        """Automotive CISPR-25 target class as int (1-5) or None."""
+        val = self._answers.get("cispr25_class")
+        try:
+            return int(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def get_iso7637_pulses(self) -> list[str]:
+        """Automotive ISO 7637-2 pulse set the design must survive."""
+        val = self._answers.get("iso7637_pulses")
+        if isinstance(val, list):
+            return [str(x) for x in val]
+        if isinstance(val, str) and val:
+            import re
+            return [tok for tok in re.split(r"[,;\s]+", val.strip()) if tok]
+        return []
+
+    def get_oem_spec(self) -> str:
+        """Automotive OEM-specific spec or 'none'."""
+        val = self._answers.get("oem_spec")
+        return val if isinstance(val, str) and val else "none"
+
+    def get_device_class(self) -> Optional[str]:
+        """Medical device class (I / IIa / IIb / III)."""
+        val = self._answers.get("device_class")
+        return val if isinstance(val, str) and val else None
+
+    def get_iec60601_edition(self) -> str:
+        """Medical IEC 60601-1-2 edition target (defaults to 4.1)."""
+        val = self._answers.get("iec60601_edition")
+        if isinstance(val, str) and val:
+            return str(val)
+        return "4.1"
+
+    def get_patient_contact(self) -> Optional[str]:
+        """Medical patient-contact type or None."""
+        val = self._answers.get("patient_contact")
+        return val if isinstance(val, str) and val else None
+
+    def get_fcc_part(self) -> Optional[str]:
+        """Wireless FCC Part (15B / 15C / 95 / etc.) or None."""
+        val = self._answers.get("fcc_part")
+        return val if isinstance(val, str) and val else None
+
+    def get_tx_power_dbm(self) -> Optional[float]:
+        """Wireless conducted TX power in dBm or None."""
+        val = self._answers.get("tx_power_dbm")
+        try:
+            return float(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def get_antenna_gain_dbi(self) -> Optional[float]:
+        """Wireless antenna gain in dBi or None."""
+        val = self._answers.get("antenna_gain_dbi")
+        try:
+            return float(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def get_intentional_radiator(self) -> bool:
+        """Wireless intentional-radiator flag (defaults to False)."""
+        val = self._answers.get("intentional_radiator")
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            return val.strip().lower() in ("true", "yes", "1")
+        return False
+
+    def get_target_regions(self) -> list[str]:
+        """Commercial target regions (multi-select)."""
+        val = self._answers.get("target_regions")
+        if isinstance(val, list):
+            return [str(x) for x in val]
+        if isinstance(val, str) and val:
+            import re
+            return [tok for tok in re.split(r"[,;\s]+", val.strip()) if tok]
+        return []
+
+    def get_cispr32_class(self) -> Optional[str]:
+        """Commercial CISPR 32 class (A / B) or None."""
+        val = self._answers.get("cispr32_class")
+        return val if isinstance(val, str) and val else None
+
+    def get_iec61000_4_immunity_level(self) -> Optional[int]:
+        """Commercial / industrial IEC 61000-4 immunity level (1-4) or None."""
+        val = self._answers.get("iec61000_4_immunity_level")
+        try:
+            return int(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def get_hazloc_class(self) -> Optional[str]:
+        """Industrial hazardous-location class or None."""
+        val = self._answers.get("hazloc_class")
+        if isinstance(val, str) and val and val.lower() != "none":
+            return str(val)
+        return None
+
+    def get_surge_target_kV(self) -> Optional[float]:  # noqa: N802 — match kV spelling
+        """Industrial IEC 61000-4-5 surge target in kV or None."""
+        val = self._answers.get("surge_target_kV") or self._answers.get("surge_target_kv")
+        try:
+            return float(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None

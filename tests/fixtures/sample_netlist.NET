@@ -1,0 +1,31 @@
+// PSTXNET netlist — synthetic test fixture (ORCAD ASCII style)
+// Format: section headers followed by pin-net mappings.
+
+PSTXNET
+DATE: 2026-01-15
+DESIGN: sample_design
+SHEETS: 1
+
+*PART*
+R1     10k       RC0402FR-0710KL     Yageo
+R2     4.7k      RC0402FR-074K7L     Yageo
+C1     10uF/16V  GRM21BR61C106KE15L  Murata
+C2     100nF/50V GRM155R71H104KE14D  Murata
+U1     STM32F407 STM32F407VGT6       STMicroelectronics
+D1     PESD5V0   PESD5V0L1BA         Nexperia
+J1     USB-C     UJ20-C-H-G-SMT-1    SamacSys
+
+*NET*
+NET_NAME='VCC_3V3'
+R1.1 U1.50 C1.1 C2.1
+NET_NAME='GND'
+U1.49 C1.2 C2.2 D1.2 J1.5
+NET_NAME='USB_DP'
+J1.6 D1.1 U1.70
+NET_NAME='USB_DM'
+J1.7 U1.71
+NET_NAME='VBUS'
+J1.1 J1.4 R2.1
+
+*MISC*
+EOF

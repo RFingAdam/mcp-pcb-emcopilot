@@ -67,8 +67,20 @@ _DOMAIN_PREFIXES: dict[str, str] = {
 
 
 def _prefix_for(domain: str) -> str:
-    """Return the finding-ID prefix for *domain*, falling back to first 3 chars."""
-    return _DOMAIN_PREFIXES.get(domain, domain[:3].upper() or "GEN")
+    """Return the finding-ID prefix for *domain*.
+
+    Looks up the curated prefix map first; otherwise strips non-letters and
+    returns the first three uppercase letters. Falls back to ``GEN`` when the
+    domain string contains no letters at all (e.g. ``"___"``), guaranteeing
+    every generated id matches ``[A-Z]+-\\d{3}``.
+    """
+    mapped = _DOMAIN_PREFIXES.get(domain)
+    if mapped:
+        return mapped
+    letters = "".join(ch for ch in domain if ch.isalpha())
+    if not letters:
+        return "GEN"
+    return letters[:3].upper()
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,35 @@ from .models.pcb_data import PCBDesignData
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "warning": 2, "medium": 2, "low": 3, "info": 4}
 
+# =============================================================================
+# Phase 3 escalation policy — applied by `_emit_next_actions` below.
+# A finding triggers escalation to a sibling MCP (openEMS / NEC2 / live regs)
+# when EITHER its severity rank is <= ESCALATE_SEVERITY_MAX OR its analyzer
+# confidence is below ESCALATE_CONFIDENCE_BELOW. Domains outside the
+# *_ESCALATION_DOMAINS sets short-circuit (no escalation needed).
+# =============================================================================
+ESCALATE_SEVERITY_MAX = SEVERITY_ORDER["high"]      # severity rank <= 1 -> escalate
+ESCALATE_CONFIDENCE_BELOW = 0.7                    # confidence < 0.7 -> escalate
+SIM_TOLERANCE_PCT = 5.0                            # passing match tolerance for openEMS
+NEC2_MIN_FREQ_MHZ = 30.0                           # below this skip antenna sim
+OPENEMS_ESCALATION_DOMAINS: frozenset[str] = frozenset({
+    "signal_integrity",
+    "rf_si",
+    "high_speed",
+    "high_speed_ddr",
+    "high_speed_pcie",
+    "high_speed_usb",
+    "high_speed_ethernet",
+    "emc",
+    "antenna",
+    "power_integrity",
+    "power_integrity_resonance",
+})
+NEC2_ESCALATION_DOMAINS: frozenset[str] = frozenset({
+    "antenna",
+    "rf_si",
+})
+
 
 @dataclass
 class ReviewFinding:
@@ -41,6 +70,20 @@ class ReviewFinding:
     location_layer: Optional[str] = None
     related_findings: list[str] = field(default_factory=list)
 
+    # ---- Phase 3 schema upgrade ------------------------------------------
+    # First-class confidence + verification status fields. Analyzers default
+    # to 0.8 (typical analytical heuristic); openEMS / NEC2 / live-regs
+    # corroboration writes higher values and flips ``verified=True``.
+    confidence: float = 0.8
+    verified: bool = False
+    source: str = "analytical"  # analytical | openems | nec2 | live_regs
+    finding_id: str = ""
+    linked_actions: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.finding_id:
+            self.finding_id = _generate_finding_id(self.domain, self.title)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize finding to a JSON-safe dictionary."""
         d: dict[str, Any] = {
@@ -49,6 +92,10 @@ class ReviewFinding:
             "title": self.title,
             "description": self.description,
             "recommendation": self.recommendation,
+            "finding_id": self.finding_id,
+            "confidence": round(self.confidence, 3),
+            "verified": self.verified,
+            "source": self.source,
         }
         if self.measured_value is not None:
             d["measured_value"] = self.measured_value
@@ -64,7 +111,34 @@ class ReviewFinding:
             }
         if self.related_findings:
             d["related_findings"] = self.related_findings
+        if self.linked_actions:
+            d["linked_actions"] = list(self.linked_actions)
         return d
+
+
+# Counter for finding-id generation per (domain, prefix). Module-level so ids
+# are unique across a process lifetime but stable within a run.
+_FINDING_ID_COUNTERS: dict[str, int] = {}
+
+
+def _generate_finding_id(domain: str, _title: str) -> str:
+    """Generate a stable per-process finding id like ``EMC-001``.
+
+    Uses the same prefix mapping as :func:`reports.report_builder._prefix_for`
+    so finding ids match the report's section ids.
+    """
+    # Local import to avoid a top-of-module cycle with reports/report_builder.
+    from .reports.report_builder import _prefix_for
+
+    prefix = _prefix_for(domain)
+    nxt = _FINDING_ID_COUNTERS.get(prefix, 0) + 1
+    _FINDING_ID_COUNTERS[prefix] = nxt
+    return f"{prefix}-{nxt:03d}"
+
+
+def reset_finding_id_counters() -> None:
+    """Reset the per-process finding-id counter. Test helper only."""
+    _FINDING_ID_COUNTERS.clear()
 
 
 @dataclass
@@ -254,7 +328,7 @@ def _select_analyzers(
         analyzers.append("usb")
     if any("pcie" in t for t in iface_types):
         analyzers.append("pcie")
-    if any(t in ("gbe", "100base-tx", "sgmii", "ethernet") for t in iface_types):
+    if any(any(tok in t for tok in ("gbe", "100base", "sgmii", "ethernet", "base-t")) for t in iface_types):
         analyzers.append("ethernet")
 
     # eMMC/SDIO (Phase 4 integration)
@@ -329,6 +403,18 @@ def _select_analyzers(
     # BOM cross-reference (when schematic data available)
     if hasattr(design, 'schematic_data') and design.schematic_data:
         analyzers.append("bom_cross_ref")
+
+    # Phase 4b schematic-aware analyzers — enabled when the session has
+    # any schematic content attached (PDF text, KiCad native, or Altium).
+    if getattr(design, "schematic_components", None):
+        analyzers.append("sch_power_topology")
+        analyzers.append("sch_protection")
+        analyzers.append("sch_decoupling_per_ic")
+        analyzers.append("sch_component_rating")
+        analyzers.append("sch_signal_flow")
+        # Three-way cross-ref runs whenever sch is present; degrades cleanly
+        # if BOM or layout is missing (see analyze_three_way_xref).
+        analyzers.append("three_way_xref")
 
     # Reference design comparison
     analyzers.append("reference_design")
@@ -1089,6 +1175,84 @@ def _run_generic_analyzer(
     return result
 
 
+def _run_schematic_callable(
+    design: PCBDesignData,
+    domain_name: str,
+    module_path: str,
+    callable_name: str,
+    schematic_only: bool = False,
+    pass_bom: bool = False,
+) -> DomainResult:
+    """Runner for Phase 4b schematic analyzers (module-level functions).
+
+    The Phase 4b analyzers expose plain functions rather than classes, so
+    this helper imports + invokes them with the appropriate argument set
+    drawn from ``design``. Each function already returns ``ReviewFinding``
+    objects directly, so we append them as-is.
+    """
+    import importlib
+
+    result = DomainResult(domain=domain_name, analyzer_name=callable_name)
+    try:
+        mod = importlib.import_module(module_path)
+        fn = getattr(mod, callable_name)
+        sc = list(getattr(design, "schematic_components", []) or [])
+        sn = list(getattr(design, "schematic_nets", []) or [])
+        if not sc and not sn and schematic_only:
+            result.status = "skipped"
+            return result
+        if pass_bom:
+            findings = fn(sc, sn, list(getattr(design, "bom_items", []) or []))
+        else:
+            findings = fn(sc, sn)
+        result.findings.extend(findings or [])
+        result.status = (
+            "fail" if result.critical_count > 0
+            else "warning" if result.warning_count > 0
+            else "pass"
+        )
+    except Exception as e:
+        result.status = "error"
+        result.error = str(e)
+        result.findings.append(ReviewFinding(
+            domain=domain_name,
+            severity="info",
+            title=f"{callable_name} error",
+            description=str(e),
+            recommendation="",
+        ))
+    return result
+
+
+def _run_three_way_xref(design: PCBDesignData) -> DomainResult:
+    """Runner for the three-way (sch ↔ BOM ↔ layout) cross-reference."""
+    from .analyzers.validation.three_way_xref import analyze_three_way_xref
+    result = DomainResult(domain="three_way_xref", analyzer_name="analyze_three_way_xref")
+    try:
+        findings = analyze_three_way_xref(
+            schematic_components=list(getattr(design, "schematic_components", []) or []),
+            bom_items=list(getattr(design, "bom_items", []) or []),
+            layout_components=list(getattr(design, "components", []) or []),
+        )
+        result.findings.extend(findings or [])
+        result.status = (
+            "fail" if result.critical_count > 0
+            else "warning" if result.warning_count > 0
+            else "pass"
+        )
+    except Exception as e:
+        result.status = "error"
+        result.error = str(e)
+        result.findings.append(ReviewFinding(
+            domain="three_way_xref",
+            severity="info",
+            title="three_way_xref error",
+            description=str(e),
+            recommendation="",
+        ))
+    return result
+
+
 def _run_ethernet_analysis(
     design: PCBDesignData,
     interfaces: InterfaceDetectionResult,
@@ -1104,7 +1268,7 @@ def _run_ethernet_analysis(
         eth_iface = None
         for iface in interfaces.interfaces:
             itype = iface.interface_type.lower()
-            if itype in ("gbe", "100base-tx", "sgmii", "ethernet"):
+            if any(tok in itype for tok in ("gbe", "100base", "sgmii", "ethernet", "base-t")):
                 eth_iface = iface
                 break
 
@@ -1438,6 +1602,283 @@ def _build_recommendations(
 
 
 # =============================================================================
+# Cross-MCP escalation — Phase 3 sibling-MCP intent queue
+# =============================================================================
+
+def _needs_em_verification(f: ReviewFinding) -> bool:
+    """Decide whether *f* warrants an openEMS escalation.
+
+    A finding escalates when its severity rank meets ESCALATE_SEVERITY_MAX
+    or its confidence drops below ESCALATE_CONFIDENCE_BELOW, *and* its
+    domain is one openEMS can address.
+    """
+    severity_rank = SEVERITY_ORDER.get(f.severity, 4)
+    severity_triggers = severity_rank <= ESCALATE_SEVERITY_MAX
+    confidence_triggers = f.confidence < ESCALATE_CONFIDENCE_BELOW
+    domain_matches = f.domain in OPENEMS_ESCALATION_DOMAINS
+    return domain_matches and (severity_triggers or confidence_triggers)
+
+
+def _emit_next_actions(
+    design: PCBDesignData,
+    review_result: ReviewResult,
+) -> list:
+    """Build the list of suggested sibling-MCP actions from a finished review.
+
+    Emits four flavours of intent:
+
+    1. openEMS — one per HIGH/CRITICAL or low-confidence finding in an
+       EM-addressable domain.
+    2. NEC2 antenna — one per finding tagged as intentional/unintentional
+       antenna at ≥ NEC2_MIN_FREQ_MHZ.
+    3. emc-regulations — one per standard in the review_context's
+       ``target_standards`` that does not yet have a cached lookup.
+    4. drawio diagrams — stackup (always), RF chain (if RF interfaces
+       detected), one EMC test setup per market, schematic markup (if a
+       schematic was parsed).
+
+    The actions are returned *without* being enqueued; the caller (the
+    server's ``pcb_run_design_review`` handler) attaches them to the
+    session via :meth:`DesignSessionManager.enqueue_actions`.
+    """
+    # Local imports to keep top-of-module clean and avoid circular refs.
+    from .analyzers.rf_si.rf_simulation_extractor import (
+        RFSimulationExtractor,
+        SimulationCandidate,
+    )
+    from .integrations.drawio_bridge import build_diagram_intents
+    from .integrations.external_actions import (
+        PRIORITY_CRITICAL,
+        PRIORITY_HIGH,
+        PRIORITY_NORMAL,
+        ExternalAction,
+        dedupe_actions,
+    )
+    from .integrations.nec2_bridge import (
+        NEC2_MIN_FREQ_MHZ as NEC2_FLOOR,
+    )
+    from .integrations.nec2_bridge import (
+        build_antenna_intent,
+        is_antenna_finding,
+    )
+    from .integrations.regulations_bridge import build_intents_for_standards
+
+    ctx = design.review_context or {}
+
+    # ------------------------------------------------------------------
+    # 1. openEMS — drive off finding severity / confidence
+    # ------------------------------------------------------------------
+    escalation_targets: list[ReviewFinding] = []
+    for dr in review_result.domain_results:
+        for f in dr.findings:
+            if _needs_em_verification(f):
+                escalation_targets.append(f)
+
+    try:
+        net_cls = NetClassifier().classify(design)
+        candidates: list[SimulationCandidate] = RFSimulationExtractor().to_candidates(
+            design, net_cls, max_candidates=20
+        )
+    except Exception:  # pragma: no cover — extractor may fail on stub data
+        candidates = []
+    candidates_by_net: dict[str, SimulationCandidate] = {}
+    for source_cand in candidates:
+        for net in source_cand.net_names:
+            candidates_by_net.setdefault(net, source_cand)
+
+    actions: list[ExternalAction] = []
+    for f in escalation_targets:
+        cand: SimulationCandidate | None = (
+            candidates_by_net.get(f.signal_name)
+            if f.signal_name and f.signal_name in candidates_by_net
+            else None
+        )
+        priority = _priority_for_finding(f, PRIORITY_CRITICAL, PRIORITY_HIGH, PRIORITY_NORMAL)
+        if cand is not None:
+            tool, params = _openems_call_for_candidate(cand)
+            # Pass the analytical value through so compare_results can use it.
+            if cand.z0_analytical:
+                params["analytical_value"] = cand.z0_analytical
+            rationale = (
+                f"Verify {f.title} with full-wave EM "
+                f"(severity={f.severity}, confidence={f.confidence:.2f})."
+            )
+        else:
+            tool = "openems_list_antenna_types"
+            params = {"_note": "no automatic candidate match; user to select geometry"}
+            rationale = (
+                f"Finding {f.finding_id} ({f.title}) warrants EM verification but "
+                f"no automatic geometry extraction matched. Manual selection needed."
+            )
+        action = ExternalAction(
+            mcp_server="openems",
+            tool_name=tool,
+            params=params,
+            rationale=rationale,
+            linked_finding_ids=[f.finding_id],
+            priority=priority,
+        )
+        actions.append(action)
+        if action.action_id not in f.linked_actions:
+            f.linked_actions.append(action.action_id)
+
+    # ------------------------------------------------------------------
+    # 2. NEC2 antenna validation
+    # ------------------------------------------------------------------
+    rf_freqs: list[float] = list(ctx.get("rf_frequencies_mhz") or [])
+    answers = ctx.get("interactive_answers", {}) or {}
+    raw_freq = answers.get("rf_operating_freq", "")
+    if isinstance(raw_freq, str) and raw_freq:
+        import re
+        rf_freqs.extend(
+            float(tok) for tok in re.split(r"[,;\s]+", raw_freq.strip())
+            if tok and tok.replace(".", "").isdigit()
+        )
+
+    for dr in review_result.domain_results:
+        for f in dr.findings:
+            if not is_antenna_finding(f.domain, f.signal_name, f.title, f.description):
+                continue
+            # Use the strongest-evidence frequency available: RF context, then
+            # the candidate's frequency, then a default.
+            ant_cand: SimulationCandidate | None = candidates_by_net.get(f.signal_name or "")
+            freq_mhz = (ant_cand.frequency_ghz * 1000.0) if ant_cand else (rf_freqs[0] if rf_freqs else 0.0)
+            if freq_mhz < NEC2_FLOOR:
+                continue
+            trace_len_mm = ant_cand.trace_length_mm if ant_cand else 25.0
+            antenna_action = build_antenna_intent(
+                finding_id=f.finding_id,
+                title=f.title,
+                description=f.description,
+                trace_length_mm=trace_len_mm,
+                frequency_mhz=freq_mhz,
+                priority=PRIORITY_HIGH,
+            )
+            if antenna_action is not None:
+                actions.append(antenna_action)
+                if antenna_action.action_id not in f.linked_actions:
+                    f.linked_actions.append(antenna_action.action_id)
+
+    # ------------------------------------------------------------------
+    # 3. emc-regulations live limit lookups
+    # ------------------------------------------------------------------
+    target_standards: list[str] = list(ctx.get("target_standards") or [])
+    # The Phase 2 playbook stores its own shortlist under review_context["playbook"].
+    pb = ctx.get("playbook") or {}
+    for s in pb.get("standards_shortlist") or []:
+        if s not in target_standards:
+            target_standards.append(s)
+    if target_standards:
+        reg_actions = build_intents_for_standards(
+            standards=target_standards,
+            sample_frequencies_mhz=(0.5, 30.0, 150.0, 1000.0),
+            priority=PRIORITY_NORMAL,
+        )
+        actions.extend(reg_actions)
+
+    # ------------------------------------------------------------------
+    # 4. drawio diagrams (always emitted; report builder reads results back)
+    # ------------------------------------------------------------------
+    stackup_layers = [
+        {
+            "name": layer.name,
+            "type": layer.layer_type,
+            "thickness_mm": layer.thickness_mm,
+            "er": getattr(layer, "dielectric_constant", None),
+            "copper_oz": getattr(layer, "copper_weight_oz", None),
+        }
+        for layer in getattr(design, "layers", []) or []
+    ]
+    detected_interfaces = list(getattr(review_result, "detected_interfaces", []) or [])
+    target_markets = list(pb.get("active_markets") or [])
+    if not target_markets and pb.get("declared_market") and pb["declared_market"] != "unknown":
+        target_markets = [pb["declared_market"]]
+    schematic_path = getattr(design, "schematic_pdf_path", None)
+    diagram_intents = build_diagram_intents(
+        stackup_layers=stackup_layers,
+        board_thickness_mm=getattr(design, "board_thickness_mm", None),
+        detected_interfaces=detected_interfaces,
+        target_markets=target_markets,
+        schematic_path=schematic_path,
+        rf_frequencies_mhz=rf_freqs or None,
+    )
+    actions.extend(diagram_intents)
+
+    return dedupe_actions(actions)
+
+
+def _priority_for_finding(
+    f: ReviewFinding,
+    p_critical: int,
+    p_high: int,
+    p_normal: int,
+) -> int:
+    """Map a finding's severity to an action priority bucket."""
+    if f.severity == "critical":
+        return p_critical
+    if f.severity == "high":
+        return p_high
+    return p_normal
+
+
+def _openems_call_for_candidate(cand) -> tuple[str, dict]:
+    """Return ``(tool_name, params)`` for a SimulationCandidate.
+
+    Mirrors :meth:`OpenEMSBridge.generate_from_candidate` but emits the
+    sibling-MCP tool call form Claude will execute.
+    """
+    st = cand.structure_type
+    base = {
+        "frequency_ghz": cand.frequency_ghz,
+        "trace_length_mm": cand.trace_length_mm,
+        "dielectric_er": cand.dielectric_er,
+    }
+    if st == "microstrip":
+        return "openems_create_microstrip", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "copper_thickness_mm": cand.copper_thickness_mm,
+        }
+    if st == "stripline":
+        return "openems_create_microstrip", {  # openems MCP exposes stripline via the microstrip helper
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "copper_thickness_mm": cand.copper_thickness_mm,
+            "_structure_hint": "stripline",
+        }
+    if st == "coupled_microstrip":
+        return "openems_create_coupled_lines", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "spacing_mm": cand.spacing_mm or 0.2,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+        }
+    if st == "coupled_stripline":
+        return "openems_create_coupled_lines", {
+            **base,
+            "trace_width_mm": cand.trace_width_mm,
+            "spacing_mm": cand.spacing_mm or 0.2,
+            "dielectric_height_mm": cand.dielectric_height_mm,
+            "_structure_hint": "stripline",
+        }
+    if st == "via_transition":
+        return "openems_create_via", {
+            **base,
+            "drill_mm": cand.via_drill_mm or 0.3,
+            "pad_mm": cand.via_pad_mm or 0.6,
+            "board_thickness_mm": cand.dielectric_height_mm,
+        }
+    # Fallback — at least carry the metadata over so Claude can inspect.
+    return "openems_list_antenna_types", {
+        **base,
+        "structure_type": st,
+        "_note": "unknown structure_type; user to select model",
+    }
+
+
+# =============================================================================
 # Main orchestration
 # =============================================================================
 
@@ -1520,6 +1961,38 @@ def run_design_review(
                 design, net_cls, "bom_cross_reference",
                 "mcp_pcb_emcopilot.analyzers.validation.bom_cross_reference", "BOMCrossReferenceAnalyzer"
             ))
+        elif key == "sch_power_topology":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_power",
+                "mcp_pcb_emcopilot.analyzers.schematic.power_topology", "analyze_power_topology",
+                schematic_only=True,
+            ))
+        elif key == "sch_protection":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_protection",
+                "mcp_pcb_emcopilot.analyzers.schematic.protection_circuits", "analyze_protection_circuits",
+                pass_bom=False,
+            ))
+        elif key == "sch_decoupling_per_ic":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_decoupling",
+                "mcp_pcb_emcopilot.analyzers.schematic.decoupling_per_ic", "analyze_decoupling_per_ic",
+                pass_bom=False,
+            ))
+        elif key == "sch_component_rating":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_rating",
+                "mcp_pcb_emcopilot.analyzers.schematic.component_rating", "analyze_component_rating",
+                pass_bom=True,
+            ))
+        elif key == "sch_signal_flow":
+            domain_results.append(_run_schematic_callable(
+                design, "schematic_signal_flow",
+                "mcp_pcb_emcopilot.analyzers.schematic.signal_flow", "analyze_signal_flow",
+                pass_bom=False,
+            ))
+        elif key == "three_way_xref":
+            domain_results.append(_run_three_way_xref(design))
         elif key == "reference_design":
             domain_results.append(_run_generic_analyzer(
                 design, net_cls, "reference_design",

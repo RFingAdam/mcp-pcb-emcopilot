@@ -84,7 +84,9 @@ class CopperPourChecker:
                     })
 
                 # Check for non-ground pours (potential misassignment)
-                name_upper = net_name.upper()
+                # `net_name` may be None on partially-parsed designs; coerce
+                # to an empty string so the .upper() call is always defined.
+                name_upper = (net_name or "").upper()
                 is_ground = any(kw in name_upper for kw in _GROUND_KEYWORDS)
                 is_power = any(
                     kw in name_upper

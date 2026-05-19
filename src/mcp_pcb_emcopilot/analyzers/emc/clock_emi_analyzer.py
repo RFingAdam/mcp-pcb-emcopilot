@@ -453,7 +453,9 @@ def calculate_smps_emi(
 # Speed of light (m/s)
 _C0 = 299792458.0
 
-# FCC Part 15 Class B limits at 3m (dBuV/m)
+# FCC Part 15 Class B limits at 3m (dBuV/m). Retained for compatibility —
+# legacy callers may still iterate this tuple list. The authoritative source
+# is now ``analyzers.emc.limits_provider``.
 _FCC_CLASS_B_LIMITS = [
     (30, 88, 40.0),
     (88, 216, 43.5),
@@ -461,7 +463,7 @@ _FCC_CLASS_B_LIMITS = [
     (960, 40000, 54.0),
 ]
 
-# CISPR 32 Class B limits at 3m (dBuV/m)
+# CISPR 32 Class B limits at 3m (dBuV/m). Retained for compatibility.
 _CISPR_CLASS_B_LIMITS = [
     (30, 230, 40.0),
     (230, 1000, 47.0),
@@ -470,9 +472,29 @@ _CISPR_CLASS_B_LIMITS = [
 
 
 def _get_regulatory_limit(frequency_mhz: float, standard: str = "fcc_b") -> float:
-    """Get emission limit for a frequency under a given standard."""
+    """Get emission limit for a frequency under a given standard.
+
+    Delegates to :func:`limits_provider.get_limit` so that the same lookup
+    can be transparently overridden by a live mcp__emc-regulations result.
+    Falls through to the legacy tuple list if the provider returns ``None``
+    (e.g. when the standard token doesn't map cleanly), preserving the
+    pre-refactor behaviour bit-for-bit.
+    """
+    from .limits_provider import get_limit
+
     std_lower = standard.lower().replace(" ", "_").replace("-", "_")
-    limits = _CISPR_CLASS_B_LIMITS if "cispr" in std_lower else _FCC_CLASS_B_LIMITS
+    is_cispr = "cispr" in std_lower
+
+    # Try the provider with a normalised standard/class first.
+    provider_standard = "CISPR_32" if is_cispr else "FCC_PART_15_B"
+    provider_class = "B"
+    point = get_limit(provider_standard, provider_class, frequency_mhz, detector="QP")
+    if point is not None:
+        return float(point.limit_value)
+
+    # Provider miss — fall back to the legacy in-file table so old behaviour
+    # never regresses on edge cases not yet modelled in the provider.
+    limits = _CISPR_CLASS_B_LIMITS if is_cispr else _FCC_CLASS_B_LIMITS
     for f_low, f_high, limit in limits:
         if f_low <= frequency_mhz <= f_high:
             return limit

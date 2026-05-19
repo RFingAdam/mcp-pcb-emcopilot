@@ -338,7 +338,10 @@ class GNSSAnalyzer:
 
             if nearby_smps:
                 findings.append({
-                    "severity": "critical" if any(s["distance_mm"] < 8.0 for s in nearby_smps) else "warning",
+                    "severity": "critical" if any(
+                        isinstance(s["distance_mm"], (int, float)) and s["distance_mm"] < 8.0
+                        for s in nearby_smps
+                    ) else "warning",
                     "category": "gnss_smps_emi",
                     "description": (
                         f"GNSS receiver {receiver.reference} has {len(nearby_smps)} "
