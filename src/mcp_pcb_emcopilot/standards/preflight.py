@@ -84,9 +84,12 @@ def validate_review_complete(
     ctx = design.review_context or {}
     answers = ctx.get("interactive_answers", {}) or {}
 
-    # Resolve active markets.
-    explicit_markets = ctx.get("markets") if isinstance(ctx.get("markets"), list) else []
-    explicit_markets = [str(m).lower() for m in explicit_markets]
+    # Resolve active markets. The ``markets`` key may be absent, the wrong
+    # type, or a list — coerce to a flat list[str] before further use.
+    raw_markets = ctx.get("markets")
+    explicit_markets: list[str] = (
+        [str(m).lower() for m in raw_markets] if isinstance(raw_markets, list) else []
+    )
     markets = [m for m in explicit_markets if m in market_packs.KNOWN_MARKETS]
     if not markets:
         pb = ctx.get("playbook") or {}

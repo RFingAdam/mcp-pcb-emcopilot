@@ -640,7 +640,7 @@ print(f"Radiated power: {{nf2ff_res.Prad[0]:.6f}} W")
     # Dispatcher: SimulationCandidate -> OpenEMSModel
     # =================================================================
 
-    def generate_from_candidate(self, candidate: "SimulationCandidate") -> OpenEMSModel:
+    def generate_from_candidate(self, candidate: SimulationCandidate) -> OpenEMSModel:
         """Route a SimulationCandidate to the appropriate model generator."""
         st = candidate.structure_type
 
@@ -694,7 +694,7 @@ print(f"Radiated power: {{nf2ff_res.Prad[0]:.6f}} W")
             raise ValueError(f"Unknown structure_type '{st}'")
 
     def generate_batch(
-        self, candidates: list["SimulationCandidate"]
+        self, candidates: list[SimulationCandidate]
     ) -> list[OpenEMSModel]:
         """Generate OpenEMS models for a list of candidates."""
         models: list[OpenEMSModel] = []

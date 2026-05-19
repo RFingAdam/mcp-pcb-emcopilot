@@ -136,19 +136,35 @@ def parse_schematic_auto(file_path: str) -> dict[str, Any]:
         }
 
     if fmt == "netlist":
-        # Phase 4b stub — keep the door open; a full ORCAD/Pads netlist
-        # parser is deferred. We return what we can read line-by-line so
-        # downstream analyzers at least see refdes lists.
+        # Phase 4c — proper ORCAD PSTXNET / Pads ASCII parser. Falls back
+        # to the original regex stub only if the proper parser produces
+        # zero output (very malformed file).
+        try:
+            from .netlist_parser import parse_netlist
+            parsed = parse_netlist(file_path)
+            comp_dicts = [_dataclass_to_dict(c) for c in parsed.components]
+            net_dicts = [_dataclass_to_dict(n) for n in parsed.nets]
+            if comp_dicts or net_dicts:
+                return {
+                    "source_format": "netlist",
+                    "components": comp_dicts,
+                    "nets": net_dicts,
+                    "title": None,
+                    "warnings": list(parsed.warnings or []),
+                    "raw": parsed,
+                    "file_path": file_path,
+                }
+        except Exception as e:  # pragma: no cover — fall through to stub
+            stub_warning = f"netlist_parser raised {e!s}; falling back to regex stub"
+        else:
+            stub_warning = "netlist_parser found nothing; falling back to regex stub"
         components, nets = _parse_simple_netlist(file_path)
         return {
             "source_format": "netlist",
             "components": components,
             "nets": nets,
             "title": None,
-            "warnings": [
-                "Phase 4b: netlist parser is a stub. ORCAD/Pads ASCII support "
-                "is line-based only; pin-net mapping is heuristic."
-            ],
+            "warnings": [stub_warning],
             "raw": None,
             "file_path": file_path,
         }
