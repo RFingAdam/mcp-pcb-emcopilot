@@ -567,10 +567,10 @@ class RFSimulationExtractor:
             if l.layer_type == "dielectric" and abs(getattr(l, "number", getattr(l, "row", 0)) - cu_row) <= 2:
                 if attr == "thickness":
                     if l.thickness_mm and l.thickness_mm > 0:
-                        return l.thickness_mm
+                        return float(l.thickness_mm)
                 elif attr == "er":
                     if l.dielectric_constant and l.dielectric_constant > 1:
-                        return l.dielectric_constant
+                        return float(l.dielectric_constant)
         return 0.0 if attr == "thickness" else 4.2
 
     @staticmethod
