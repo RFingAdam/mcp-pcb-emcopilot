@@ -186,7 +186,9 @@ def parse_schematic_auto(file_path: str) -> dict[str, Any]:
 def _dataclass_to_dict(obj: Any) -> dict[str, Any]:
     if isinstance(obj, dict):
         return dict(obj)
-    if is_dataclass(obj):
+    # ``is_dataclass(obj)`` returns True for the class itself too, but
+    # ``asdict`` only accepts instances. Narrow before calling.
+    if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
     # Last resort — try to read attributes off whatever this is.
     return {k: getattr(obj, k) for k in dir(obj) if not k.startswith("_") and not callable(getattr(obj, k, None))}

@@ -1682,13 +1682,13 @@ def _emit_next_actions(
     except Exception:  # pragma: no cover — extractor may fail on stub data
         candidates = []
     candidates_by_net: dict[str, SimulationCandidate] = {}
-    for cand in candidates:
-        for net in cand.net_names:
-            candidates_by_net.setdefault(net, cand)
+    for source_cand in candidates:
+        for net in source_cand.net_names:
+            candidates_by_net.setdefault(net, source_cand)
 
     actions: list[ExternalAction] = []
     for f in escalation_targets:
-        cand = (
+        cand: SimulationCandidate | None = (
             candidates_by_net.get(f.signal_name)
             if f.signal_name and f.signal_name in candidates_by_net
             else None
@@ -1741,11 +1741,11 @@ def _emit_next_actions(
                 continue
             # Use the strongest-evidence frequency available: RF context, then
             # the candidate's frequency, then a default.
-            cand = candidates_by_net.get(f.signal_name or "")
-            freq_mhz = (cand.frequency_ghz * 1000.0) if cand else (rf_freqs[0] if rf_freqs else 0.0)
+            ant_cand: SimulationCandidate | None = candidates_by_net.get(f.signal_name or "")
+            freq_mhz = (ant_cand.frequency_ghz * 1000.0) if ant_cand else (rf_freqs[0] if rf_freqs else 0.0)
             if freq_mhz < NEC2_FLOOR:
                 continue
-            trace_len_mm = cand.trace_length_mm if cand else 25.0
+            trace_len_mm = ant_cand.trace_length_mm if ant_cand else 25.0
             antenna_action = build_antenna_intent(
                 finding_id=f.finding_id,
                 title=f.title,
