@@ -25,13 +25,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[all,dev]"
-      # mypy is currently advisory — the codebase has pre-existing type
-      # debt (see #124) that we're tackling incrementally. The step still
-      # runs and surfaces errors in the job log, but `continue-on-error`
-      # converts a non-zero exit into a successful step so the PR check
-      # is green until #124 closes.
       - run: mypy src/mcp_pcb_emcopilot/ --ignore-missing-imports
-        continue-on-error: true
 
   test:
     runs-on: ubuntu-latest
