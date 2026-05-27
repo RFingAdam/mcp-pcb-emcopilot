@@ -89,3 +89,11 @@ report_images/
 
 # Schematic extracts
 pcb_schematic_*/
+
+# web-ui (React/Vite scaffold) build + deps
+web-ui/node_modules/
+web-ui/dist/
+web-ui/.vite/
+
+# Transient session notes
+.session-notes-text.tmp
