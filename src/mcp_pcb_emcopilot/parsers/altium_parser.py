@@ -66,6 +66,10 @@ class AltiumComponent:
     # Parameter-record extras: DNP flag, ComponentClass, tolerance, comment, etc.
     # Populated by AltiumSchematicParser._parse_records when present.
     properties: Dict[str, Any] = field(default_factory=dict)
+    # Pin records (#2) attached to this component during the second-pass
+    # linkage. Each pin dict mirrors ``ParsedComponent.pins``:
+    # ``{pin_number, name, x_mm, y_mm, x_abs, y_abs, electrical_type, net}``.
+    pins: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -231,6 +235,20 @@ class AltiumBoardData:
 
 
 @dataclass
+class AltiumSheetSymbol:
+    """A hierarchical sheet-symbol record (#15) on a parent schematic.
+
+    Each sheet-symbol references a child SchDoc via its FILE_NAME (#33)
+    record (linked by owner_idx) and exposes one or more sheet-entries
+    (#16) that match port labels on the child sheet.
+    """
+    name: str  # DESIGNATOR field — the sheet block label
+    filename: Optional[str] = None  # linked FILE_NAME record's TEXT
+    owner_idx: int = -1
+    entries: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
 class AltiumSchematicData:
     """Complete parsed Altium SchDoc data."""
     source_file: str
@@ -246,6 +264,10 @@ class AltiumSchematicData:
 
     # Power symbols
     power_symbols: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Hierarchy (populated from SHEET_SYMBOL/FILE_NAME records).
+    sheet_symbols: List[AltiumSheetSymbol] = field(default_factory=list)
+    child_sheets: List[str] = field(default_factory=list)
 
     # Warnings
     warnings: List[str] = field(default_factory=list)
@@ -1478,6 +1500,11 @@ class AltiumSchematicParser:
             logger.error(f"Failed to parse SchDoc: {e}")
             raise ValueError(f"SchDoc parse error: {str(e)}")
 
+    # Coordinate tolerance for the geometric pin → net fallback (mm).
+    # Matches KiCadSchematicParser._LABEL_SNAP_MM — both tools snap to
+    # the same nominal grid resolution at the mil level.
+    _LABEL_SNAP_MM = 0.51
+
     def _parse_fileheader(self, raw_data: bytes, data: AltiumSchematicData) -> None:
         """Parse FileHeader stream containing schematic records.
 
@@ -1491,6 +1518,13 @@ class AltiumSchematicParser:
         components_by_idx: Dict[int, AltiumComponent] = {}
         designators: List[Tuple[int, str]] = []  # (owner_idx, text)
         parameters: List[Tuple[int, str, str]] = []  # (owner_idx, name, value)
+        pins: List[Tuple[int, Dict[str, Any]]] = []  # (owner_idx, pin_dict)
+        sheet_symbols_by_idx: Dict[int, AltiumSheetSymbol] = {}
+        sheet_entries: List[Tuple[int, Dict[str, Any]]] = []  # (owner_idx, entry_dict)
+        filenames: List[Tuple[int, str]] = []  # (owner_idx, filename)
+        wires: List[Dict[str, float]] = []
+        junctions: List[Dict[str, float]] = []
+        net_labels: List[Dict[str, Any]] = []  # {name, x, y}
 
         while pos < len(raw_data):
             # Record format: <length 4 bytes><data>
@@ -1555,8 +1589,71 @@ class AltiumSchematicParser:
 
                 elif record_type == 25:  # NET_LABEL
                     net_name = fields.get('TEXT', fields.get('Text', '')).strip('"')
-                    if net_name and not any(n.name == net_name for n in data.nets):
-                        data.nets.append(AltiumNet(name=net_name))
+                    if net_name:
+                        if not any(n.name == net_name for n in data.nets):
+                            data.nets.append(AltiumNet(name=net_name))
+                        # Anchor coords for the geometric pin → net pass.
+                        net_labels.append({
+                            'name': net_name,
+                            'x': self._parse_coord(fields.get('LOCATION.X', '0')) * 0.0254,
+                            'y': self._parse_coord(fields.get('LOCATION.Y', '0')) * 0.0254,
+                        })
+
+                elif record_type == 2:  # PIN
+                    owner_idx = self._parse_int(fields.get('OWNERINDEX', '-1'))
+                    pin_dict: Dict[str, Any] = {
+                        'pin_number': fields.get('DESIGNATOR', '').strip('"'),
+                        'name': fields.get('NAME', '').strip('"'),
+                        'x_mm': self._parse_coord(fields.get('LOCATION.X', '0')) * 0.0254,
+                        'y_mm': self._parse_coord(fields.get('LOCATION.Y', '0')) * 0.0254,
+                        'electrical_type': fields.get('ELECTRICAL', ''),
+                        # Explicit NetIdentifier wins over the geometric pass.
+                        'net': fields.get('NETIDENTIFIER', '').strip('"') or None,
+                    }
+                    # Absolute coordinates are filled in during the second
+                    # pass once the parent component's origin is known.
+                    pin_dict['x_abs'] = pin_dict['x_mm']
+                    pin_dict['y_abs'] = pin_dict['y_mm']
+                    if owner_idx >= 0:
+                        pins.append((owner_idx, pin_dict))
+
+                elif record_type == 15:  # SHEET_SYMBOL
+                    sheet_name = fields.get('DESIGNATOR', '').strip('"')
+                    sheet_symbols_by_idx[record_index] = AltiumSheetSymbol(
+                        name=sheet_name,
+                        owner_idx=record_index,
+                    )
+
+                elif record_type == 16:  # SHEET_ENTRY
+                    owner_idx = self._parse_int(fields.get('OWNERINDEX', '-1'))
+                    entry = {
+                        'name': fields.get('NAME', '').strip('"'),
+                        'io_type': fields.get('IOTYPE', fields.get('IO_TYPE', '')),
+                        'x_mm': self._parse_coord(fields.get('LOCATION.X', '0')) * 0.0254,
+                        'y_mm': self._parse_coord(fields.get('LOCATION.Y', '0')) * 0.0254,
+                    }
+                    if owner_idx >= 0:
+                        sheet_entries.append((owner_idx, entry))
+
+                elif record_type == 33:  # FILE_NAME (child sheet filename)
+                    owner_idx = self._parse_int(fields.get('OWNERINDEX', '-1'))
+                    filename = fields.get('TEXT', fields.get('Text', '')).strip('"')
+                    if owner_idx >= 0 and filename:
+                        filenames.append((owner_idx, filename))
+
+                elif record_type == 27:  # WIRE
+                    wires.append({
+                        'x1': self._parse_coord(fields.get('LOCATION.X', fields.get('X1', '0'))) * 0.0254,
+                        'y1': self._parse_coord(fields.get('LOCATION.Y', fields.get('Y1', '0'))) * 0.0254,
+                        'x2': self._parse_coord(fields.get('CORNER.X', fields.get('X2', '0'))) * 0.0254,
+                        'y2': self._parse_coord(fields.get('CORNER.Y', fields.get('Y2', '0'))) * 0.0254,
+                    })
+
+                elif record_type == 29:  # JUNCTION
+                    junctions.append({
+                        'x': self._parse_coord(fields.get('LOCATION.X', '0')) * 0.0254,
+                        'y': self._parse_coord(fields.get('LOCATION.Y', '0')) * 0.0254,
+                    })
 
                 elif record_type == 31:  # HEADER (sheet properties)
                     data.title = fields.get('SHEETNAME', fields.get('SheetName', ''))
@@ -1605,6 +1702,48 @@ class AltiumSchematicParser:
                     if not hasattr(comp, "properties") or comp.properties is None:
                         comp.properties = {}
                     comp.properties.setdefault(param_name.lower(), param_value)
+
+        # Attach pin records to their owning components. Absolute pin
+        # coordinates are component_origin + pin_offset so the geometric
+        # pass can match them against label anchors in the same frame.
+        for owner_idx, pin_dict in pins:
+            parent = components_by_idx.get(owner_idx + 1)
+            if parent is None:
+                continue
+            pin_dict['x_abs'] = parent.x_mm + pin_dict.get('x_mm', 0.0)
+            pin_dict['y_abs'] = parent.y_mm + pin_dict.get('y_mm', 0.0)
+            parent.pins.append(pin_dict)
+
+        # Geometric fallback: pins without an explicit NetIdentifier
+        # are matched to the nearest NET_LABEL anchor via the shared
+        # resolver. Pins with a NetIdentifier are skipped (the resolver
+        # checks ``pin['net']`` truthiness).
+        if pins and net_labels and wires:
+            from ._pin_net_geometric import resolve_pins_by_geometry
+            # Build a {name → AltiumNet} map so the resolver can append
+            # pin back-references.
+            net_lookup = {n.name: n for n in data.nets}
+            resolve_pins_by_geometry(
+                components_by_idx.values(),
+                wires, net_labels, junctions,
+                nets=net_lookup, snap_mm=self._LABEL_SNAP_MM,
+            )
+
+        # Link FILE_NAME records to their parent SHEET_SYMBOL via owner index.
+        for owner_idx, filename in filenames:
+            sheet_symbol = sheet_symbols_by_idx.get(owner_idx + 1)
+            if sheet_symbol is not None:
+                sheet_symbol.filename = filename
+
+        # Link SHEET_ENTRY records to their parent SHEET_SYMBOL.
+        for owner_idx, entry in sheet_entries:
+            sheet_symbol = sheet_symbols_by_idx.get(owner_idx + 1)
+            if sheet_symbol is not None:
+                sheet_symbol.entries.append(entry)
+
+        # Top-level hierarchy summary.
+        data.sheet_symbols = list(sheet_symbols_by_idx.values())
+        data.child_sheets = [s.filename for s in data.sheet_symbols if s.filename]
 
         # Add components with valid designators to result
         for comp in components_by_idx.values():
@@ -1739,6 +1878,80 @@ class AltiumProjectParser:
             })
 
         return bom
+
+
+def altium_to_parsed_schematic(data: AltiumSchematicData) -> Any:
+    """Convert ``AltiumSchematicData`` into the unified ``ParsedSchematicData``
+    shape expected by downstream analyzers (3-way cross-reference, signal-flow,
+    schematic-layout validator).
+
+    Field mapping is one-to-one where the target has a matching slot; the
+    remainder (``description``, ``library_ref``, child sheets, sheet symbols)
+    flow into ``ParsedComponent.properties`` / ``ParsedSchematicData.properties``
+    so no information is lost.
+    """
+    # Local import to avoid circular dependency at module load time —
+    # schematic_parser imports altium_parser inside its factory branch.
+    from dataclasses import asdict
+
+    from .schematic_parser import (
+        ParsedComponent,
+        ParsedNet,
+        ParsedSchematicData,
+        _looks_like_ground,
+        _looks_like_power,
+    )
+
+    parsed_components: List[Any] = []
+    for ac in data.components:
+        props = dict(ac.properties or {})
+        if ac.description:
+            props.setdefault("description", ac.description)
+        if ac.library_ref:
+            props.setdefault("library_ref", ac.library_ref)
+        if ac.source_library:
+            props.setdefault("source_library", ac.source_library)
+        if ac.unique_id:
+            props.setdefault("unique_id", ac.unique_id)
+        parsed_components.append(ParsedComponent(
+            reference=ac.reference,
+            value=ac.value,
+            part_number=ac.part_number,
+            manufacturer=ac.manufacturer,
+            footprint=ac.footprint,
+            x_coord=ac.x_mm,
+            y_coord=ac.y_mm,
+            properties=props,
+            pins=list(ac.pins or []),
+        ))
+
+    parsed_nets: List[Any] = []
+    for an in data.nets:
+        parsed_nets.append(ParsedNet(
+            net_name=an.name,
+            pins=list(an.pins or []),
+            is_power=_looks_like_power(an.name),
+            is_ground=_looks_like_ground(an.name),
+        ))
+
+    top_props: Dict[str, Any] = {}
+    if data.child_sheets:
+        top_props["child_sheets"] = list(data.child_sheets)
+    if data.sheet_symbols:
+        top_props["sheet_symbols"] = [asdict(s) for s in data.sheet_symbols]
+    if data.power_symbols:
+        top_props["power_symbols"] = list(data.power_symbols)
+    top_props["source_file"] = data.source_file
+
+    return ParsedSchematicData(
+        components=parsed_components,
+        nets=parsed_nets,
+        sheet_count=1 + len(data.child_sheets),
+        title=data.title,
+        revision=data.revision,
+        warnings=list(data.warnings or []),
+        properties=top_props,
+    )
 
 
 def get_format_benefits() -> Dict[str, Dict[str, Any]]:

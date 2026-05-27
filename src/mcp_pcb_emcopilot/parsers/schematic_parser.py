@@ -362,48 +362,12 @@ class KiCadSchematicParser:
         labels: list[dict[str, Any]],
         junctions: list[dict[str, Any]],
     ) -> None:
-        """Best-effort pin → net mapping.
-
-        Snaps each label's coordinate to its nearest wire endpoint, then
-        for every component pin whose absolute position lies on the same
-        wire (within tolerance), tag the pin with the label's net name.
-        """
-        if not wires or not labels:
-            return
-
-        snap = self._LABEL_SNAP_MM ** 2  # squared distance
-
-        # Pre-compute label → wire endpoint that anchors it.
-        label_anchors: dict[str, tuple[float, float]] = {}
-        for label in labels:
-            label_anchors.setdefault(label["name"], (label["x"], label["y"]))
-
-        # Index pins to nets by coordinate proximity to label anchor.
-        for comp in self.components:
-            for pin in comp.pins:
-                px = float(pin.get("x_abs", comp.x_coord))
-                py = float(pin.get("y_abs", comp.y_coord))
-                best_net: Optional[str] = None
-                best_d2 = snap
-                for name, (lx, ly) in label_anchors.items():
-                    d2 = (px - lx) ** 2 + (py - ly) ** 2
-                    if d2 <= best_d2:
-                        best_d2 = d2
-                        best_net = name
-                if best_net is not None:
-                    pin["net"] = best_net
-                    net = self.nets.get(best_net)
-                    if net is not None:
-                        net.pins.append({
-                            "component": comp.reference,
-                            "pin_number": pin.get("pin_number", ""),
-                        })
-
-        # Junctions don't directly create new nets, but if a junction sits
-        # on a wire segment that's also labelled, we ensure that net exists
-        # in self.nets — already handled in _parse_tree label branch, so no
-        # further work needed here.
-        _ = junctions  # reserved for future cross-wire net merging
+        """Best-effort pin → net mapping via the shared resolver."""
+        from ._pin_net_geometric import resolve_pins_by_geometry
+        resolve_pins_by_geometry(
+            self.components, wires, labels, junctions,
+            nets=self.nets, snap_mm=self._LABEL_SNAP_MM,
+        )
 
     def _parse_kicad_sch(self, content: str) -> None:
         """Parse KiCad schematic S-expression content."""
@@ -573,6 +537,11 @@ class SchematicParserFactory:
     def parse(file_path: str) -> ParsedSchematicData:
         """Parse schematic file with automatic format detection.
 
+        For ``.SchDoc`` files the concrete parser returns the Altium-shape
+        ``AltiumSchematicData``; we convert it to ``ParsedSchematicData``
+        here so downstream analyzers see one uniform shape regardless of
+        the source format.
+
         Args:
             file_path: Path to schematic file
 
@@ -581,6 +550,17 @@ class SchematicParserFactory:
 
         Raises:
             ValueError: If file format is not supported
+            TypeError: If the concrete parser returns an unexpected type
         """
         parser = SchematicParserFactory.create_parser(file_path)
-        return parser.parse(file_path)  # type: ignore[no-any-return, attr-defined]
+        result = parser.parse(file_path)  # type: ignore[attr-defined]
+        if isinstance(result, ParsedSchematicData):
+            return result
+        from .altium_parser import AltiumSchematicData, altium_to_parsed_schematic
+        if isinstance(result, AltiumSchematicData):
+            return altium_to_parsed_schematic(result)
+        raise TypeError(
+            f"Parser for {file_path!r} returned unexpected type "
+            f"{type(result).__name__}; expected ParsedSchematicData or "
+            "AltiumSchematicData."
+        )

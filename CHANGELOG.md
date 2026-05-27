@@ -5,6 +5,42 @@ All notable changes to **mcp-pcb-emcopilot** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-05-27
+
+### Added
+- **AltiumSchematicParser**: PIN (#2), SHEET_SYMBOL (#15), SHEET_ENTRY
+  (#16), FILE_NAME (#33), WIRE (#27), JUNCTION (#29) record-type
+  handling. NET_LABEL (#25) records now also capture coordinates for
+  geometric pin-net resolution.
+- **Pin → net resolution** for `.SchDoc` input: explicit `NetIdentifier`
+  parameter on a pin record wins; pins without one fall back to the
+  shared geometric resolver (label-anchor snap, same algorithm as
+  KiCad).
+- **Sheet-symbol hierarchy** — `AltiumSchematicData.sheet_symbols` and
+  `child_sheets` populated from SHEET_SYMBOL + FILE_NAME owner-index
+  linkage. Hierarchy now surfaces in `ParsedSchematicData.sheet_count`
+  and `properties['child_sheets']`.
+- **`altium_to_parsed_schematic()`** converter (in `altium_parser.py`):
+  maps `AltiumSchematicData` to the canonical `ParsedSchematicData`
+  shape downstream analyzers expect. `SchematicParserFactory.parse()`
+  wires the converter in so `.SchDoc` input flows through the same
+  analyzer surface as `.kicad_sch` — schematic-aware analyzers
+  (3-way cross-reference, signal-flow, schematic-layout validator)
+  stop running in degraded mode against Altium files.
+- **17 integration tests** in `test_altium_parameter_records.py` that
+  exercise the real `_parse_fileheader` against synthetic FileHeader
+  byte streams. The previous test scaffolding duplicated the
+  parameter-mapping logic inside the test file; that helper is gone.
+
+### Changed
+- `KiCadSchematicParser._resolve_pin_nets` extracted to
+  `parsers/_pin_net_geometric.py:resolve_pins_by_geometry()` so both
+  parsers share one implementation.
+
+### Closes
+- [#121](https://github.com/RFingAdam/mcp-pcb-emcopilot/issues/121) —
+  Extend AltiumSchematicParser for DNP / MPN / pin-net mapping.
+
 ## [0.4.0] — 2026-05-27
 
 ### Added

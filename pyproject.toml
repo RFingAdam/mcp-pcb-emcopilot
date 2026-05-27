@@ -1,6 +1,6 @@
 [project]
 name = "mcp-pcb-emcopilot"
-version = "0.4.0"
+version = "0.4.1"
 description = "MCP server for PCB design review, EMC analysis, and signal integrity"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
