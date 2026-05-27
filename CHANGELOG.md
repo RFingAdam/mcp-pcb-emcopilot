@@ -5,6 +5,46 @@ All notable changes to **mcp-pcb-emcopilot** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-27
+
+### Added
+- **Phase 2** — Claude-driven meticulous-review workflow.
+- **Phase 3 / 3a** — cross-MCP intent queue + four orchestration tools
+  (`pcb_request_simulation`, `pcb_request_limit_lookup`,
+  `pcb_request_antenna_check`, `pcb_request_filter_design`).
+- **Phase 3b** — limits provider with sibling-MCP bridges into
+  `mcp-emc-regulations`, `mcp-openems`, `mcp-nec2-antenna`, and
+  `mcp-ltspice-qucs`.
+- **Phase 4** — multi-market intake (FCC Part 15 / CISPR / automotive
+  CISPR-25 / medical IEC-60601), standards-coverage report, and a
+  pre-flight gate that refuses analysis when required market context
+  is missing.
+- **Phase 4b** — schematic-aware analyzers and 3-way schematic /
+  layout / BOM cross-reference, plus the
+  `pcb_three_way_cross_reference` tool.
+- **Phase 4c** — KiCad `sexpdata` parser for `.kicad_sch` and
+  `.kicad_pcb`, netlist extractor, and `pcb_analyze_signal_flow`
+  tool. CI pinned for reproducibility.
+- **web-ui scaffold** — React + Vite + Tailwind frontend salvaged
+  from the earlier Agentarium `pcb_em_copilot` module (2026-04-21).
+  Ships under `web-ui/` with its own README documenting the
+  remaining Flask-backend retargeting work. Not built or served by
+  the Python package yet — included as the integration starting
+  point for the next iteration.
+
+### Changed
+- **CI** — bumped GitHub Actions to Node 24 (`checkout@v5`,
+  `setup-python@v6`).
+- **Type checking** — mypy typecheck is now a required CI step;
+  `continue-on-error` moved from job- to step-level so individual
+  step failures still surface.
+
+### Fixed
+- Cleared all pre-existing mypy errors across the source tree.
+- Stripped the `src.` prefix from `importlib.import_module()` string
+  args and from `test_integration_odb` imports so tests resolve
+  against the installed package, not the working tree.
+
 ## [0.3.0] — 2026-05-13
 
 ### Changed
