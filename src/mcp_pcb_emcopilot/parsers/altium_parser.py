@@ -30,7 +30,10 @@ import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from .schematic_parser import ParsedSchematicData
 
 try:
     import olefile
@@ -1880,7 +1883,7 @@ class AltiumProjectParser:
         return bom
 
 
-def altium_to_parsed_schematic(data: AltiumSchematicData) -> Any:
+def altium_to_parsed_schematic(data: AltiumSchematicData) -> ParsedSchematicData:
     """Convert ``AltiumSchematicData`` into the unified ``ParsedSchematicData``
     shape expected by downstream analyzers (3-way cross-reference, signal-flow,
     schematic-layout validator).
