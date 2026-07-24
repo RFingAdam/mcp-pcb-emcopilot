@@ -98,10 +98,6 @@ PART_DATABASE: Dict[str, Dict[str, Any]] = {
         "type": "ble", "sleep_ua": 1, "idle_ma": 0.6, "tx_ma": 13,
         "rx_ma": 8, "description": "TI CC1352 Sub-GHz + BLE",
     },
-    "453-00148": {
-        "type": "ble", "sleep_ua": 2, "idle_ma": 0.5, "tx_ma": 12,
-        "rx_ma": 10, "description": "Ezurio BLE module",
-    },
     "DA1469": {
         "type": "ble", "sleep_ua": 1.5, "idle_ma": 0.5, "tx_ma": 11,
         "rx_ma": 9, "description": "Renesas DA14695 BLE",
@@ -134,9 +130,9 @@ PART_DATABASE: Dict[str, Dict[str, Any]] = {
     },
 
     # ── HaLow (802.11ah) ───────────────────────────────────────────────
-    "453-00155": {
+    "NRC7|MM610|HALOW": {
         "type": "halow", "sleep_ua": 5, "idle_ma": 3, "tx_ma": 280,
-        "rx_ma": 60, "description": "Silex/Ezurio HaLow",
+        "rx_ma": 60, "description": "Generic 802.11ah (HaLow) radio",
     },
 
     # ── Cellular modems ─────────────────────────────────────────────────
