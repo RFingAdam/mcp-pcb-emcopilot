@@ -84,7 +84,7 @@ class TestKiCadFixtureParsing:
     reason="Real ODB++ test file not available at /home/swamp/Downloads/Test/Test_ODB.zip"
 )
 class TestRealODBParsing:
-    """Integration tests using real example design ODB++ design."""
+    """Integration tests using a real ODB++ design (local, not committed)."""
 
     @pytest.fixture(scope="class")
     def design(self):
