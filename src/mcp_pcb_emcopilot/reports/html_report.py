@@ -660,10 +660,12 @@ def _generate_html_from_data(data: HTMLReportData) -> str:
 
     # Overall status
     overall_status = data.summary.get("overall_status", "N/A") if data.summary else "N/A"
+    _status_upper = str(overall_status).upper()
     status_cls = "status-pass"
-    if any(k in str(overall_status).upper() for k in ("CRITICAL", "FAIL")):
+    if any(k in _status_upper for k in ("CRITICAL", "FAIL")):
         status_cls = "status-fail"
-    elif "WARNING" in str(overall_status).upper():
+    elif "WARNING" in _status_upper or "INCONCLUSIVE" in _status_upper:
+        # INCONCLUSIVE (incomplete coverage) must read as caution, never green.
         status_cls = "status-warning"
 
     summary_cards = f"""
@@ -744,6 +746,55 @@ def _generate_html_from_data(data: HTMLReportData) -> str:
 </script>
 </body>
 </html>
+"""
+
+
+def _build_human_review_html(hr: dict) -> str:
+    """Render the 'Items Requiring Human Review / Lab Verification' callout.
+
+    Returns "" when the block is absent or not required, so clean reviews are
+    not cluttered. When present it renders as a prominent amber panel — this is
+    the report's honesty backstop against an over-confident automated verdict.
+    """
+    if not hr or not hr.get("required"):
+        return ""
+    reasons = hr.get("reasons", []) or []
+    items = hr.get("items", []) or []
+    reason_lis = "".join(f"<li>{_escape_html(str(r))}</li>" for r in reasons)
+
+    rows = ""
+    for it in items:
+        conf = it.get("confidence")
+        conf_str = f"{float(conf) * 100:.0f}%" if isinstance(conf, (int, float)) else "—"
+        cell = 'style="padding:4px 6px;border-bottom:1px solid var(--border);"'
+        rows += (
+            "<tr>"
+            f"<td {cell}>{_escape_html(str(it.get('finding_id', '')))}</td>"
+            f"<td {cell}>{_escape_html(str(it.get('domain', '')))}</td>"
+            f"<td {cell}>{_escape_html(str(it.get('title', '')))}</td>"
+            f"<td {cell}>{_escape_html(str(it.get('severity', '')))}</td>"
+            f"<td {cell}>{conf_str}</td>"
+            f"<td {cell}>{_escape_html(str(it.get('reason', '')))}</td>"
+            "</tr>"
+        )
+    items_table = ""
+    if rows:
+        th = 'style="padding:4px 6px;"'
+        items_table = (
+            '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'
+            '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">'
+            f"<th {th}>ID</th><th {th}>Domain</th><th {th}>Finding</th>"
+            f"<th {th}>Severity</th><th {th}>Confidence</th><th {th}>Why flagged</th>"
+            f"</tr></thead><tbody>{rows}</tbody></table>"
+        )
+
+    return f"""
+<div class="human-review" style="margin:16px 0;padding:16px;border:2px solid #e6a800;border-radius:10px;background:#ffc10714;">
+  <div style="font-size:16px;font-weight:700;color:#e6a800;margin-bottom:6px;">&#9888; Items Requiring Human Review / Lab Verification</div>
+  <p style="margin:0 0 8px 0;color:var(--muted);font-size:13px;">This automated review is decision support, not a compliance sign-off. Confirm the items below before committing to fabrication or a compliance test.</p>
+  <ul style="margin:0 0 4px 18px;">{reason_lis}</ul>
+  {items_table}
+</div>
 """
 
 
@@ -900,10 +951,12 @@ def generate_html_report(
 
     # --- Build executive summary ---
     overall_status = summary.get("overall_status", "N/A")
+    _status_upper = overall_status.upper()
     status_cls = "status-pass"
-    if "CRITICAL" in overall_status.upper() or "FAIL" in overall_status.upper():
+    if "CRITICAL" in _status_upper or "FAIL" in _status_upper:
         status_cls = "status-fail"
-    elif "WARNING" in overall_status.upper():
+    elif "WARNING" in _status_upper or "INCONCLUSIVE" in _status_upper:
+        # INCONCLUSIVE (incomplete coverage) must read as caution, never green.
         status_cls = "status-warning"
 
     # --- VP Executive Dashboard ---
@@ -913,8 +966,12 @@ def generate_html_report(
     pass_count = severity_counts.get('PASS', 0)
     info_count = severity_counts.get('INFO', 0)
 
-    # SVG donut gauge for overall status
-    gauge_color = "#dc3545" if "FAIL" in overall_status.upper() else "#ffc107" if "WARN" in overall_status.upper() else "#28a745"
+    # SVG donut gauge for overall status (INCONCLUSIVE reads as amber caution)
+    gauge_color = (
+        "#dc3545" if "FAIL" in _status_upper
+        else "#ffc107" if ("WARN" in _status_upper or "INCONCLUSIVE" in _status_upper)
+        else "#28a745"
+    )
     gauge_pct = max(5, min(95, 100 - (crit_count * 5 + high_count * 3 + warn_count)))  # Rough health score
     gauge_offset = 283 - (283 * gauge_pct / 100)
 
@@ -1014,6 +1071,11 @@ def generate_html_report(
 </div>
 """
 
+    # Human-review / lab-verification callout (from review_results)
+    human_review_html = _build_human_review_html(
+        results.get("human_review", {}) if isinstance(results, dict) else {}
+    )
+
     # --- Assemble full HTML document ---
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     html = f"""<!DOCTYPE html>
@@ -1039,6 +1101,7 @@ def generate_html_report(
 <main class="container">
   <h2>Executive Summary</h2>
   {summary_cards}
+  {human_review_html}
   {filter_bar}
   {"".join(sections_html)}
 </main>
