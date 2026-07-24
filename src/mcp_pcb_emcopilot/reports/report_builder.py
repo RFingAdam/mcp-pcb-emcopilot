@@ -595,12 +595,19 @@ class ReportBuilder:
     # ------------------------------------------------------------------
 
     def _determine_verdict(self, findings: list[TrackedFinding]) -> str:
-        """Determine overall report verdict from severity distribution."""
+        """Determine overall report verdict from severity distribution + coverage."""
         severities = {f.severity for f in findings}
         if "CRITICAL" in severities:
             return "CRITICAL \u2014 Remediation Required Before Prototype"
         if "HIGH" in severities:
             return "CONDITIONAL \u2014 Proceed with Caution, Address HIGH Items"
+        # A clean/warnings pass is only trustworthy if the review actually
+        # assessed the board. The orchestrator's coverage gate (errored domains,
+        # partial parse, nothing-ran) is the source of truth; default to True so
+        # callers that set review_results without coverage info are unaffected.
+        exec_summary = (self.design.review_results or {}).get("executive_summary", {})
+        if not exec_summary.get("coverage_complete", True):
+            return "INCONCLUSIVE \u2014 Not Fully Assessed, Human Review Required"
         if "WARNING" in severities:
             return "PASS WITH WARNINGS \u2014 Review Recommended Items"
         return "PASS \u2014 Ready for Prototype"
@@ -1478,7 +1485,7 @@ class ReportBuilder:
             run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
         elif "CONDITIONAL" in verdict:
             run.font.color.rgb = RGBColor(0xE6, 0x5C, 0x00)
-        elif "WARNINGS" in verdict:
+        elif "WARNINGS" in verdict or "INCONCLUSIVE" in verdict:
             run.font.color.rgb = RGBColor(0x7F, 0x60, 0x00)
         else:
             run.font.color.rgb = RGBColor(0x1B, 0x5E, 0x20)
@@ -1668,6 +1675,10 @@ class ReportBuilder:
             bg_color, border_color = "FFF3E0", "E65100"
             rec_text = "CONDITIONAL GO -- Address HIGH Items Before Production"
             text_rgb = RGBColor(0xE6, 0x51, 0x00)
+        elif "INCONCLUSIVE" in verdict:
+            bg_color, border_color = "FFF3E0", "E65100"
+            rec_text = "REVIEW INCOMPLETE -- NOT READY FOR SIGN-OFF"
+            text_rgb = RGBColor(0xE6, 0x51, 0x00)
         else:
             bg_color, border_color = "E8F5E9", "388E3C"
             rec_text = "GO FOR PROTOTYPE BUILD"
@@ -1727,6 +1738,11 @@ class ReportBuilder:
             run = p4.add_run(
                 "The design must address all CRITICAL and HIGH findings before "
                 "proceeding to prototype fabrication."
+            )
+        elif "INCONCLUSIVE" in verdict:
+            run = p4.add_run(
+                "This review could not fully assess the design. Resolve the items in "
+                "the human-review section and re-run before relying on this result."
             )
         else:
             run = p4.add_run(

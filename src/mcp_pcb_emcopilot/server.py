@@ -3658,7 +3658,20 @@ def _get_session(session_id: str) -> PCBDesignData:
 
 
 def main() -> None:
-    """Run the MCP server."""
+    """Run the MCP server, or the headless ``review`` subcommand.
+
+    With no arguments — how MCP clients launch it — this starts the stdio MCP
+    server. ``mcp-pcb-emcopilot review <board> ...`` instead runs a one-shot
+    headless design review and exits, so the engine is usable as a plain CLI
+    without an LLM host.
+    """
+    import sys
+
+    if sys.argv[1:2] == ["review"]:
+        from .cli import run_review
+
+        raise SystemExit(run_review(sys.argv[2:]))
+
     async def run() -> None:
         async with stdio_server() as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())

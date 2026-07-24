@@ -153,10 +153,62 @@ def parse_pcb_file(file_path: str, format_hint: Optional[str] = None) -> PCBDesi
         )
 
 
+# Formats that carry full layout + connectivity (STEP is geometry-only).
+_CONNECTIVITY_FORMATS = frozenset(
+    {"kicad", "odb", "gerber", "altium", "allegro", "ipc2581"}
+)
+
+
+def _completeness_warnings(data: PCBDesignData, fmt: str) -> list[str]:
+    """Sanity-check a parsed design and return human-readable warnings.
+
+    A partial parse that silently reports success is the core ingest risk: a
+    downstream review then runs on incomplete data and can print a confident,
+    wrong verdict. These gates catch the common "looked fine, wasn't" cases —
+    nothing extracted, components with no connectivity, no routing, or no board
+    outline — so the parse can be flagged partial and human review required.
+    """
+    warns: list[str] = []
+    n_comp = len(data.components)
+    n_net = len(data.nets)
+    n_trace = len(data.traces)
+    area = (data.board_width_mm or 0.0) * (data.board_height_mm or 0.0)
+
+    if fmt in _CONNECTIVITY_FORMATS:
+        if n_comp == 0 and n_net == 0 and n_trace == 0:
+            warns.append(
+                "Parse produced no components, nets, or traces — the file may be "
+                "unsupported, an unexpected version, or corrupt."
+            )
+        else:
+            if n_comp > 0 and n_net == 0:
+                warns.append(
+                    f"{n_comp} component(s) parsed but 0 nets — connectivity was not "
+                    "extracted; net/return-path analysis will be unreliable."
+                )
+            if n_comp > 0 and n_trace == 0:
+                warns.append(
+                    f"{n_comp} component(s) parsed but 0 traces — routing/copper was "
+                    "not extracted; layout-dependent analysis will be unreliable."
+                )
+            if area <= 0:
+                warns.append(
+                    "Board outline/dimensions not determined (0 area) — per-area and "
+                    "enclosure/cavity analysis will be unreliable."
+                )
+    elif fmt == "step":
+        if not data.step_components and not data.board_3d:
+            warns.append(
+                "STEP parse produced no 3D components or board body — the model may "
+                "be unsupported or empty."
+            )
+    return warns
+
+
 def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
-    """Wrap a format-specific parser with error handling."""
+    """Wrap a format-specific parser with error handling + a completeness gate."""
     try:
-        return parser_fn(file_path)  # type: ignore[no-any-return]
+        data: PCBDesignData = parser_fn(file_path)
     except ParseError:
         raise  # Re-raise our own errors as-is
     except Exception as e:
@@ -165,6 +217,15 @@ def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
             f"Failed to parse {fmt} file: {e}",
             {"file": file_path, "format": fmt},
         ) from e
+
+    # Completeness gate: flag suspicious/partial parses instead of reporting
+    # silent success. Never raises — a partial parse still returns usable data,
+    # but marked so the review degrades its verdict and requires human review.
+    gate_warnings = _completeness_warnings(data, fmt)
+    if gate_warnings:
+        data.warnings = list(data.warnings) + gate_warnings
+        data.parse_completeness = "partial"
+    return data
 
 
 def _parse_kicad(file_path: str) -> PCBDesignData:
