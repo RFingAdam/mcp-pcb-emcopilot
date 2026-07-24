@@ -10,7 +10,7 @@
 
 ## 1. Problem Statement
 
-The current report generation is a hardcoded script (`generate_docx_report.py`) specific to the example design design. It has several shortcomings:
+The current report generation is a hardcoded script (`generate_docx_report.py`) specific to one example design. It has several shortcomings:
 
 - **Not reusable** — every new project requires rewriting the script
 - **Not traceable** — findings say "a 31 mm trace" without specifying which net, layer, or components
