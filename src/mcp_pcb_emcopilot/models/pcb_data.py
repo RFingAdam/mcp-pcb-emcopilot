@@ -142,6 +142,11 @@ class PCBDesignData:
 
     # Parsing info
     warnings: list[str] = field(default_factory=list)
+    # Parse completeness: "complete" or "partial". Set by the completeness gate
+    # in ``parsers._parse_format`` when a parse looks suspicious (e.g. components
+    # but no nets/traces, or no board outline). A partial parse means downstream
+    # analysis ran on incomplete data and must not be reported as a clean pass.
+    parse_completeness: str = "complete"
 
     # Deep extraction data (populated by ODB++ and other parsers)
     drill_table: list[dict] = field(default_factory=list)  # [{size_mm, count, plating, aspect_ratio}]
@@ -173,6 +178,11 @@ class PCBDesignData:
     # 3D / STEP data (optional, from step_parser)
     step_components: list[dict] = field(default_factory=list)  # [{reference, x, y, z, width, depth, height}]
     board_3d: dict = field(default_factory=dict)  # {width, depth, thickness, bounding_box}
+
+    @property
+    def parse_is_partial(self) -> bool:
+        """True when the completeness gate flagged the parse as suspect."""
+        return self.parse_completeness != "complete"
 
     @property
     def component_count(self) -> int:
@@ -222,4 +232,6 @@ class PCBDesignData:
             "total_trace_length_mm": round(self.total_trace_length_mm, 1),
             "title": self.title,
             "revision": self.revision,
+            "parse_completeness": self.parse_completeness,
+            "warnings": list(self.warnings),
         }

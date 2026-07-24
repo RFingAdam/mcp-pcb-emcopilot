@@ -541,6 +541,43 @@ def generate_docx_report(
         add_styled_table(doc, ["Metric", "Value"], summary_rows, col_widths=[3.0, 3.5])
         doc.add_page_break()
 
+    # ---- Items requiring human review / lab verification ----
+    hr = results.get("human_review", {})
+    if hr.get("required"):
+        doc.add_heading("Items Requiring Human Review / Lab Verification", level=1)
+        note = doc.add_paragraph(
+            "This automated review is decision support, not a compliance sign-off. "
+            "Confirm the items below before committing to fabrication or a compliance "
+            "test."
+        )
+        if note.runs:
+            note.runs[0].italic = True
+        for reason in hr.get("reasons", []):
+            doc.add_paragraph(f"• {reason}")
+        hr_items = hr.get("items", [])
+        if hr_items:
+            hr_rows = []
+            for it in hr_items:
+                conf = it.get("confidence")
+                conf_str = (
+                    f"{float(conf) * 100:.0f}%"
+                    if isinstance(conf, (int, float)) else "—"
+                )
+                hr_rows.append((
+                    str(it.get("finding_id", "")),
+                    str(it.get("domain", "")),
+                    str(it.get("severity", "")),
+                    conf_str,
+                    str(it.get("reason", "")),
+                ))
+            add_styled_table(
+                doc,
+                ["ID", "Domain", "Severity", "Confidence", "Why flagged"],
+                hr_rows,
+                col_widths=[0.9, 1.4, 1.0, 1.0, 2.2],
+            )
+        doc.add_page_break()
+
     # ---- Domain results ----
     figure_num = 1
     for dr in results.get("domain_results", []):

@@ -235,6 +235,10 @@ class ReviewResult:
     review_context: dict = field(default_factory=dict)
     unanswered_questions: list[dict] = field(default_factory=list)
     assumptions_made: list[dict] = field(default_factory=list)
+    # "Requires human review / lab verification" block: review-level gaps
+    # (partial parse, errored domains, INCONCLUSIVE verdict) plus specific
+    # low-confidence / screening-only findings. Built by _build_human_review.
+    human_review: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the full review result to a JSON-safe dictionary."""
@@ -250,6 +254,8 @@ class ReviewResult:
             "recommendations": self.recommendations,
             "review_context": self.review_context,
         }
+        if self.human_review:
+            d["human_review"] = self.human_review
         if self.unanswered_questions:
             d["unanswered_questions"] = self.unanswered_questions
         if self.assumptions_made:
@@ -1510,8 +1516,14 @@ def _build_executive_summary(
     domain_results: list[DomainResult],
     classification: DesignClassificationResult,
     cross_correlations: list[CrossCorrelation],
+    parse_partial: bool = False,
 ) -> dict:
-    """Build executive summary with pass/fail/warning counts per domain."""
+    """Build executive summary with pass/fail/warning counts per domain.
+
+    ``parse_partial`` (from the ingest completeness gate) is treated as a
+    coverage gap: analysis that ran on incompletely-parsed data cannot be
+    trusted as a clean pass.
+    """
     total_critical = 0
     total_warning = 0
     total_info = 0
@@ -1528,7 +1540,30 @@ def _build_executive_summary(
             "info": dr.info_count,
         }
 
-    overall = "FAIL" if total_critical > 0 else "WARNING" if total_warning > 0 else "PASS"
+    # Coverage gate on the verdict. A pure critical/warning count would let a
+    # review that never actually ran ("we didn't check") masquerade as "PASS"
+    # ("we checked and it's fine") — the one failure mode a compliance-adjacent
+    # tool must never have. An "error" domain is an *applicable* analyzer that
+    # threw (a genuine gap); "skipped" means not-applicable (no DDR interface,
+    # no power nets, no schematic) and is benign on its own. So a zero-finding
+    # result is only a real PASS when at least one domain was actually assessed
+    # and none errored; otherwise it is INCONCLUSIVE and needs human review.
+    domains_errored = sum(1 for dr in domain_results if dr.status == "error")
+    domains_assessed = sum(
+        1 for dr in domain_results if dr.status in ("pass", "warning", "fail")
+    )
+    coverage_complete = (
+        domains_assessed > 0 and domains_errored == 0 and not parse_partial
+    )
+
+    if total_critical > 0:
+        overall = "FAIL"
+    elif total_warning > 0:
+        overall = "WARNING"
+    elif not coverage_complete:
+        overall = "INCONCLUSIVE"
+    else:
+        overall = "PASS"
 
     return {
         "overall_status": overall,
@@ -1539,8 +1574,82 @@ def _build_executive_summary(
         "total_info": total_info,
         "total_findings": total_critical + total_warning + total_info,
         "domains_analyzed": len(domain_results),
+        "domains_assessed": domains_assessed,
+        "domains_errored": domains_errored,
+        "coverage_complete": coverage_complete,
+        "parse_partial": parse_partial,
         "cross_correlations": len(cross_correlations),
         "domain_statuses": domain_statuses,
+    }
+
+
+def _build_human_review(
+    domain_results: list[DomainResult],
+    exec_summary: dict,
+) -> dict:
+    """Assemble the "requires human review / lab verification" block.
+
+    A compliance-adjacent report must be explicit about what it could NOT
+    confidently determine, so nothing rides on an unverified automated call.
+    Surfaces review-level gaps (partial parse, errored domains, INCONCLUSIVE
+    verdict) and specific low-confidence or screening-only findings.
+    """
+    reasons: list[str] = []
+    if exec_summary.get("parse_partial"):
+        reasons.append(
+            "The design file did not fully parse (partial ingest) — findings ran on "
+            "incomplete data. Re-export/verify the source file and re-run."
+        )
+    n_err = int(exec_summary.get("domains_errored", 0) or 0)
+    if n_err:
+        reasons.append(
+            f"{n_err} analysis domain(s) errored and were not assessed — coverage is "
+            "incomplete."
+        )
+    if exec_summary.get("overall_status") == "INCONCLUSIVE":
+        reasons.append(
+            "Overall verdict is INCONCLUSIVE: the review could not fully assess the "
+            "board. Do not treat the absence of findings as a pass."
+        )
+
+    items: list[dict] = []
+    has_emc_or_pdn = False
+    for dr in domain_results:
+        for f in dr.findings:
+            sev = (getattr(f, "severity", "") or "").lower()
+            dom = (getattr(f, "domain", "") or dr.domain or "").lower()
+            if dom.startswith("emc") or dom.startswith("power_integrity"):
+                has_emc_or_pdn = True
+            conf = float(getattr(f, "confidence", 1.0))
+            source = getattr(f, "source", "analytical")
+            reason = None
+            if conf < ESCALATE_CONFIDENCE_BELOW:
+                reason = f"low analyzer confidence ({conf:.0%})"
+            elif sev in ("critical", "high") and source == "analytical":
+                reason = f"{sev.upper()} severity from an unverified analytical model"
+            if reason:
+                items.append({
+                    "finding_id": getattr(f, "finding_id", ""),
+                    "domain": getattr(f, "domain", "") or dr.domain,
+                    "title": getattr(f, "title", ""),
+                    "severity": getattr(f, "severity", ""),
+                    "confidence": round(conf, 2),
+                    "reason": reason,
+                })
+
+    # EMC and PDN pass/fail physics are screening-grade (see gap analysis):
+    # never let them read as a compliance verdict without corroboration.
+    if has_emc_or_pdn:
+        reasons.append(
+            "EMC emission/immunity and power-integrity (PDN) results are screening "
+            "indicators, not compliance verdicts — confirm marginal results with field "
+            "simulation (openEMS) or accredited lab measurement before release."
+        )
+
+    return {
+        "required": bool(reasons or items),
+        "reasons": reasons,
+        "items": items,
     }
 
 
@@ -2091,8 +2200,12 @@ def run_design_review(
 
     # Phase 5: Risk matrix, summary, recommendations
     risk_matrix = _build_risk_matrix(domain_results, cross_correlations)
-    executive_summary = _build_executive_summary(domain_results, classification, cross_correlations)
+    executive_summary = _build_executive_summary(
+        domain_results, classification, cross_correlations,
+        parse_partial=design.parse_is_partial,
+    )
     recommendations = _build_recommendations(domain_results, cross_correlations, risk_matrix)
+    human_review = _build_human_review(domain_results, executive_summary)
 
     review_result = ReviewResult(
         session_id=session_id,
@@ -2107,6 +2220,7 @@ def run_design_review(
         review_context=ctx,
         unanswered_questions=unanswered,
         assumptions_made=assumptions_made,
+        human_review=human_review,
     )
 
     # Store in session
