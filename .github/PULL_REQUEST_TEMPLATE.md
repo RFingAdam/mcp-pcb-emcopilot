@@ -5,6 +5,7 @@
 <!-- Closes #XX -->
 
 ## Checklist
+- [ ] I have read and agree to [CLA.md](../CLA.md) for this contribution.
 - [ ] Tests added/updated
 - [ ] `ruff check` passes
 - [ ] `mypy` passes (or N/A)
