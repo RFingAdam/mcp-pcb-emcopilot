@@ -204,7 +204,7 @@ class TestEveryToolStructurallySound:
         malformed_errors: list[str] = []
 
         for tool in registered_tools:
-            args = _build_args(tool.inputSchema or {}, session_id)
+            args = _build_args(tool.input_schema or {}, session_id)
             try:
                 result = srv._dispatch(tool.name, args)
             except Exception as e:

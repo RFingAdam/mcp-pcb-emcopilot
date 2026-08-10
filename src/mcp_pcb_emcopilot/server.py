@@ -29,9 +29,9 @@ from dataclasses import asdict
 from enum import Enum
 from typing import Any
 
-from mcp.server import Server
+from mcp.server import Server, ServerRequestContext
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolRequestParams, CallToolResult, ListToolsRequest, ListToolsResult, TextContent, Tool
 
 from .errors import (
     ParseError,
@@ -529,10 +529,36 @@ def _make_tool(name: str, desc: str, props: dict[str, Any], required: list[str] 
     schema = {"type": "object", "properties": props}
     if required:
         schema["required"] = required
-    return Tool(name=name, description=desc, inputSchema=schema)
+    return Tool(name=name, description=desc, input_schema=schema)
 
 
-@server.list_tools()
+# =============================================================================
+# MCP 2.0 Handler functions
+# =============================================================================
+
+async def handle_list_tools(ctx: ServerRequestContext, params: ListToolsRequest) -> ListToolsResult:
+    """Handle tools/list request for MCP 2.0."""
+    tools = await list_tools()
+    return ListToolsResult(tools=tools)
+
+
+async def handle_call_tool(ctx: ServerRequestContext, params: CallToolRequestParams) -> CallToolResult:
+    """Handle tools/call request for MCP 2.0."""
+    name = params.name
+    arguments = params.arguments or {}
+    content = await call_tool(name, arguments)
+    return CallToolResult(content=content)
+
+
+def _register_handlers() -> None:
+    """Register MCP 2.0 request handlers."""
+    server.add_request_handler("tools/list", ListToolsRequest, handle_list_tools)
+    server.add_request_handler("tools/call", CallToolRequestParams, handle_call_tool)
+
+
+_register_handlers()  # Register MCP 2.0 request handlers at module load
+
+
 async def list_tools() -> list[Tool]:
     """List all PCB analysis tools."""
     return [
@@ -1411,7 +1437,6 @@ async def list_tools() -> list[Tool]:
 # Tool dispatch
 # =============================================================================
 
-@server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle all tool calls."""
     try:
