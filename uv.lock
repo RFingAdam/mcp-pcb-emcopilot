@@ -1213,7 +1213,7 @@ requires-dist = [
     { name = "cairosvg", marker = "extra == 'dev'", specifier = ">=2.7" },
     { name = "cairosvg", marker = "extra == 'report'", specifier = ">=2.7" },
     { name = "matplotlib", specifier = ">=3.10.8" },
-    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "mcp", specifier = ">=1.0.0,<2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.2" },
     { name = "networkx", marker = "extra == 'ground'", specifier = ">=3.2" },
