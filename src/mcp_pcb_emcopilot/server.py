@@ -31,7 +31,18 @@ from typing import Any
 
 from mcp.server import Server, ServerRequestContext
 from mcp.server.stdio import stdio_server
-from mcp.types import CallToolRequestParams, CallToolResult, ListToolsRequest, ListToolsResult, TextContent, Tool
+from mcp.types import (
+    AudioContent,
+    CallToolRequestParams,
+    CallToolResult,
+    EmbeddedResource,
+    ImageContent,
+    ListToolsRequest,
+    ListToolsResult,
+    ResourceLink,
+    TextContent,
+    Tool,
+)
 
 from .errors import (
     ParseError,
@@ -1437,7 +1448,7 @@ async def list_tools() -> list[Tool]:
 # Tool dispatch
 # =============================================================================
 
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent | ImageContent | AudioContent | ResourceLink | EmbeddedResource]:
     """Handle all tool calls."""
     try:
         result = _dispatch(name, arguments)

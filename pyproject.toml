@@ -49,7 +49,7 @@ dev = [
     # [tool.ruff.lint].ignore — older ruff (<0.9) fails to parse the
     # config with "Unknown rule selector: UP045".
     "ruff>=0.9.0,<1.0",
-    "mypy>=1.10",
+    "mypy>=1.13",
     "cairosvg>=2.7",
     "python-docx>=1.1",
     "sexpdata>=1.0.0",
@@ -98,7 +98,7 @@ ignore = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
