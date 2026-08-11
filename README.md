@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-1E40AF.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/downloads/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-93-22D3EE.svg)](#tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-131-22D3EE.svg)](#tools)
 [![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
 [![eng-mcp-suite](https://img.shields.io/badge/eng--mcp--suite-member-22D3EE.svg)](https://github.com/RFingAdam/eng-mcp-suite)
 
@@ -25,7 +25,7 @@
 ## What is mcp-pcb-emcopilot?
 
 mcp-pcb-emcopilot is a Model Context Protocol server that provides
-**93 tools** for AI-assisted PCB design review. It parses layouts from
+**131 tools** for AI-assisted PCB design review. It parses layouts from
 KiCad / ODB++ / Gerber / IPC-2581 / Altium / STEP, runs physics-based
 analyzers across eight engineering domains, and emits annotated DOCX
 reports with embedded board renders and per-finding severity.
@@ -38,7 +38,7 @@ when you want to debug one net or revalidate one DDR byte-lane.
 **What mcp-pcb-emcopilot does well:**
 
 - 🤖 **AI-native via MCP.** First-class [Model Context Protocol](https://modelcontextprotocol.io)
-  server with 93 tools across parsing, calculation, analysis, and
+  server with 131 tools across parsing, calculation, analysis, and
   reporting. Any Claude / LLM agent can drive a full design review.
 - 🧱 **Multi-format layout parsing.** KiCad `.kicad_pcb`, ODB++, Gerber
   RS-274X, IPC-2581, Altium `.PcbDoc`, 3D STEP — same downstream
@@ -109,8 +109,9 @@ fabrication-grade document.
 
 ## Tools
 
-93 tools across 14 categories. Full table is below — full reference
-with arguments in [`docs/tools.md`](docs/tools.md).
+131 tools across 14 categories (count is manually maintained, may lag
+by a release). Representative tools by category are below — full
+reference with arguments in [`docs/tools.md`](docs/tools.md).
 
 ### Parsers & data extraction (15)
 | Tool | Description |
