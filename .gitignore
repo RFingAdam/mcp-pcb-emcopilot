@@ -54,10 +54,18 @@ htmlcov/
 *.gbr
 *.drl
 *.ger
+*.kicad_pcb
+*.brd
+*.step
+*.stp
 # Allow test fixtures
 !tests/fixtures/*.gbr
 !tests/fixtures/*.drl
 !tests/fixtures/*.ger
+!tests/fixtures/*.kicad_pcb
+!tests/fixtures/*.brd
+!tests/fixtures/*.step
+!tests/fixtures/*.stp
 
 # Design review outputs (customer-specific, do not commit)
 /*.docx
@@ -77,8 +85,11 @@ sim_plots/
 
 # ODB++ and layout files
 *.tgz
+*.zip
 Test_ODB*
 Test_Schematic*
+# Allow test fixtures
+!tests/fixtures/*.zip
 
 # Lock files
 .~lock.*
@@ -97,3 +108,6 @@ web-ui/.vite/
 
 # Transient session notes
 .session-notes-text.tmp
+
+# Local IP/customer-term denylist (repo-specific, not for distribution)
+.ip-denylist
