@@ -1600,24 +1600,64 @@ def _build_executive_summary(
     # result is only a real PASS when at least one domain was actually assessed
     # and none errored; otherwise it is INCONCLUSIVE and needs human review.
     domains_errored = sum(1 for dr in domain_results if dr.status == "error")
+    domains_insufficient = sum(
+        1 for dr in domain_results if dr.status == "insufficient_data"
+    )
     domains_assessed = sum(
         1 for dr in domain_results if dr.status in ("pass", "warning", "fail")
     )
     coverage_complete = (
-        domains_assessed > 0 and domains_errored == 0 and not parse_partial
+        domains_assessed > 0
+        and domains_errored == 0
+        and domains_insufficient == 0
+        and not parse_partial
     )
 
+    # Verdict precedence: FAIL > INCONCLUSIVE > WARNING > PASS.
+    #
+    # FAIL outranks everything: a critical finding on partial data is still
+    # actionable and must not be softened into "we didn't check".
+    #
+    # INCONCLUSIVE must be tested *before* WARNING. They answer different
+    # questions — WARNING means "we assessed this and found issues",
+    # INCONCLUSIVE means "we could not assess it". Reporting WARNING on
+    # incomplete coverage overstates confidence, because it implies the absence
+    # of any *further* findings. Testing WARNING first meant a single warning
+    # suppressed this gate entirely, which is how a fabricated placeholder
+    # finding could make an unrun review read as an assessed one.
+    #
+    # Real warnings are not weakened: total_warnings, domain_statuses and every
+    # individual finding are still reported verbatim. Only the one-word headline
+    # changes, and verdict_reason names the gate that fired.
     if total_critical > 0:
         overall = "FAIL"
-    elif total_warning > 0:
-        overall = "WARNING"
+        verdict_reason = f"{total_critical} critical finding(s)"
     elif not coverage_complete:
         overall = "INCONCLUSIVE"
+        gaps = []
+        if domains_assessed == 0:
+            gaps.append("no domain was actually assessed")
+        if domains_errored:
+            gaps.append(f"{domains_errored} domain(s) errored")
+        if domains_insufficient:
+            gaps.append(f"{domains_insufficient} domain(s) had insufficient data")
+        if parse_partial:
+            gaps.append("the design file parsed only partially")
+        detail = "; ".join(gaps) or "coverage incomplete"
+        suffix = (
+            f" ({total_warning} warning(s) still reported)" if total_warning else ""
+        )
+        verdict_reason = f"coverage incomplete — {detail}{suffix}"
+    elif total_warning > 0:
+        overall = "WARNING"
+        verdict_reason = f"{total_warning} warning(s) across assessed domains"
     else:
         overall = "PASS"
+        verdict_reason = "all applicable domains assessed, no critical or warning findings"
 
     return {
         "overall_status": overall,
+        "verdict_reason": verdict_reason,
         "design_type": classification.design_type,
         "complexity": classification.complexity_label,
         "total_critical": total_critical,
@@ -1627,6 +1667,7 @@ def _build_executive_summary(
         "domains_analyzed": len(domain_results),
         "domains_assessed": domains_assessed,
         "domains_errored": domains_errored,
+        "domains_insufficient": domains_insufficient,
         "coverage_complete": coverage_complete,
         "parse_partial": parse_partial,
         "cross_correlations": len(cross_correlations),
