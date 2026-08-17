@@ -4,8 +4,13 @@ Converts SVG output from BoardRenderer, StackupRenderer, Annotator,
 and net renders into rasterized PNG files suitable for embedding in
 DOCX/PDF reports.
 
-Optional dependency: cairosvg (pip install cairosvg).
-Falls back to writing raw SVG if cairosvg is not available.
+Optional dependency: cairosvg (pip install cairosvg), which additionally needs
+the native Cairo library present at import time.
+
+PNG export raises :class:`MissingDependencyError` when cairosvg is unusable —
+it does *not* silently fall back to writing SVG bytes, because a file named
+``.png`` containing SVG is worse than an explicit failure. Callers that want a
+fallback should test :func:`png_export_available` and use :func:`svg_to_file`.
 """
 
 from __future__ import annotations
@@ -13,6 +18,27 @@ from __future__ import annotations
 import os
 import tempfile
 from typing import Optional
+
+from ..errors import MissingDependencyError
+
+# cairosvg is installable but unusable without native Cairo (the common case on
+# Windows), where ``import cairosvg`` raises OSError from cairocffi's dlopen
+# rather than ImportError.
+_CAIRO_IMPORT_ERRORS = (ImportError, OSError)
+
+
+def png_export_available() -> bool:
+    """Return True if PNG rasterisation can actually run.
+
+    Checks that cairosvg *imports*, not merely that it is installed — the two
+    differ whenever the native Cairo library is missing. Lets callers and tests
+    branch without provoking an exception.
+    """
+    try:
+        import cairosvg  # noqa: F401
+    except _CAIRO_IMPORT_ERRORS:
+        return False
+    return True
 
 
 def svg_to_png(
@@ -33,15 +59,21 @@ def svg_to_png(
         Absolute path to the written PNG file.
 
     Raises:
-        ImportError: If cairosvg is not installed.
+        MissingDependencyError: If cairosvg is not installed, or is installed
+            but cannot load the native Cairo library.
     """
     try:
         import cairosvg
-    except ImportError:
-        raise ImportError(
-            "cairosvg is required for PNG export. "
-            "Install with: pip install cairosvg"
-        )
+    except _CAIRO_IMPORT_ERRORS as exc:
+        raise MissingDependencyError(
+            "MISSING_DEPENDENCY",
+            "cairosvg is required for PNG export but is not usable: "
+            f"{type(exc).__name__}: {exc}. Install with 'pip install cairosvg'; "
+            "on Windows the native Cairo library is also required (an OSError "
+            "here means cairosvg is installed but Cairo itself is missing). "
+            "SVG output via svg_to_file() needs no extra dependency.",
+            {"dependency": "cairosvg", "underlying_error": type(exc).__name__},
+        ) from exc
 
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".png", prefix="pcb_render_")

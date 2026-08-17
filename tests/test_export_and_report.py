@@ -6,7 +6,21 @@ import tempfile
 import pytest
 
 from mcp_pcb_emcopilot.models.pcb_data import PCBDesignData
-from mcp_pcb_emcopilot.visualization.exporter import batch_export, svg_to_file, svg_to_png
+from mcp_pcb_emcopilot.visualization.exporter import (
+    batch_export,
+    png_export_available,
+    svg_to_file,
+    svg_to_png,
+)
+
+# PNG rasterisation needs cairosvg *and* the native Cairo library. cairosvg
+# installs cleanly from a wheel on Windows but raises OSError on import there,
+# so "installed" is not the same as "usable" and `importorskip` is insufficient.
+# CI (ubuntu) has Cairo and runs these; Windows developers skip them.
+requires_png = pytest.mark.skipif(
+    not png_export_available(),
+    reason="PNG export unavailable: cairosvg or native Cairo library missing",
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -59,6 +73,7 @@ def _make_design() -> PCBDesignData:
 class TestSvgExporter:
     """Tests for visualization/exporter.py functions."""
 
+    @requires_png
     def test_svg_to_png_creates_file(self):
         """svg_to_png should write a valid PNG file."""
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -74,6 +89,7 @@ class TestSvgExporter:
         finally:
             os.unlink(out_path)
 
+    @requires_png
     def test_svg_to_png_auto_path(self):
         """svg_to_png with no output_path should create temp file."""
         result = svg_to_png(SIMPLE_SVG)
@@ -97,6 +113,7 @@ class TestSvgExporter:
         finally:
             os.unlink(out_path)
 
+    @requires_png
     def test_batch_export_png(self):
         """batch_export should create multiple PNG files."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -154,6 +171,7 @@ class TestDocxReport:
         finally:
             os.unlink(out_path)
 
+    @requires_png
     def test_generate_docx_with_images(self):
         """generate_docx_report should embed images from image_dir."""
         try:
