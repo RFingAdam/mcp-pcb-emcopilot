@@ -1475,7 +1475,15 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent | 
 
         return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
     except PCBError as e:
-        return [TextContent(type="text", text=json.dumps(e.to_dict(), indent=2, default=str))]
+        # `success: False` is required for a client to tell a structured
+        # refusal from a successful result. `to_dict()` omits it, and the
+        # success path above defaults a missing "success" to True — so without
+        # this an INSUFFICIENT_DATA refusal was indistinguishable from an
+        # answer. `errors.error_response()` shows this was always the intent.
+        return [TextContent(
+            type="text",
+            text=json.dumps({"success": False, **e.to_dict()}, indent=2, default=str),
+        )]
     except Exception as e:
         import traceback
         tb = traceback.format_exc()

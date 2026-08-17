@@ -145,11 +145,23 @@ def reset_finding_id_counters() -> None:
 class DomainResult:
     """Results from a single analysis domain."""
     domain: str
-    status: str = "pass"  # pass, warning, fail, error, skipped
+    # pass | warning | fail | error | skipped | insufficient_data
+    #
+    # The last three are easy to conflate and mean different things:
+    #   skipped           — not applicable to this design (no DDR interface,
+    #                       no power nets). Benign; does not gate the verdict.
+    #   error             — an applicable analyzer raised. A coverage gap.
+    #   insufficient_data — the analyzer is applicable and ran, but the design
+    #                       carries none of the inputs it needs. Also a coverage
+    #                       gap, and the one that used to masquerade as "pass".
+    status: str = "pass"
     findings: list[ReviewFinding] = field(default_factory=list)
     analyzer_name: str = ""
     raw_data: dict = field(default_factory=dict)
     error: Optional[str] = None
+    # Populated from InsufficientDataError.context["missing"] so the report can
+    # say *which* inputs were absent rather than just that something was.
+    missing_inputs: list[str] = field(default_factory=list)
 
     @property
     def critical_count(self) -> int:
@@ -179,6 +191,8 @@ class DomainResult:
         }
         if self.error:
             d["error"] = self.error
+        if self.missing_inputs:
+            d["missing_inputs"] = list(self.missing_inputs)
         return d
 
 
