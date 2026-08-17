@@ -8,12 +8,15 @@ Optional dependency: python-docx (pip install python-docx).
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
 from typing import Optional
 
 from ..models.pcb_data import PCBDesignData
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -201,11 +204,25 @@ def generate_all_renders(
     """
     from ..visualization.annotator import Annotator
     from ..visualization.board_renderer import BoardRenderer
-    from ..visualization.exporter import svg_to_png
+    from ..visualization.exporter import png_export_available, svg_to_png
     from ..visualization.stackup_renderer import StackupRenderer
 
     os.makedirs(output_dir, exist_ok=True)
     results: dict[str, str] = {}
+
+    # PNG rasterisation needs cairosvg *and* native Cairo. If it is unusable,
+    # return no renders rather than attempting a dozen calls that will each fail
+    # identically. Callers degrade to a text-only report; the DOCX generator does
+    # not require images. Previously the first two calls below were unguarded, so
+    # a missing dependency aborted report generation entirely — and because
+    # cairocffi raises OSError rather than ImportError, the per-render
+    # ``except Exception`` guards further down were the only thing catching it.
+    if not png_export_available():
+        logger.warning(
+            "PNG export unavailable (cairosvg/native Cairo missing) — "
+            "generating report without images; use SVG renders instead."
+        )
+        return results
 
     # Full board render
     renderer = BoardRenderer(design, width_px=width_px)

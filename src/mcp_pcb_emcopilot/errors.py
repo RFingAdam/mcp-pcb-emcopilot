@@ -48,6 +48,21 @@ class SessionError(PCBError):
     pass
 
 
+class MissingDependencyError(PCBError):
+    """An optional dependency required for this output is not usable.
+
+    Distinct from a bare :class:`ImportError` for two reasons. First, callers
+    need to tell "this feature needs an extra installed" apart from "the import
+    machinery is broken", and the MCP layer already serialises :class:`PCBError`
+    into a structured tool response. Second, an optional dependency can be
+    installed and still unusable — ``cairosvg`` imports ``cairocffi``, which
+    raises :class:`OSError` when the native Cairo library is absent (the normal
+    situation on Windows). Guarding only ``ImportError`` lets that escape, so
+    code intended to degrade gracefully crashes instead.
+    """
+    pass
+
+
 def error_response(code: str, message: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create a structured error response dict for MCP tool results."""
     return {
