@@ -383,7 +383,17 @@ class EMIRiskScorer:
 
         Returns:
             EMIRiskResult with complete assessment
+
+        Raises:
+            InsufficientDataError: If the design carries no nets. Scoring walks
+                ``design_data.nets``; with none, every downstream count is zero
+                and the result reads as a clean low-risk assessment. That is a
+                data gap, not a finding of low risk.
         """
+        from ...errors import require_data
+
+        require_data("EMI risk scoring", nets=getattr(design_data, "nets", None))
+
         result = EMIRiskResult()
         limits = STANDARD_LIMITS.get(standard, FCC_CLASS_B_LIMITS)
 
@@ -947,12 +957,24 @@ class EMIRiskScorer:
         Returns dict with predicted pass/fail, margin, worst frequency.
         """
         if not frequency_risks:
+            # No spectral content could be estimated, so compliance is
+            # unassessable. This previously returned predicted_pass=True with a
+            # 100 dB margin — a fabricated clean pass produced *because* there
+            # was nothing to analyse, which is the most dangerous possible
+            # answer for a compliance-adjacent tool. Report the gap instead.
             return {
                 standard: {
-                    "predicted_pass": True,
-                    "margin_db": 100,
-                    "worst_frequency_mhz": 0,
-                    "notes": "No frequency data to analyze",
+                    "assessable": False,
+                    "predicted_pass": None,
+                    "margin_db": None,
+                    "worst_frequency_mhz": None,
+                    "notes": (
+                        "Compliance NOT assessed: no spectral content could be "
+                        "estimated from the design (no clock or edge-rate data "
+                        "was available for any net). This is not a pass — no "
+                        "prediction is reported because any margin would be "
+                        "invented."
+                    ),
                 }
             }
 
@@ -960,6 +982,7 @@ class EMIRiskScorer:
 
         return {
             standard: {
+                "assessable": True,
                 "predicted_pass": worst.margin_db >= 0,
                 "margin_db": round(worst.margin_db, 1),
                 "worst_frequency_mhz": worst.frequency_mhz,
@@ -975,6 +998,26 @@ class EMIRiskScorer:
     def _build_executive_summary(self, result: EMIRiskResult, standard: str) -> str:
         """Build a concise executive summary of the EMI risk assessment."""
         parts = []
+
+        # No signal nets scored => no assessment. Say so before anything else.
+        # The "low risk" branch below is reached whenever the score is 0, which
+        # is also what an unscored design produces, so without this guard an
+        # empty analysis announced "LOW EMI RISK ... likely to meet limits".
+        # A design can have nets while having no *signal* nets (all power and
+        # ground), so this is still reachable with the nets precondition in
+        # score() satisfied.
+        if not result.net_risks:
+            parts.append(
+                f"EMI RISK NOT ASSESSED: no signal nets were scored, so no "
+                f"{standard} risk conclusion is available. This is a coverage "
+                "gap, not a low-risk result."
+            )
+            if result.frequency_risks:
+                parts.append(
+                    f"{len(result.frequency_risks)} frequency point(s) were "
+                    "evaluated without net attribution."
+                )
+            return " ".join(parts)
 
         # Overall status
         if result.overall_risk_level == "critical":

@@ -16,6 +16,7 @@ from typing import Any, Optional
 from .classifiers.design_classifier import DesignClassificationResult, DesignClassifier
 from .classifiers.interface_detector import InterfaceDetectionResult, InterfaceDetector
 from .classifiers.net_classifier import NetClassificationResult, NetClassifier
+from .errors import InsufficientDataError, require_data
 from .models.pcb_data import PCBDesignData
 
 # =============================================================================
@@ -162,6 +163,11 @@ class DomainResult:
     # Populated from InsufficientDataError.context["missing"] so the report can
     # say *which* inputs were absent rather than just that something was.
     missing_inputs: list[str] = field(default_factory=list)
+    # The analyzer's live result object, for runners that feed another analyzer.
+    # Deliberately excluded from to_dict(): raw_data already carries the
+    # serialised form, and this exists so downstream analyzers get the real
+    # object rather than a round-tripped dict.
+    analyzer_result: Optional[Any] = None
 
     @property
     def critical_count(self) -> int:
@@ -550,6 +556,16 @@ def _run_return_path_analysis(
 
         result.status = "fail" if result.critical_count > 0 else "warning" if result.warning_count > 0 else "pass"
         result.raw_data = _safe_serialize(rp_result)
+        # Expose the live result so the EMI scorer can consume it (see
+        # _run_emi_risk_analysis) instead of scoring blind to return paths.
+        result.analyzer_result = rp_result
+    except InsufficientDataError as e:
+        # Must precede the bare Exception clause below, or "we had no data to
+        # look at" is recorded as "the analyzer crashed" — two different
+        # coverage gaps that a reader needs to tell apart.
+        result.status = "insufficient_data"
+        result.error = str(e)
+        result.missing_inputs = list(e.context.get("missing") or [])
     except Exception as e:
         result.status = "error"
         result.error = str(e)
@@ -560,14 +576,28 @@ def _run_emi_risk_analysis(
     design: PCBDesignData,
     net_cls: NetClassificationResult,
     standard: str = "FCC_B",
+    return_path_result: Optional[Any] = None,
 ) -> DomainResult:
-    """Run EMI risk scoring."""
+    """Run EMI risk scoring.
+
+    ``return_path_result`` matters more than it looks. The scorer uses it to
+    build a per-net return-path lookup that feeds loop-area and return-quality
+    into each net's score. Omitting it leaves that lookup empty, so every net is
+    scored as though its return path were unknown — which is why the
+    orchestrator's numbers used to diverge from the standalone
+    ``pcb_analyze_emi_risk`` tool, which has always passed it.
+    """
     from .analyzers.emc.emi_risk_scorer import EMIRiskScorer
 
     result = DomainResult(domain="emc_emi_risk", analyzer_name="EMIRiskScorer")
     try:
         scorer = EMIRiskScorer()
-        emi_result = scorer.score(design, classified_nets=net_cls, standard=standard)
+        emi_result = scorer.score(
+            design,
+            return_path_result,
+            classified_nets=net_cls,
+            standard=standard,
+        )
 
         # Convert top risks to findings
         for net_risk in getattr(emi_result, "net_risks", [])[:20]:
@@ -595,6 +625,10 @@ def _run_emi_risk_analysis(
         overall = getattr(emi_result, "overall_risk_level", "low")
         result.status = "fail" if overall == "critical" else "warning" if overall in ("high", "medium") else "pass"
         result.raw_data = _safe_serialize(emi_result)
+    except InsufficientDataError as e:
+        result.status = "insufficient_data"
+        result.error = str(e)
+        result.missing_inputs = list(e.context.get("missing") or [])
     except Exception as e:
         result.status = "error"
         result.error = str(e)
@@ -608,33 +642,44 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
     result = DomainResult(domain="emc_grounding", analyzer_name="GroundingAnalyzer")
     try:
         analyzer = GroundingAnalyzer()
-        # Build ground planes from design zones
-        planes = []
         gnd_zones = [z for z in design.zones if z.net_name and "gnd" in z.net_name.lower()]
-        layer_num_map = {l.name: idx for idx, l in enumerate(design.layers)} if design.layers else {}
-        if gnd_zones:
-            for i, zone in enumerate(gnd_zones):
-                planes.append(GroundPlane(
-                    layer_number=layer_num_map.get(zone.layer, i),
-                    name=zone.layer,
-                    coverage_percent=80.0,
-                    width_mm=design.board_width_mm or 100,
-                    height_mm=design.board_height_mm or 100,
-                ))
-        else:
-            # Assume at least one ground plane
-            planes.append(GroundPlane(
-                layer_number=0,
-                name="GND",
-                coverage_percent=80.0,
-                width_mm=design.board_width_mm or 100,
-                height_mm=design.board_height_mm or 100,
-            ))
 
-        # Calculate actual GND via stitching density from design data
-        board_w = design.board_width_mm or 100
-        board_h = design.board_height_mm or 100
+        # Preconditions. Previously, when no ground zone was found this
+        # fabricated a plane named "GND" at 80% coverage on a 100x100 mm board
+        # and analysed *that*. Because via density on an empty design is 0, the
+        # invented plane reliably produced a via-stitching warning, which was
+        # enough to promote the review verdict away from INCONCLUSIVE — an
+        # unrun analysis reading as a performed one, off a plane that does not
+        # exist. If we cannot see a ground plane we do not know there is one.
+        require_data(
+            "grounding analysis",
+            ground_zones=gnd_zones,
+            board_width_mm=design.board_width_mm,
+            board_height_mm=design.board_height_mm,
+        )
+
+        board_w = design.board_width_mm
+        board_h = design.board_height_mm
         board_area_cm2 = (board_w * board_h) / 100
+
+        # Coverage per plane, from the zone's own measured area. Zones whose
+        # area did not survive ingest (several parsers leave area_mm2 at 0) get
+        # None = "not measured" rather than an assumed constant, so no
+        # coverage-derived score or threshold is computed from a guess.
+        planes = []
+        layer_num_map = {l.name: idx for idx, l in enumerate(design.layers)} if design.layers else {}
+        board_area_mm2 = board_w * board_h
+        for i, zone in enumerate(gnd_zones):
+            coverage: Optional[float] = None
+            if zone.area_mm2 and board_area_mm2 > 0:
+                coverage = min(100.0, zone.area_mm2 / board_area_mm2 * 100.0)
+            planes.append(GroundPlane(
+                layer_number=layer_num_map.get(zone.layer, i),
+                name=zone.layer,
+                coverage_percent=coverage,
+                width_mm=board_w,
+                height_mm=board_h,
+            ))
 
         # Count GND stitching vias (exclude BGA escape vias by checking
         # if they're near a component center — crude but better than raw count)
@@ -667,19 +712,39 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
             via_density=via_density,
         )
 
-        # Extract findings
+        # Extract findings. GroundingResult.issues is list[str], so the generic
+        # getattr(issue, "severity", ...) pattern used elsewhere would title
+        # every one of them "issue" and drop the text into the description only
+        # by accident — see _finding_from_issue.
         for issue in getattr(gnd_result, "issues", []):
-            severity = getattr(issue, "severity", "warning")
+            result.findings.append(_finding_from_issue(
+                issue,
+                domain="emc_grounding",
+                title_prefix="Grounding",
+                default_severity="warning",
+            ))
+
+        # Anything the analyzer could not determine is reported as info, not
+        # omitted. A quantity that was never measured must be visible to the
+        # reader rather than looking like a quantity that came back clean.
+        for gap in getattr(gnd_result, "not_determined", []):
             result.findings.append(ReviewFinding(
                 domain="emc_grounding",
-                severity=severity,
-                title=f"Grounding: {getattr(issue, 'issue_type', 'issue')}",
-                description=getattr(issue, "description", str(issue)),
-                recommendation=getattr(issue, "recommendation", ""),
+                severity="info",
+                title="Grounding: quantity not determined",
+                description=str(gap),
+                recommendation=(
+                    "Supply copper geometry or zone areas for a measured "
+                    "coverage figure."
+                ),
             ))
 
         result.status = "fail" if result.critical_count > 0 else "warning" if result.warning_count > 0 else "pass"
         result.raw_data = _safe_serialize(gnd_result)
+    except InsufficientDataError as e:
+        result.status = "insufficient_data"
+        result.error = str(e)
+        result.missing_inputs = list(e.context.get("missing") or [])
     except Exception as e:
         result.status = "error"
         result.error = str(e)
@@ -2180,11 +2245,24 @@ def run_design_review(
     standard = (ctx.get("target_standards") or ["FCC_B"])[0]
     thermal_limits = ctx.get("thermal_limits", {})
 
+    # Return-path output feeds EMI risk scoring: the scorer uses it to build a
+    # per-net loop-area / return-quality lookup. Without it every net is scored
+    # as though its return path were unknown, which is why these numbers used to
+    # differ from the standalone pcb_analyze_emi_risk tool. _select_analyzers
+    # appends "return_path" before "emi_risk" and gates both on the same
+    # condition, so this is populated whenever emi_risk runs; the None default
+    # keeps it correct if that ever changes.
+    rp_raw: Optional[Any] = None
+
     for key in analyzer_keys:
         if key == "return_path":
-            domain_results.append(_run_return_path_analysis(design, net_cls))
+            rp_domain = _run_return_path_analysis(design, net_cls)
+            rp_raw = rp_domain.analyzer_result
+            domain_results.append(rp_domain)
         elif key == "emi_risk":
-            domain_results.append(_run_emi_risk_analysis(design, net_cls, standard))
+            domain_results.append(
+                _run_emi_risk_analysis(design, net_cls, standard, return_path_result=rp_raw)
+            )
         elif key == "emc_grounding":
             domain_results.append(_run_grounding_analysis(design))
         elif key == "pdn":

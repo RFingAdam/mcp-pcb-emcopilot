@@ -380,7 +380,25 @@ class ReturnPathAnalyzer:
 
         Returns:
             ReturnPathAnalysisResult with complete analysis
+
+        Raises:
+            InsufficientDataError: If the design carries no nets. The analysis
+                walks ``design_data.nets``; with none, the result is the
+                dataclass defaults — 0 nets analyzed, 0 split crossings, 0
+                errors, 0 warnings — which reads as a design whose return paths
+                were checked and found clean. That is the single most dangerous
+                output this analyzer can produce, so it refuses instead.
+
+                Note ``analyze_net`` deliberately does *not* raise: it takes an
+                explicit net name and already reports "Net 'X' not found in
+                design" honestly.
         """
+        from ...errors import require_data
+
+        require_data(
+            "return path analysis", nets=getattr(design_data, "nets", None)
+        )
+
         result = ReturnPathAnalysisResult()
 
         # Build classification lookup
