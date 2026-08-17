@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -30,18 +31,76 @@ logger = logging.getLogger(__name__)
 _MAX_FILE_SIZE = 500 * 1024 * 1024
 
 
+def _zip_looks_like_gerber_job(file_path: str) -> bool:
+    """Does this archive hold a Gerber+drill job rather than an ODB++ tree?
+
+    ``.zip`` is claimed by ODB++, but a Gerber job is just as commonly shipped
+    zipped, and routing one into the ODB++ parser fails in a confusing way.
+    Decided by looking at the member names: ODB++ has a distinctive ``matrix``
+    and ``steps`` layout, while a Gerber job is a flat pile of layer and drill
+    extensions.
+
+    Returns False for anything unreadable, so a nonexistent path keeps the
+    historical ``odb`` answer.
+    """
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(file_path) as archive:
+            names = [n.lower() for n in archive.namelist()]
+    except Exception:
+        return False
+
+    if any("matrix/matrix" in n or n.endswith("/matrix") for n in names):
+        return False
+    if any("/steps/" in n or n.startswith("steps/") for n in names):
+        return False
+
+    gerber_like = 0
+    for name in names:
+        suffix = Path(name).suffix
+        if _GERBER_EXT_RE.match(suffix) or _DRILL_EXT_RE.match(suffix):
+            gerber_like += 1
+    return gerber_like >= 3
+
+
+# Copper/mechanical Gerber extensions. `.g<n>` covers Altium inner layers
+# (.G1-.G8), which were previously rejected outright, and `.gm<n>` the numbered
+# mechanical layers.
+_GERBER_EXT_RE = re.compile(
+    r"^\.(gbr|ger|gtl|gbl|gts|gbs|gto|gbo|gtp|gbp|gko|gpt|gpb|g\d+|gm\d*|gd\d+|gp\d+)$"
+)
+# ASCII drill extensions. `.tx<n>` is Altium's per-span naming; `.txt` is
+# handled separately because it needs a content check.
+_DRILL_EXT_RE = re.compile(r"^\.(drl|xln|exc|nc|tx\d+|dr\d+)$")
+
+
 def detect_format(file_path: str) -> str:
     """Auto-detect PCB file format from extension and content."""
     path = Path(file_path)
     ext = path.suffix.lower()
     name = path.name.lower()
 
+    # A directory is a multi-file job, not a single design file. Checked first
+    # because a directory can carry any suffix at all.
+    #
+    # os.path.isdir rather than Path.is_dir: Path("") normalises to Path(".")
+    # which *is* a directory, so is_dir() would classify the empty string as a
+    # job. os.path.isdir("") is False.
+    if os.path.isdir(file_path):
+        return "gerber_job"
+
     if ext == ".kicad_pcb":
         return "kicad"
-    elif ext in (".tgz",) or name.endswith(".tar.gz") or ext == ".zip":
+    elif ext in (".tgz",) or name.endswith(".tar.gz"):
         return "odb"
-    elif ext in (".gbr", ".ger", ".gtl", ".gbl", ".gts", ".gbs", ".gto", ".gbo", ".gtp", ".gbp"):
+    elif ext == ".zip":
+        # Sniff members; fall back to the historical answer when unreadable.
+        return "gerber_job" if _zip_looks_like_gerber_job(file_path) else "odb"
+    elif _GERBER_EXT_RE.match(ext):
         return "gerber"
+    elif _DRILL_EXT_RE.match(ext):
+        return "excellon"
     elif ext in (".pcbdoc",):
         return "altium"
     elif ext == ".brd":
@@ -85,6 +144,17 @@ def detect_format(file_path: str) -> str:
                     return "allegro"
                 if "ALLEGRO" in header.upper() or "ORCAD" in header.upper():
                     return "allegro"
+                # Altium names its through-hole drill export `<job>-Plated.TXT`,
+                # so `.txt` is shared with Allegro exports and with fabrication
+                # status reports. Content is the only reliable discriminator —
+                # checked after Allegro so that detection is unchanged for it.
+                stripped = header.lstrip()
+                if (
+                    stripped.startswith("M48")
+                    or ";FILE_FORMAT" in header
+                    or re.search(r"^(INCH|METRIC)\b", header, re.M)
+                ):
+                    return "excellon"
         except Exception:
             pass
         return "unknown"
@@ -100,6 +170,16 @@ def _validate_file(file_path: str) -> Path:
     path = Path(file_path)
     if not path.exists():
         raise ParseError("FILE_NOT_FOUND", f"File not found: {file_path}", {"file": file_path})
+
+    # A directory is a valid multi-file job input. Falling through to the size
+    # check would reject every one of them: st_size for a directory is 0 on
+    # Windows, which the empty-file guard below treats as fatal.
+    #
+    # os.path.isdir rather than Path.is_dir, because is_dir() consults stat()
+    # and a caller may legitimately have patched that (the size-limit test does
+    # exactly this, with a stub carrying only st_size).
+    if os.path.isdir(file_path):
+        return path
 
     file_size = path.stat().st_size
     if file_size == 0:

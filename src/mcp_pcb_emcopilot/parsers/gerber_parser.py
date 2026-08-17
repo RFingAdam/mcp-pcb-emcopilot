@@ -281,6 +281,15 @@ class GerberData:
     layer_side: Optional[str] = None  # top, bottom, inner
     layer_number: Optional[int] = None  # For inner layers
 
+    # G04 comment content. Altium states a layer's stack position only here, so
+    # this is the sole in-file source for stackup ordering.
+    comments: List[str] = field(default_factory=list)
+    physical_order: Optional[int] = None  # G04 Layer_Physical_Order=N
+    board_origin: Optional[Tuple[int, int]] = None  # G04 Board_Origin=a|b
+    # G04 #@! TF.SameCoordinates,<guid> — shared by every layer of one export,
+    # so a mismatch across files means they are not in the same coordinate frame.
+    coordinate_system_id: Optional[str] = None
+
     # Statistics
     trace_count: int = 0
     pad_count: int = 0
@@ -342,9 +351,16 @@ class GerberParser:
         'silkscreen_bottom': [r'\.gbo$', r'silk.*bot', r'bot.*silk', r'b\.silks'],
         'paste_top': [r'\.gtp$', r'paste.*top', r'top.*paste', r'f\.paste'],
         'paste_bottom': [r'\.gbp$', r'paste.*bot', r'bot.*paste', r'b\.paste'],
-        'drill': [r'\.drl$', r'\.xln$', r'drill', r'\.exc$'],
-        'outline': [r'\.gko$', r'\.gm1$', r'outline', r'edge', r'profile'],
+        'drill': [r'\.drl$', r'\.xln$', r'drill', r'\.exc$', r'\.tx\d$'],
+        # `.gm` with no digit is Altium's board profile, and `.gm<n>` covers the
+        # numbered mechanical layers a fab drawing lands on. Matching only
+        # `.gm1` missed both.
+        'outline': [r'\.gko$', r'\.gm$', r'\.gm\d+$', r'outline', r'edge', r'profile'],
     }
+
+    # `.G1` is the 2nd copper layer, `.G8` the 9th: the digit counts *inner*
+    # layers, so the physical position is one greater.
+    _RE_INNER_LAYER_DIGIT = re.compile(r'\.g(\d+)$', re.I)
 
     def __init__(self):
         self.current_aperture: Optional[int] = None
@@ -407,7 +423,7 @@ class GerberParser:
         return data
 
     def _infer_layer_type(self, filename: str, data: GerberData) -> None:
-        """Infer layer type from filename patterns"""
+        """Infer layer type, side and ordinal from filename patterns."""
         filename_lower = filename.lower()
 
         for layer_type, patterns in self.LAYER_PATTERNS.items():
@@ -418,10 +434,19 @@ class GerberParser:
 
                     if 'top' in layer_type:
                         data.layer_side = 'top'
+                        if data.layer_number is None:
+                            data.layer_number = 1
                     elif 'bottom' in layer_type or 'bot' in layer_type:
                         data.layer_side = 'bottom'
                     elif 'inner' in layer_type:
                         data.layer_side = 'inner'
+                        # The digit was previously discarded, so `.G1` and `.G8`
+                        # were indistinguishable — both just "some inner layer".
+                        # An explicit X2 attribute or G04 order wins over this
+                        # filename convention, so only fill a gap.
+                        digit = self._RE_INNER_LAYER_DIGIT.search(filename_lower)
+                        if digit and data.layer_number is None:
+                            data.layer_number = int(digit.group(1)) + 1
 
                     return
 
@@ -568,6 +593,55 @@ class GerberParser:
         # Load scaling: LS<factor>
         elif line.startswith('LS'):
             pass  # Track if needed
+
+    # Altium layer metadata, emitted only as G04 comments.
+    _RE_PHYSICAL_ORDER = re.compile(r"Layer_Physical_Order\s*=\s*(\d+)", re.I)
+    _RE_BOARD_ORIGIN = re.compile(r"Board_Origin\s*=\s*(-?\d+)\s*\|\s*(-?\d+)", re.I)
+    _RE_LAYER_COLOR = re.compile(r"Layer_Color\s*=\s*(-?\d+)", re.I)
+    # X2 attributes in comment form: "G04 #@! TF.FileFunction,Copper,L3,Inner*"
+    _RE_X2_IN_COMMENT = re.compile(r"#@!\s*(T[FAOD]\.?.*)$")
+
+    def _parse_comment(self, line: str, data: GerberData) -> None:
+        """Extract metadata from a G04 comment.
+
+        Two distinct things arrive this way and both were previously discarded:
+
+        1. Altium's own layer metadata (``Layer_Physical_Order``,
+           ``Board_Origin``, ``Layer_Color``). The physical order is the only
+           in-file statement of where a layer sits in the stack.
+        2. Gerber X2 attributes written in the ``#@!`` comment form instead of as
+           a ``%TF`` command. ``_parse_extended_command`` only fires on lines
+           beginning with ``%``, so these never reached the attribute parser.
+        """
+        body = line[3:].strip().rstrip("*").strip()
+        if body:
+            data.comments.append(body)
+
+        order = self._RE_PHYSICAL_ORDER.search(body)
+        if order:
+            data.physical_order = int(order.group(1))
+
+        origin = self._RE_BOARD_ORIGIN.search(body)
+        if origin:
+            data.board_origin = (int(origin.group(1)), int(origin.group(2)))
+
+        colour = self._RE_LAYER_COLOR.search(body)
+        if colour:
+            data.attributes.custom["Layer_Color"] = colour.group(1)
+
+        x2 = self._RE_X2_IN_COMMENT.search(body)
+        if x2:
+            attr = x2.group(1).strip().rstrip("*").strip()
+            if attr.startswith("TF"):
+                self._parse_file_attribute(attr, data)
+                if "SameCoordinates" in attr:
+                    parts = attr.split(",", 1)
+                    if len(parts) > 1:
+                        data.coordinate_system_id = parts[1].strip()
+            elif attr.startswith("TA"):
+                self._parse_aperture_attribute(attr, data)
+            elif attr.startswith("TO"):
+                self._parse_object_attribute(attr, data)
 
     def _parse_format_spec(self, line: str, data: GerberData) -> None:
         """Parse format specification command"""
@@ -942,8 +1016,16 @@ class GerberParser:
             self.region_points = []
 
         # Comment: G04
+        #
+        # Comments are NOT inert in practice. Altium writes its layer metadata
+        # here — `G04 Layer_Physical_Order=5*` is the only in-file statement of
+        # where a layer sits in the stack — and it also emits X2 attributes in
+        # the comment form `G04 #@! TF.FileFunction,...*` rather than as a %TF
+        # command. Discarding G04 content unconditionally threw both away, which
+        # left stackup order unrecoverable from the Gerber files themselves.
         if line.startswith('G04') or line.startswith('G4'):
-            return  # Skip comments
+            self._parse_comment(line, data)
+            return
 
         # Coordinate command
         if 'X' in line or 'Y' in line or 'I' in line or 'J' in line:
@@ -1322,3 +1404,101 @@ class GerberParser:
         self._calculate_statistics(data)
 
         return data
+
+
+# ===========================================================================
+# Cheap header-only scan
+# ===========================================================================
+
+@dataclass
+class GerberHeaderInfo:
+    """The handful of facts a job-level ingest needs before a full parse."""
+
+    filename: str
+    physical_order: Optional[int] = None
+    layer_type: Optional[str] = None
+    layer_side: Optional[str] = None
+    layer_number: Optional[int] = None
+    units: Optional[str] = None
+    integer_digits: Optional[int] = None
+    decimal_digits: Optional[int] = None
+    file_function: Optional[str] = None
+    file_polarity: Optional[str] = None
+    coordinate_system_id: Optional[str] = None
+    board_origin: Optional[Tuple[int, int]] = None
+    is_gerber: bool = False
+
+
+def scan_gerber_header(
+    file_path: str | Path,
+    max_lines: int = 80,
+) -> GerberHeaderInfo:
+    """Read only a Gerber file's header, for ordering a job's layers.
+
+    Determining stack order requires reading every copper file, but a full parse
+    of a multi-hundred-kilobyte layer is wasted effort when the answer sits in
+    the first few dozen lines. Altium writes ``G04 Layer_Physical_Order=N*``
+    directly after the generation-software comment, so ``max_lines`` well short
+    of the aperture table is enough.
+
+    Never raises for unreadable or non-Gerber input: ``is_gerber`` reports
+    whether anything Gerber-like was actually seen.
+    """
+    path = Path(file_path)
+    info = GerberHeaderInfo(filename=path.name)
+
+    parser = GerberParser()
+    probe = GerberData(source_file=path.name)
+    parser._infer_layer_type(path.name, probe)
+    info.layer_type = probe.layer_type
+    info.layer_side = probe.layer_side
+    info.layer_number = probe.layer_number
+
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            lines = [handle.readline() for _ in range(max_lines)]
+    except OSError:
+        return info
+
+    for raw in lines:
+        if not raw:
+            break
+        line = raw.strip()
+        if not line:
+            continue
+
+        if line.startswith("G04") or line.startswith("G4"):
+            info.is_gerber = True
+            parser._parse_comment(line, probe)
+            continue
+
+        if line.startswith("%"):
+            info.is_gerber = True
+            body = line.strip("%").strip("*")
+            if body.startswith("FS"):
+                parser._parse_format_spec(body, probe)
+            elif body.startswith("MO"):
+                probe.units = "mm" if "MM" in body else "inch"
+            elif body.startswith("TF"):
+                parser._parse_file_attribute(body, probe)
+            continue
+
+        if line.startswith(("G01", "G70", "G71", "G75", "D", "X", "Y")):
+            info.is_gerber = True
+            # Past the header: apertures and geometry follow.
+            if line.startswith(("X", "Y", "D")):
+                break
+
+    info.physical_order = probe.physical_order
+    info.units = probe.units
+    info.integer_digits = probe.integer_digits
+    info.decimal_digits = probe.decimal_digits
+    info.file_function = probe.attributes.file_function
+    info.file_polarity = probe.attributes.file_polarity
+    info.coordinate_system_id = probe.coordinate_system_id
+    info.board_origin = probe.board_origin
+    # An X2 FileFunction or a G04 order may name the layer position; prefer
+    # those over the filename convention picked up above.
+    if probe.layer_number is not None:
+        info.layer_number = probe.layer_number
+    return info
