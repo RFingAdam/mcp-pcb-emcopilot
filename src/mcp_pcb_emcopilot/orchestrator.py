@@ -288,17 +288,41 @@ def set_review_context(
         operating_conditions: Dict with temp_range, altitude, etc.
 
     Returns:
-        The stored context dict.
+        The stored context dict, including any pre-existing keys.
+
+    Note:
+        ``review_context`` is a namespace shared with three other tools, which
+        write the ``playbook`` (pcb_start_professional_review), ``markets``
+        (pcb_set_market) and ``interactive_answers``
+        (pcb_answer_review_questions) buckets. This function therefore merges
+        rather than replacing: assigning a freshly-built dict over the whole
+        namespace silently discarded all of them, and in the documented
+        workflow order (start review -> set market -> set context -> run
+        review) that state was always gone by the time the review ran.
+
+        Per-key semantics are "supplied wins, else preserve, else default", so
+        an argument left unset cannot downgrade a value another tool
+        established — notably ``target_standards``, which pcb_set_market
+        populates from the market shortlist.
     """
-    ctx = {
-        "design_intent": design_intent,
-        "target_standards": target_standards or ["FCC_B"],
-        "known_issues": known_issues or [],
-        "impedance_targets": impedance_targets or {},
-        "thermal_limits": thermal_limits or {},
-        "operating_conditions": operating_conditions or {},
+    ctx = dict(design.review_context or {})
+
+    def _resolve(key: str, supplied: Any, default: Any) -> Any:
+        if supplied:
+            return supplied
+        if key in ctx:
+            return ctx[key]
+        return default
+
+    ctx.update({
+        "design_intent": _resolve("design_intent", design_intent, ""),
+        "target_standards": _resolve("target_standards", target_standards, ["FCC_B"]),
+        "known_issues": _resolve("known_issues", known_issues, []),
+        "impedance_targets": _resolve("impedance_targets", impedance_targets, {}),
+        "thermal_limits": _resolve("thermal_limits", thermal_limits, {}),
+        "operating_conditions": _resolve("operating_conditions", operating_conditions, {}),
         "set_at": time.time(),
-    }
+    })
     design.review_context = ctx
     return ctx
 
