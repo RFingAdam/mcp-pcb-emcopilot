@@ -63,6 +63,68 @@ class MissingDependencyError(PCBError):
     pass
 
 
+class InsufficientDataError(PCBError):
+    """The analysis cannot be answered from the data available.
+
+    Deliberately distinct from its siblings:
+
+    - :class:`ValidationError` — the caller passed something malformed.
+    - :class:`AnalysisError` — the computation was attempted and failed.
+    - :class:`InsufficientDataError` — the inputs are well-formed, they are
+      simply *absent*, and any number returned would be invented.
+
+    This exists because the alternative is worse than an error. Several
+    analyzers iterate a collection that is empty on an unparsed or
+    partially-parsed design, produce zero findings, and report that as a clean
+    result — a confident "no problems found" that a user has every reason to
+    trust. For a compliance-adjacent tool, "we could not look" and "we looked
+    and it is fine" must never serialise to the same thing.
+
+    Raise it rather than returning a sentinel field: a sentinel has to be
+    checked at every call site, and a forgotten check silently reproduces the
+    original failure. An unhandled raise degrades to a refusal, never to a
+    fabricated number.
+    """
+    pass
+
+
+class InsufficientSystemContextError(InsufficientDataError):
+    """The design parsed fine, but the surrounding system is undetermined.
+
+    Some questions are unanswerable from a board file alone no matter how well
+    it parsed. A module or SoM that mounts on a carrier board is the motivating
+    case: well below a wavelength the board itself is a poor radiator, so the
+    radiating structure is the carrier, and absolute radiated-emissions or
+    compliance figures do not exist without the carrier's dimensions.
+
+    A subclass of :class:`InsufficientDataError` so existing handlers catch it,
+    but separately identifiable because the remedy differs — supplying a
+    stackup or a better export will not fix this one.
+    """
+    pass
+
+
+def require_data(analysis: str, **inputs: Any) -> None:
+    """Raise :class:`InsufficientDataError` naming every falsy input.
+
+    Usage::
+
+        require_data("return path analysis", nets=design.nets, layers=design.layers)
+
+    Greppable via ``require_data(`` / ``INSUFFICIENT_DATA`` /
+    ``InsufficientDataError`` so the set of guarded analyses can be audited.
+    """
+    missing = sorted(name for name, value in inputs.items() if not value)
+    if missing:
+        raise InsufficientDataError(
+            "INSUFFICIENT_DATA",
+            f"Cannot perform {analysis}: the parsed design has no "
+            f"{', '.join(missing)}. This is a data gap, not a pass — no result "
+            "is reported because any value would be invented.",
+            {"analysis": analysis, "missing": missing},
+        )
+
+
 def error_response(code: str, message: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create a structured error response dict for MCP tool results."""
     return {
