@@ -434,6 +434,46 @@ def _select_analyzers(
     return list(dict.fromkeys(analyzers))  # deduplicate preserving order
 
 
+def _finding_from_issue(
+    issue: Any,
+    *,
+    domain: str,
+    title_prefix: str,
+    default_severity: str,
+    signal_name: Optional[str] = None,
+    recommendation: str = "",
+) -> ReviewFinding:
+    """Build a :class:`ReviewFinding` from an analyzer issue of unknown shape.
+
+    Analyzers are inconsistent about this: ``ReturnPathResult.issues`` and
+    ``GroundingResult.issues`` are typed ``list[str]``, while DFM/thermal issues
+    are dataclasses carrying ``severity`` / ``issue_type`` / ``description``.
+
+    A blanket ``getattr(issue, "severity", "warning")`` over a plain string
+    silently relabels *every* string issue as a warning and titles it "unknown".
+    So severity is supplied by the caller — which knows what the analyzer
+    actually graded — and never invented here.
+    """
+    if isinstance(issue, str):
+        text = issue.strip()
+        return ReviewFinding(
+            domain=domain,
+            severity=default_severity,
+            title=f"{title_prefix}: {text[:90]}",
+            description=text,
+            recommendation=recommendation,
+            signal_name=signal_name,
+        )
+    return ReviewFinding(
+        domain=domain,
+        severity=getattr(issue, "severity", default_severity),
+        title=f"{title_prefix}: {getattr(issue, 'issue_type', 'issue')}",
+        description=getattr(issue, "description", str(issue)),
+        recommendation=getattr(issue, "recommendation", recommendation),
+        signal_name=signal_name or getattr(issue, "net_name", None),
+    )
+
+
 def _run_return_path_analysis(
     design: PCBDesignData,
     net_cls: NetClassificationResult,
@@ -446,17 +486,28 @@ def _run_return_path_analysis(
         analyzer = ReturnPathAnalyzer()
         rp_result = analyzer.analyze(design, net_cls)
 
-        # Extract findings from return path result
-        for net_analysis in getattr(rp_result, "net_analyses", []):
-            for issue in getattr(net_analysis, "issues", []):
-                severity = getattr(issue, "severity", "warning")
-                result.findings.append(ReviewFinding(
+        # Extract findings from every per-net result.
+        #
+        # The field is ``net_results``. This previously read ``net_analyses``
+        # through a getattr default, which silently yielded [] and dropped every
+        # finding — so the domain reported a clean "pass" for any design while
+        # the real output sat unused in ``raw_data``. Direct attribute access is
+        # deliberate: a future rename must fail loudly rather than degrade to a
+        # false pass.
+        for net_result in rp_result.net_results:
+            recommendation = "; ".join(net_result.recommendations)
+            for issue in net_result.issues:
+                result.findings.append(_finding_from_issue(
+                    issue,
                     domain="emc_return_path",
-                    severity=severity,
-                    title=f"Return path issue: {getattr(issue, 'issue_type', 'unknown')}",
-                    description=getattr(issue, "description", str(issue)),
-                    recommendation=getattr(issue, "recommendation", ""),
-                    signal_name=getattr(net_analysis, "net_name", None),
+                    title_prefix="Return path",
+                    # ``issues`` is list[str] and carries no severity. Do not
+                    # escalate off ``return_path_quality`` either: a net with an
+                    # empty name grades "poor" purely for having no routing,
+                    # which is a data artifact, not an EMC critical.
+                    default_severity="warning",
+                    signal_name=net_result.net_name or None,
+                    recommendation=recommendation,
                 ))
 
         result.status = "fail" if result.critical_count > 0 else "warning" if result.warning_count > 0 else "pass"
