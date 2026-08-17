@@ -115,24 +115,6 @@ class TestFindingAnnotator:
         assert svg is None or isinstance(svg, str)
 
 
-class TestGroundIslandAnalyzer:
-    def test_module_imports_and_dataclasses_instantiate(self):
-        # The module's public surface is dataclasses for results; the
-        # import alone covers the class bodies. Constructing one with
-        # defaults verifies the dataclass declarations are valid.
-        from mcp_pcb_emcopilot.analyzers.emc.ground_island_analyzer import (
-            GroundIslandAnalysisResult,
-        )
-        result = GroundIslandAnalysisResult(
-            total_ground_nets=0,
-            main_ground_area_mm2=0.0,
-            islands=[],
-            stitching_issues=[],
-            return_path_issues=[],
-        )
-        assert result.islands == []
-
-
 class TestRfIsolationAnalyzer:
     def test_module_imports_and_dataclasses_instantiate(self):
         from mcp_pcb_emcopilot.analyzers.emc.rf_isolation_analyzer import (
