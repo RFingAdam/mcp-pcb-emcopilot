@@ -394,20 +394,37 @@ def test_tool_registration():
 
 
 def test_edge_cases():
-    """Test edge cases: empty design, missing nets, etc."""
+    """Test edge cases: empty design, missing nets, etc.
+
+    NOTE (behaviour change): this test previously asserted that analysing an
+    empty design *succeeds* — ``analyze(empty).total_nets_analyzed == 0`` and
+    ``score(empty).overall_risk_score == 0``. Those assertions pinned a
+    fabrication rather than a feature: a score of 0 is the "low risk" branch, so
+    an empty design produced "LOW EMI RISK ... Design appears likely to meet
+    FCC_B limits" together with ``predicted_pass: True`` and a 100 dB margin.
+    Zero findings from zero inputs is a data gap, not a clean board.
+
+    Both analyzers now raise InsufficientDataError, and the assertions below
+    were changed to require that refusal. `analyze_net` is unaffected: it takes
+    an explicit net name and already reported the miss honestly.
+    """
+    import pytest
+
     from mcp_pcb_emcopilot.analyzers.emc.emi_risk_scorer import EMIRiskScorer
     from mcp_pcb_emcopilot.analyzers.emc.return_path_analyzer import ReturnPathAnalyzer
+    from mcp_pcb_emcopilot.errors import InsufficientDataError
 
     analyzer = ReturnPathAnalyzer()
     scorer = EMIRiskScorer()
 
-    # Empty design
+    # Empty design — must refuse rather than report a clean result.
     empty = PCBDesignData(source_file="empty.kicad_pcb")
-    result = analyzer.analyze(empty)
-    assert result.total_nets_analyzed == 0
-    print("  Empty design: OK")
+    with pytest.raises(InsufficientDataError) as exc:
+        analyzer.analyze(empty)
+    assert exc.value.context["missing"] == ["nets"]
+    print("  Empty design refuses: OK")
 
-    # Missing net
+    # Missing net — analyze_net takes an explicit name and reports honestly.
     design = make_mock_design()
     result = analyzer.analyze_net(design, "NONEXISTENT_NET")
     assert result.return_path_quality == "poor"
@@ -428,10 +445,12 @@ def test_edge_cases():
     assert result.total_nets_analyzed > 0
     print("  No vias design: OK")
 
-    # EMI scorer with empty design
-    result = scorer.score(empty)
-    assert result.overall_risk_score == 0
-    print("  EMI scorer empty design: OK")
+    # EMI scorer with empty design — must refuse, not return score 0 ("low").
+    with pytest.raises(InsufficientDataError) as exc:
+        scorer.score(empty)
+    assert exc.value.code == "INSUFFICIENT_DATA"
+    assert "not a pass" in exc.value.message
+    print("  EMI scorer empty design refuses: OK")
 
     print("  PASS: Edge cases handled correctly")
 

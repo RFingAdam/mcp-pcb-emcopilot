@@ -13,8 +13,9 @@ class GroundingResult:
     board_id: str
     layer_count: int
 
-    # Ground plane assessment
-    ground_coverage_percent: float
+    # Ground plane assessment. None = not measured, distinct from 0.0 = measured
+    # as having no coverage.
+    ground_coverage_percent: Optional[float]
     plane_count: int
     split_plane_count: int
     island_count: int
@@ -39,6 +40,11 @@ class GroundingResult:
     issues: List[str] = field(default_factory=list)
     recommendations: List[str] = field(default_factory=list)
 
+    # Quantities that could not be determined from the available data, each
+    # naming what was skipped as a result. A reader must be able to tell
+    # "measured and fine" from "never measured".
+    not_determined: List[str] = field(default_factory=list)
+
     # Details
     metrics: Dict[str, Any] = field(default_factory=dict)
 
@@ -48,7 +54,12 @@ class GroundPlane:
     """Ground plane definition"""
     layer_number: int
     name: str
-    coverage_percent: float
+    # None means "not measured". Determining real coverage needs copper
+    # geometry, which several ingest paths do not provide (zone areas can come
+    # through as 0). Passing an assumed number here silently turns every
+    # coverage-derived score and threshold check into arithmetic on that
+    # assumption, so callers that do not know must pass None.
+    coverage_percent: Optional[float]
     width_mm: float
     height_mm: float
     copper_thickness_um: float = 35
@@ -120,13 +131,21 @@ class GroundingAnalyzer:
 
         # Analyze each plane
         total_coverage: float = 0
+        known_coverage_planes = 0
         total_splits = 0
         total_islands = 0
         total_vias = 0
         all_splits = []
+        not_determined: List[str] = []
 
         for plane in planes:
-            total_coverage += plane.coverage_percent
+            # Coverage may be genuinely unknown: extracting it needs copper
+            # geometry, and several ingest paths do not provide zone areas. A
+            # plane with unknown coverage is excluded from the average rather
+            # than counted as some assumed value.
+            if plane.coverage_percent is not None:
+                total_coverage += plane.coverage_percent
+                known_coverage_planes += 1
             total_splits += len(plane.splits)
             total_vias += len(plane.via_locations)
 
@@ -139,7 +158,16 @@ class GroundingAnalyzer:
             # Estimate islands from voids
             total_islands += self._estimate_islands(plane)
 
-        avg_coverage = total_coverage / len(planes) if planes else 0
+        avg_coverage: Optional[float] = (
+            total_coverage / known_coverage_planes if known_coverage_planes else None
+        )
+        if avg_coverage is None and planes:
+            not_determined.append(
+                "ground_coverage_percent: not measured — no plane supplied a "
+                "coverage figure, so coverage-based scoring and the <80% "
+                "coverage check were skipped rather than run against an "
+                "assumed value."
+            )
         # Use provided via density if available (from actual design data),
         # otherwise fall back to counting via_locations on plane objects
         if via_density is None:
@@ -191,7 +219,7 @@ class GroundingAnalyzer:
         issues = []
         recommendations = []
 
-        if avg_coverage < 80:
+        if avg_coverage is not None and avg_coverage < 80:
             issues.append(f"Ground coverage {avg_coverage:.1f}% below 80% target")
             recommendations.append("Increase ground plane copper pour")
 
@@ -221,7 +249,9 @@ class GroundingAnalyzer:
         return GroundingResult(
             board_id=board_id,
             layer_count=len(planes),
-            ground_coverage_percent=round(avg_coverage, 1),
+            ground_coverage_percent=(
+                round(avg_coverage, 1) if avg_coverage is not None else None
+            ),
             plane_count=len(planes),
             split_plane_count=total_splits,
             island_count=total_islands,
@@ -235,6 +265,7 @@ class GroundingAnalyzer:
             splits=all_splits,
             issues=issues,
             recommendations=recommendations,
+            not_determined=not_determined,
             metrics={
                 "board_area_cm2": round(board_area_cm2, 1),
                 "total_vias": total_vias,
@@ -349,16 +380,21 @@ class GroundingAnalyzer:
 
     def _calculate_return_path_score(
         self,
-        coverage: float,
+        coverage: Optional[float],
         splits: int,
         via_density: float,
         max_freq_mhz: float,
     ) -> float:
-        """Calculate return path quality score 0-100."""
+        """Calculate return path quality score 0-100.
+
+        ``coverage`` of None means it was not measured, so no coverage penalty
+        is applied. Applying one from an assumed value would make the score a
+        function of that assumption rather than of the design.
+        """
         score = 100.0
 
         # Coverage factor
-        if coverage < 95:
+        if coverage is not None and coverage < 95:
             score -= (95 - coverage) * 1.5
 
         # Split penalty
@@ -373,18 +409,22 @@ class GroundingAnalyzer:
 
     def _calculate_emc_score(
         self,
-        coverage: float,
+        coverage: Optional[float],
         splits: int,
         islands: int,
         via_density: float,
         plane_impedance: float,
         max_freq_mhz: float,
     ) -> float:
-        """Calculate overall EMC score 0-100."""
+        """Calculate overall EMC score 0-100.
+
+        ``coverage`` of None means it was not measured; no coverage penalty is
+        applied in that case (see :meth:`_calculate_return_path_score`).
+        """
         score = 100.0
 
         # Coverage (40% weight)
-        if coverage < 90:
+        if coverage is not None and coverage < 90:
             score -= (90 - coverage) * 0.5
 
         # Splits and islands (30% weight)
