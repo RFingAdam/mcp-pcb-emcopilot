@@ -194,7 +194,7 @@ def _print_summary(review, written: Sequence[Path], markets: Sequence[str], desi
     if markets:
         lines.append(f"  markets:  {', '.join(markets)}")
     if getattr(design, "parse_is_partial", False):
-        lines.append("  parse:    ⚠ PARTIAL — the design file did not fully parse")
+        lines.append("  parse:    ⚠ PARTIAL. The design file did not fully parse")
         for w in list(getattr(design, "warnings", []))[:5]:
             lines.append(f"              • {w}")
     lines.append(
@@ -214,7 +214,7 @@ def _print_summary(review, written: Sequence[Path], markets: Sequence[str], desi
     if not_assessed:
         lines.append("")
         lines.append(
-            f"  ⚠ {not_assessed} domain(s) errored or were skipped — this review is "
+            f"  ⚠ {not_assessed} domain(s) errored or were skipped. This review is "
             "PARTIAL."
         )
         lines.append(

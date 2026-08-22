@@ -1,4 +1,4 @@
-"""Design revision comparison — diff two PCBDesignData instances."""
+"""Design revision comparison: diff two PCBDesignData instances."""
 from __future__ import annotations
 
 import math

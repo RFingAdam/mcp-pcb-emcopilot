@@ -13,7 +13,7 @@ three sources at once. The severity table follows the plan:
 | Tolerance / V-rating differs         | MEDIUM   |
 | Manufacturer differs only            | LOW      |
 
-The analyzer is robust to missing sources — any missing leg degrades the
+The analyzer is robust to missing sources. Any missing leg degrades the
 relevant check to an info-level "skipped, source unavailable" entry
 rather than emitting false positives.
 """
@@ -103,7 +103,7 @@ def analyze_three_way_xref(
     lay_by_ref = _layout_by_ref(layout_components)
 
     # Each source is "useful" when it has at least one parsed entry. Empty
-    # sources are treated as "not yet attached" — they neither block the
+    # sources are treated as "not yet attached". They neither block the
     # upfront gate nor trigger missing-from-X flagging. This keeps the
     # analyzer permissive of incremental workflows where a reviewer
     # attaches schematic + BOM first, then runs xref before fab.
@@ -140,7 +140,7 @@ def analyze_three_way_xref(
         # --- Presence checks ---------------------------------------------
         # Each presence check fires whenever the *other* source(s) the
         # comparison depends on are attached, even if those sources are
-        # currently empty (an empty layout is meaningful — it says "nothing
+        # currently empty (an empty layout is meaningful. It says "nothing
         # is placed").
         if sch and not lay and lay_attached:
             findings.append(ReviewFinding(
@@ -165,7 +165,7 @@ def analyze_three_way_xref(
                 description=(
                     f"Component {ref} is placed on the layout but the "
                     f"schematic doesn't define it. Possible orphan or test "
-                    f"point — verify intent."
+                    f"point: verify intent."
                 ),
                 recommendation=f"Either add {ref} to the schematic or remove it from the layout.",
                 signal_name=ref,
@@ -208,7 +208,7 @@ def analyze_three_way_xref(
 
         sch_dnp = _is_dnp(sch_val)
         bom_dnp = _is_dnp(bom_val) or _is_dnp(str((bom or {}).get("description") or ""))
-        _lay_dnp = _is_dnp(lay_val)  # reserved — layout DNP comparison TBD
+        _lay_dnp = _is_dnp(lay_val)  # reserved: layout DNP comparison TBD
 
         # DNP flag differs across sources?
         if sch and bom and sch_dnp != bom_dnp:
@@ -304,7 +304,7 @@ def analyze_three_way_xref(
             title="Three-way cross-reference clean",
             description=(
                 f"Compared {len(sch_by_ref)} schematic / {len(bom_by_ref)} BOM / "
-                f"{len(lay_by_ref)} layout components — no mismatches detected."
+                f"{len(lay_by_ref)} layout components. No mismatches detected."
             ),
             recommendation="",
             confidence=0.85,
@@ -316,7 +316,7 @@ def analyze_three_way_xref(
 
 _UNIT_REPLACEMENTS = {
     "μf": "uf",
-    "ω": "",       # bare ohm symbol — drop; the prefix carries the unit ('10k' is enough)
+    "ω": "",       # bare ohm symbol: drop; the prefix carries the unit ('10k' is enough)
     "ohm": "",
     " ": "",
     "-": "",

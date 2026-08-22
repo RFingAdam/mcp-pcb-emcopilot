@@ -8,7 +8,7 @@ regulator drives it.
 Limitations: PDF schematic extraction is text-only, so pin-net mapping
 is heuristic. This analyzer relies on:
 1. The ``is_power`` flag (set by parsers based on net name).
-2. Refdes class detection (capacitors, ICs, regulators) — works on any
+2. Refdes class detection (capacitors, ICs, regulators): works on any
    parser flavour that fills the refdes field.
 3. Net-name → rail-voltage parsing (VCC_3V3 → 3.3 V).
 

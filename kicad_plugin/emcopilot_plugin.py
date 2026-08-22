@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from typing import Optional
 
-# KiCad's pcbnew module — only available inside KiCad
+# KiCad's pcbnew module: only available inside KiCad
 try:
     import pcbnew
     KICAD_AVAILABLE = True

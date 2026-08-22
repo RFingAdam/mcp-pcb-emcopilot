@@ -5,10 +5,10 @@ intents that the report builder later embeds, replacing the
 ``docs/diagram_*.svg`` placeholders that ship with the framework
 documentation:
 
-1. ``create_pcb_stackup`` — always, given the parsed stackup.
-2. ``create_rf_block_diagram`` — only if RF nets/interfaces detected.
-3. ``create_emc_test_setup`` — one per market in ``target_markets``.
-4. ``markup_schematic`` — only when a schematic file was parsed this session.
+1. ``create_pcb_stackup``: always, given the parsed stackup.
+2. ``create_rf_block_diagram``: only if RF nets/interfaces detected.
+3. ``create_emc_test_setup``. One per market in ``target_markets``.
+4. ``markup_schematic``: only when a schematic file was parsed this session.
 
 This is a pure intent-emission module; result ingestion stores the returned
 SVG path on the session via ``pcb_attach_external_result`` and the report

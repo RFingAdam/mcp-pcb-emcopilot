@@ -32,7 +32,7 @@ class _DesignCls:
 
 
 class _Design:
-    """Minimal stand-in for PCBDesignData — only the fields review_context uses."""
+    """Minimal stand-in for PCBDesignData: only the fields review_context uses."""
     def __init__(self, review_context: dict | None = None) -> None:
         self.review_context = review_context or {}
 
@@ -72,7 +72,7 @@ def test_core_pack_returned_when_no_markets():
     qs = get_review_questions(design, _DesignCls(), _NetCls())
     ids = {q["id"] for q in qs}
     assert "operating_environment" in ids   # core
-    assert "vehicle_class" not in ids       # automotive — not active
+    assert "vehicle_class" not in ids       # automotive. Not active
 
 
 def test_automotive_market_adds_pack():

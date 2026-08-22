@@ -6,7 +6,7 @@ absent, against the highest rail voltage seen in the schematic). Flag
 items operating above 80 % of their rating per IPC-2152 / common
 derating practice.
 
-Today's scope is voltage rating only — current rating handling needs
+Today's scope is voltage rating only: current rating handling needs
 runtime current data from the PDN analyzer, which is downstream of this
 module. Phase 4c can add that path.
 """
@@ -54,7 +54,7 @@ def analyze_component_rating(
         findings.append(ReviewFinding(
             domain="schematic_rating",
             severity="info",
-            title="No BOM data — component rating audit skipped",
+            title="No BOM data: component rating audit skipped",
             description=(
                 "Provide a BOM (pcb_parse_bom) to enable per-component voltage / "
                 "current derating audit. Schematic values rarely carry rating "
@@ -65,7 +65,7 @@ def analyze_component_rating(
         ))
         return findings
 
-    # Compute the maximum rail voltage seen in the schematic — used as the
+    # Compute the maximum rail voltage seen in the schematic. Used as the
     # fallback "stress" value when pin-net mapping is absent.
     rail_voltages: list[float] = []
     for net in schematic_nets:
@@ -75,7 +75,7 @@ def analyze_component_rating(
                 rail_voltages.append(v)
     max_rail_voltage = max(rail_voltages, default=0.0)
     if max_rail_voltage == 0.0:
-        max_rail_voltage = 3.3  # safest assumption — most digital designs
+        max_rail_voltage = 3.3  # safest assumption. Most digital designs
 
     has_pin_net = any(bool(N.coerce(c).get("pins")) for c in schematic_components)
 
@@ -92,7 +92,7 @@ def analyze_component_rating(
         if rated_v is None:
             rated_v = N.parse_voltage_v(N.component_value(c))
         if rated_v is None:
-            continue  # no rating data — can't audit
+            continue  # no rating data: can't audit
 
         # Determine the stress voltage for this component.
         if has_pin_net:

@@ -1,4 +1,4 @@
-"""TrackedFinding dataclass — traceable design review finding."""
+"""TrackedFinding dataclass: traceable design review finding."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class TrackedFinding:
     recommendation: str
     reference_standard: str
 
-    # Traceability (optional — not all findings map to a specific net)
+    # Traceability (optional. Not all findings map to a specific net)
     nets: list[str] = field(default_factory=list)
     layers: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)

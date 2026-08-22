@@ -1,4 +1,4 @@
-"""Cross-MCP action queue — the data types the orchestrator emits and the
+"""Cross-MCP action queue. The data types the orchestrator emits and the
 helpers that manage them.
 
 The pcb-emcopilot Python process cannot invoke sibling MCP servers directly
@@ -13,8 +13,8 @@ The pcb-emcopilot Python process cannot invoke sibling MCP servers directly
 3. The orchestrator's re-correlation step updates the linked finding's
    ``verified`` / ``confidence`` / ``source`` based on the simulated result.
 
-This module is pure data — no I/O, no globals beyond the small priority
-constants below — so it composes cleanly with the existing
+This module is pure data. No I/O, no globals beyond the small priority
+constants below, so it composes cleanly with the existing
 ``OpenEMSBridge`` and the future regulations/nec2/drawio bridges.
 """
 

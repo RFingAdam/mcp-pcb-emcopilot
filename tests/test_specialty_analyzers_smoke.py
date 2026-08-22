@@ -2,7 +2,7 @@
 
 Each test exercises a meaningful entry point of an analyzer with
 realistic numeric defaults. The goal is structural coverage of the
-analyzer bodies — the per-analyzer correctness tests (where they exist)
+analyzer bodies. The per-analyzer correctness tests (where they exist)
 live in separate modules.
 """
 from __future__ import annotations

@@ -1,17 +1,17 @@
 """In-memory design session manager.
 
-Replaces PostgreSQL — holds parsed PCBDesignData in a dict keyed by session ID.
+Replaces PostgreSQL: holds parsed PCBDesignData in a dict keyed by session ID.
 Sessions persist for the lifetime of the MCP server process.
 
 In addition to design data, each session can hold two ancillary queues used by
 the Phase 3 cross-MCP intent pattern (see
 ``integrations/external_actions.py``):
 
-- ``pending_actions[session_id]`` — :class:`ExternalAction` list emitted by
+- ``pending_actions[session_id]``: :class:`ExternalAction` list emitted by
   the orchestrator (openEMS escalations, NEC2 antenna runs, live limit
   lookups, drawio diagrams). Drained by Claude via
   ``pcb_suggest_next_actions``.
-- ``external_results[session_id]`` — :class:`ExternalResult` map keyed by
+- ``external_results[session_id]``: :class:`ExternalResult` map keyed by
   ``action_id``, populated as Claude feeds sibling-MCP results back through
   ``pcb_attach_external_result``.
 """
@@ -158,7 +158,7 @@ class DesignSessionManager:
         """Store an external-MCP result, mark the matching action completed.
 
         Returns ``True`` if the action was found and marked, ``False`` if
-        the action_id is unknown (out-of-band result — still stored for
+        the action_id is unknown (out-of-band result: still stored for
         diagnostic purposes).
         """
         if session_id not in self._sessions:

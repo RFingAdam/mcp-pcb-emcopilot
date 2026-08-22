@@ -1,4 +1,4 @@
-"""Tests for integrations/drawio_bridge — diagram intent emission."""
+"""Tests for integrations/drawio_bridge: diagram intent emission."""
 
 from __future__ import annotations
 

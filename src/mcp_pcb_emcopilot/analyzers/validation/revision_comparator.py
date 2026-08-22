@@ -1,4 +1,4 @@
-"""Design revision comparator — diff between Rev A and Rev B."""
+"""Design revision comparator: diff between Rev A and Rev B."""
 from __future__ import annotations
 
 import math

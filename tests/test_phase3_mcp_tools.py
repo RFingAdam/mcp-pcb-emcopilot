@@ -1,4 +1,4 @@
-"""End-to-end tests for the Phase 3a MCP tools — suggest_next_actions,
+"""End-to-end tests for the Phase 3a MCP tools: suggest_next_actions,
 attach_external_result, finalize_review, lookup_limit_live, and the
 report-generation gate."""
 
@@ -231,7 +231,7 @@ def test_finalize_review_force_bypasses_critical_gate(fresh_session):
 # --- Report gate ------------------------------------------------------------
 
 def _satisfy_preflight_commercial(sid: str) -> None:
-    """Helper — satisfy the Phase 4 preflight gate so we can test the
+    """Helper: satisfy the Phase 4 preflight gate so we can test the
     Phase 3a cross-MCP gate downstream."""
     srv._dispatch("pcb_set_market", {
         "session_id": sid,
@@ -280,7 +280,7 @@ def test_report_gate_force_emits_preliminary(fresh_session):
         {"session_id": fresh_session, "format": "html", "force": True},
     )
     # The report builder may return a dict; if so we stamped it preliminary.
-    # If it raised internally, the test should fail loudly — we accept either
+    # If it raised internally, the test should fail loudly. We accept either
     # a dict with preliminary=True or any other dict that the builder produces.
     assert isinstance(out, dict)
     if out.get("status") == "deferred":

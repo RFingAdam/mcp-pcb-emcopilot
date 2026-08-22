@@ -33,7 +33,7 @@ def session_with_layout():
 @pytest.fixture
 def session_with_schematic(session_with_layout, tmp_path):
     """Inject synthetic schematic_components / schematic_nets straight onto
-    the session — bypasses the parser so the test runs without fixture PDFs."""
+    the session: bypasses the parser so the test runs without fixture PDFs."""
     sid = session_with_layout
     data = srv.sessions.get_session(sid)
     data.schematic_components = [
@@ -61,7 +61,7 @@ def session_with_schematic(session_with_layout, tmp_path):
 # --- pcb_parse_schematic ----------------------------------------------------
 
 def test_parse_schematic_netlist_stub(tmp_path, session_with_layout):
-    """The netlist parser is a stub — but the dispatcher should still work."""
+    """The netlist parser is a stub, but the dispatcher should still work."""
     p = tmp_path / "test.net"
     p.write_text("R1 100k\nU1 STM32\nNET_NAME = 'VCC_3V3'\n")
     out = srv._dispatch(

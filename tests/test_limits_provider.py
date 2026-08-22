@@ -1,4 +1,4 @@
-"""Tests for analyzers/emc/limits_provider — local fallback + live cache."""
+"""Tests for analyzers/emc/limits_provider: local fallback + live cache."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_cispr25_radiated_class_5_strict():
 
 
 def test_cispr25_conducted_class_3_avg_band():
-    # 1.0 MHz lives in the 0.53–1.8 MHz conducted band — avg limit is 50 dBuV.
+    # 1.0 MHz lives in the 0.53–1.8 MHz conducted band: avg limit is 50 dBuV.
     p = get_limit("CISPR_25", "3", 1.0, detector="AVG")
     assert p is not None
     assert p.limit_value == 50
@@ -137,8 +137,8 @@ def test_clear_live_cache_restores_fallback():
 
 
 def test_clock_emi_uses_provider():
-    """The clock_emi analyzer was refactored to read through the provider —
-    a live override should change its returned limit too."""
+    """The clock_emi analyzer was refactored to read through the provider.
+    A live override should change its returned limit too."""
     from mcp_pcb_emcopilot.analyzers.emc.clock_emi_analyzer import (
         _get_regulatory_limit,
     )

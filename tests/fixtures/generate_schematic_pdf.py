@@ -1,7 +1,7 @@
 """Generate a tiny synthetic PDF that the PDF schematic parser can mine
 for refdes + net names. Run once to produce ``sample_schematic.pdf``.
 
-Pure-stdlib; no PyMuPDF or reportlab dependency — we hand-write a minimal
+Pure-stdlib; no PyMuPDF or reportlab dependency. We hand-write a minimal
 valid PDF document with a single page containing a text stream that names
 a few components and nets. The PDF schematic parser uses pdfplumber
 internally which reads the same text layer.
@@ -14,9 +14,9 @@ from pathlib import Path
 
 # Minimal PDF 1.4 with a single uncompressed text stream. The byte offsets
 # are computed and patched in at write time so we don't have to keep the
-# xref table hand-aligned. Layout-only — no fonts beyond Helvetica.
+# xref table hand-aligned. Layout-only. No fonts beyond Helvetica.
 def build_pdf(text_lines: list[str]) -> bytes:
-    # Construct the page content stream — one line per call to Tj.
+    # Construct the page content stream. One line per call to Tj.
     content_lines: list[bytes] = [b"BT\n/F1 12 Tf\n50 750 Td\n"]
     for line in text_lines:
         content_lines.append(f"({line}) Tj\n0 -16 Td\n".encode("latin-1"))

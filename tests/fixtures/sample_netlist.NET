@@ -1,4 +1,4 @@
-// PSTXNET netlist — synthetic test fixture (ORCAD ASCII style)
+// PSTXNET netlist: synthetic test fixture (ORCAD ASCII style)
 // Format: section headers followed by pin-net mappings.
 
 PSTXNET

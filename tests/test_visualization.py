@@ -1,4 +1,4 @@
-"""Tests for PCB design visualization — board renderer, stackup renderer, annotator.
+"""Tests for PCB design visualization: board renderer, stackup renderer, annotator.
 
 Creates mock PCBDesignData and exercises all four visualization MCP tools
 through their dispatch handlers.

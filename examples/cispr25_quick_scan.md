@@ -2,13 +2,13 @@
 
 A 60-second pre-compliance sanity check on an automotive PCB layout
 before shipping it to the EMC lab. The goal: catch obvious return-path
-breaks, decoupling gaps, and clock-EMI risks early — when changing them
+breaks, decoupling gaps, and clock-EMI risks early. When changing them
 is cheap.
 
 ## Scenario
 
-You have a KiCad PCB for an automotive accessory — a switching regulator
-+ MCU + CAN transceiver — and you want to know if it has any obvious
+You have a KiCad PCB for an automotive accessory. A switching regulator
++ MCU + CAN transceiver, and you want to know if it has any obvious
 EMC red flags against CISPR-25 (vehicle-component radiated emissions)
 before sending it out for testing.
 
@@ -16,7 +16,7 @@ before sending it out for testing.
 
 - A `.kicad_pcb` file (or ODB++, IPC-2581, Altium `.PcbDoc`, Gerber set)
 - Knowledge of which net carries the switching node (e.g. `SW_3V3`)
-- Target class — CISPR-25 Class 5 is the common automotive bar
+- Target class: CISPR-25 Class 5 is the common automotive bar
 
 ## Conversation script
 
@@ -60,14 +60,14 @@ Claude: [calls pcb_generate_docx_report with severity_threshold='medium']
 
 This walkthrough exercises these tools from mcp-pcb-emcopilot's catalog:
 
-- `pcb_set_review_context` — locks the standard + class
-- `pcb_parse_layout` — KiCad parser
-- `pcb_classify_nets` — finds clocks, power, and switching nodes
+- `pcb_set_review_context`: locks the standard + class
+- `pcb_parse_layout`: KiCad parser
+- `pcb_classify_nets`: finds clocks, power, and switching nodes
 - `pcb_analyze_return_paths`, `pcb_analyze_decoupling`,
-  `pcb_analyze_smps_emi`, `pcb_analyze_clock_emi` — domain analyzers
-- `pcb_predict_emissions` — predicted-vs-limit comparison
-- `pcb_get_cispr25_limit` — limit-line lookup
-- `pcb_generate_docx_report` — final deliverable
+  `pcb_analyze_smps_emi`, `pcb_analyze_clock_emi`: domain analyzers
+- `pcb_predict_emissions`: predicted-vs-limit comparison
+- `pcb_get_cispr25_limit`: limit-line lookup
+- `pcb_generate_docx_report`: final deliverable
 
 ## Notes and caveats
 

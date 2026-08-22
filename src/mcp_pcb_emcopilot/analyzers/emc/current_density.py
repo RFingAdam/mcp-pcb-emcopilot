@@ -6,7 +6,7 @@ signal trace using the analytical 1/(pi*h) * h^2/(h^2 + x^2) model,
 and calculates optimal via stitching spacing to contain return current
 within acceptable bounds at a given frequency.
 
-All calculations are pure Python — no external dependencies.
+All calculations are pure Python. No external dependencies.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def calculate_return_current_density(
 
     if trace_height_mm > 0.3:
         notes.append(
-            "Large trace-to-plane spacing spreads return current widely — "
+            "Large trace-to-plane spacing spreads return current widely: "
             "EMI risk increases. Use inner layers closer to planes."
         )
 

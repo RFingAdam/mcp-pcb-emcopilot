@@ -111,7 +111,7 @@ def test_attach_passing_sim_sets_verified_and_high_confidence(session_with_findi
 
 def test_attach_warning_sim_keeps_severity_lowers_confidence(session_with_finding):
     sid, action = session_with_finding
-    # Difference 8% — outside 5% pass tolerance but within 10% warning band
+    # Difference 8%: outside 5% pass tolerance but within 10% warning band
     out = srv._dispatch(
         "pcb_attach_external_result",
         {
@@ -135,7 +135,7 @@ def test_attach_warning_sim_keeps_severity_lowers_confidence(session_with_findin
 
 def test_attach_failing_sim_escalates_to_critical(session_with_finding):
     sid, action = session_with_finding
-    # Difference 30% — well past 2x tolerance → "fail"
+    # Difference 30%: well past 2x tolerance → "fail"
     out = srv._dispatch(
         "pcb_attach_external_result",
         {

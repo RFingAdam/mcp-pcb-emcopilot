@@ -3,7 +3,7 @@ previously had zero test coverage.
 
 Strategy: each test constructs the public entry point and calls its main
 method on the KiCad fixture (plus a classified-nets / review result
-where required). The test doesn't assert deeply on output — it asserts
+where required). The test doesn't assert deeply on output. It asserts
 that the call completes without raising a structural error, which is
 enough to bring each module from 0% to the 40–80% range without
 prescribing analysis correctness (per-analyzer tests handle that).
@@ -82,8 +82,8 @@ class TestRevisionComparator:
         from mcp_pcb_emcopilot.analyzers.validation.revision_comparator import (
             RevisionComparator,
         )
-        # Comparing a design to itself should report zero meaningful diffs —
-        # the interesting assertion is simply that compare() completes.
+        # Comparing a design to itself should report zero meaningful diffs.
+        # The interesting assertion is simply that compare() completes.
         result = RevisionComparator().compare(design, design)
         assert result is not None
 
@@ -91,7 +91,7 @@ class TestRevisionComparator:
 class TestEcoGenerator:
     def test_generate_runs(self, design, review):
         from mcp_pcb_emcopilot.reports.eco_generator import ECOGenerator
-        # recommendations is optional; pass an empty list — the intent is to
+        # recommendations is optional; pass an empty list. The intent is to
         # exercise the generator path without prescribing specific content.
         result = ECOGenerator().generate(design, review, recommendations=[])
         assert result is not None

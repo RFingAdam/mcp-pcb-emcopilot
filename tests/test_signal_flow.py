@@ -114,7 +114,7 @@ def test_jtag_nets_without_connector_high():
 def test_jtag_nets_with_unrelated_connector_medium():
     components = [
         _comp("U1", "STM32", pins=[{"net": "SWCLK"}, {"net": "SWDIO"}]),
-        _comp("J1", "USB-C", pins=[{"net": "VBUS"}, {"net": "GND"}]),  # USB conn — not JTAG
+        _comp("J1", "USB-C", pins=[{"net": "VBUS"}, {"net": "GND"}]),  # USB conn. Not JTAG
     ]
     nets = [_net("SWCLK"), _net("SWDIO")]
     findings = analyze_signal_flow(components, nets)

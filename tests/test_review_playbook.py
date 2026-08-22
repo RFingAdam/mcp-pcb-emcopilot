@@ -1,4 +1,4 @@
-"""Tests for review_playbook module — server-side helpers for the meticulous
+"""Tests for review_playbook module: server-side helpers for the meticulous
 multi-pass review workflow."""
 
 from __future__ import annotations

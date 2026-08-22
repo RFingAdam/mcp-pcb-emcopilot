@@ -1,9 +1,9 @@
 """Schematic format auto-dispatch.
 
-One entry point — :func:`detect_format` — that maps a file path to the
+One entry point: :func:`detect_format`. That maps a file path to the
 appropriate parser based on extension plus magic-byte inspection for
 the cases where extension alone isn't sufficient (PDFs vs Altium .SchDoc
-which is OLE2 — different first bytes).
+which is OLE2: different first bytes).
 
 The downstream :func:`parse_schematic_auto` calls the correct concrete
 parser and returns a uniform ``{components, nets, source_format}``
@@ -72,7 +72,7 @@ def _is_image_only_pdf(file_path: str) -> bool:
     try:
         import pdfplumber  # type: ignore[import-not-found]
     except ImportError:
-        return False  # can't tell — be permissive
+        return False  # can't tell: be permissive
     try:
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages[:2]:  # first two pages are enough
@@ -136,7 +136,7 @@ def parse_schematic_auto(file_path: str) -> dict[str, Any]:
         }
 
     if fmt == "netlist":
-        # Phase 4c — proper ORCAD PSTXNET / Pads ASCII parser. Falls back
+        # Phase 4c: proper ORCAD PSTXNET / Pads ASCII parser. Falls back
         # to the original regex stub only if the proper parser produces
         # zero output (very malformed file).
         try:
@@ -154,7 +154,7 @@ def parse_schematic_auto(file_path: str) -> dict[str, Any]:
                     "raw": parsed,
                     "file_path": file_path,
                 }
-        except Exception as e:  # pragma: no cover — fall through to stub
+        except Exception as e:  # pragma: no cover: fall through to stub
             stub_warning = f"netlist_parser raised {e!s}; falling back to regex stub"
         else:
             stub_warning = "netlist_parser found nothing; falling back to regex stub"
@@ -190,7 +190,7 @@ def _dataclass_to_dict(obj: Any) -> dict[str, Any]:
     # ``asdict`` only accepts instances. Narrow before calling.
     if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
-    # Last resort — try to read attributes off whatever this is.
+    # Last resort: try to read attributes off whatever this is.
     return {k: getattr(obj, k) for k in dir(obj) if not k.startswith("_") and not callable(getattr(obj, k, None))}
 
 

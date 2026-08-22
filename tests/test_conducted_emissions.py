@@ -1,4 +1,4 @@
-"""Tests for conducted emissions analysis — LISN, CISPR 25 & FCC Part 15."""
+"""Tests for conducted emissions analysis: LISN, CISPR 25 & FCC Part 15."""
 from __future__ import annotations
 
 import math
@@ -267,7 +267,7 @@ class TestCompliancePrediction:
 
     def test_marginal_status_exists(self, analyzer):
         """6 dB margin boundary should produce marginal findings."""
-        # This is a statistical check — we just verify the model can produce
+        # This is a statistical check. We just verify the model can produce
         # findings with any status
         result = analyzer.predict_conducted_compliance(
             switching_freq_khz=200, input_voltage=12.0,

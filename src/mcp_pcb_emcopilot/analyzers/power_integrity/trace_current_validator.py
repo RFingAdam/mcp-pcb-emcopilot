@@ -205,7 +205,7 @@ class TraceCurrentValidator:
                         f"on {narrowest_layer} to at least "
                         f"{self._width_for_current(estimated_current, copper_oz, is_any_internal):.3f}mm "
                         f"for {estimated_current:.1f}A at 10°C rise (IPC-2152). "
-                        f"{'Switching node — use wide copper pour with short, direct path.' if is_switching else ''}"
+                        f"{'Switching node. Use wide copper pour with short, direct path.' if is_switching else ''}"
                     ),
                     "details": {
                         "net": net_name,

@@ -40,7 +40,7 @@ The server is layered: parsers normalize file formats into a single
 `PCBDesignData` model; classifiers tag nets and interfaces; analyzers
 run physics-based checks against that model; reports + visualization
 turn analyzer findings into engineer-readable artifacts. Sessions are
-in-memory keyed by id — restart-clean.
+in-memory keyed by id: restart-clean.
 
 ## Source layout
 
@@ -66,7 +66,7 @@ mcp-pcb-emcopilot/
 ## Position in eng-mcp-suite
 
 mcp-pcb-emcopilot sits in the **layout-aware analysis** layer of the
-engineering MCP stack — it takes a real PCB file in, emits findings
+engineering MCP stack. It takes a real PCB file in, emits findings
 out. The circuit-level synthesis siblings stop at the schematic, and
 the field-solver siblings cover specific geometries; this server
 bridges them on actual hardware.
@@ -90,16 +90,16 @@ bridges them on actual hardware.
 
 ### Feeds (this MCP produces output that)…
 
-- **drawio-engineering-mcp** — board renders + EMI hotspot maps for
+- **drawio-engineering-mcp**: board renders + EMI hotspot maps for
   documentation packages.
-- **mcp-emc-regulations** — predicted-emission spectra for
+- **mcp-emc-regulations**: predicted-emission spectra for
   margin-against-limit comparisons.
 
 ### Consumes (this MCP accepts input from)…
 
-- **lineforge** — characteristic-impedance reference values used to
+- **lineforge**: characteristic-impedance reference values used to
   cross-check `pcb_calc_*_impedance` results.
-- **mcp-ltspice-qucs** — Touchstone `.s2p` from filter designs so the
+- **mcp-ltspice-qucs**: Touchstone `.s2p` from filter designs so the
   insertion-loss budgeter can include the schematic-level filter
   contribution.
 

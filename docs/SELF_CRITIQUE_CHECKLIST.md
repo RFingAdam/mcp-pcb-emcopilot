@@ -90,14 +90,14 @@ Limits that are pulled from neither (e.g. cited from training-data memory) are a
 
 ## 7. Human-review flags
 
-Items that a human Professional Engineer (PE) must verify personally before signing the report. These are not Claude's failures — they are out-of-scope items that need human expertise.
+Items that a human Professional Engineer (PE) must verify personally before signing the report. These are not Claude's failures. They are out-of-scope items that need human expertise.
 
 **Always-included flags:**
 - Schematic-derived intent (Claude reads schematics; PE reads design intent).
 - Long-term reliability (FIT rates, MTBF, ageing-component derating beyond 80%).
 - Functional-safety qualitative arguments (ISO 26262, IEC 61508 FMEA quality).
 - ESD soft-failure (analytical-only; lab measurement needed).
-- ISO 7637-2 transients (no analytical model yet — Phase 4 stub).
+- ISO 7637-2 transients (no analytical model yet: Phase 4 stub).
 - Variant differences (DNP assemblies, BOM swaps, region-specific firmware).
 
 **Conditional flags:**
@@ -112,14 +112,14 @@ Items that a human Professional Engineer (PE) must verify personally before sign
 
 Things this review **cannot** detect, called out explicitly so the user knows what's missing:
 
-- **Thermal transients** — analyses are steady-state.
-- **ESD soft-fail / latch-up** — only static voltage-margin checks.
-- **Long-term drift** — capacitor ageing, electromigration, solder-joint cycling.
-- **EOL stackup tolerance** — fab variation across lots not modelled.
-- **Supply-chain MPN substitutions** — alternates in BOM not always equivalent.
-- **EMC chamber-vs-prediction delta** — analytical predictions are approximate; chamber measurement is the source of truth.
-- **Cross-talk through reference-plane gaps** — heuristic only; full 3D field solve only when escalated.
-- **Connector/cable contributions** — analyses end at the board edge; cable/connector EMI is out-of-scope unless `cable_coupling` was run with cable data.
+- **Thermal transients**: analyses are steady-state.
+- **ESD soft-fail / latch-up**: only static voltage-margin checks.
+- **Long-term drift**: capacitor ageing, electromigration, solder-joint cycling.
+- **EOL stackup tolerance**: fab variation across lots not modelled.
+- **Supply-chain MPN substitutions**: alternates in BOM not always equivalent.
+- **EMC chamber-vs-prediction delta**: analytical predictions are approximate; chamber measurement is the source of truth.
+- **Cross-talk through reference-plane gaps**: heuristic only; full 3D field solve only when escalated.
+- **Connector/cable contributions**: analyses end at the board edge; cable/connector EMI is out-of-scope unless `cable_coupling` was run with cable data.
 
 **Output.** `{"blind_spots_acknowledged": ["...", "..."]}`
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo-banner.svg" alt="mcp-pcb-emcopilot — PCB EMC + signal-integrity analysis (return paths, decoupling, DDR/PCIe/USB)" width="100%"/>
+<img src="assets/logo-banner.svg" alt="mcp-pcb-emcopilot: PCB EMC + signal-integrity analysis (return paths, decoupling, DDR/PCIe/USB)" width="100%"/>
 
 <br/>
 
@@ -10,7 +10,7 @@
 [![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
 [![eng-mcp-suite](https://img.shields.io/badge/eng--mcp--suite-member-22D3EE.svg)](https://github.com/RFingAdam/eng-mcp-suite)
 
-**AI-powered PCB design review — EMC, signal integrity, power integrity, thermal, and DFM in one MCP server.**
+**AI-powered PCB design review: EMC, signal integrity, power integrity, thermal, and DFM in one MCP server.**
 **Catch return-path breaks, decoupling gaps, and DDR/PCIe topology errors before fabrication, from your terminal or AI agent.**
 
 [Quick start](#quick-start) ·
@@ -41,7 +41,7 @@ when you want to debug one net or revalidate one DDR byte-lane.
   server with 131 tools across parsing, calculation, analysis, and
   reporting. Any Claude / LLM agent can drive a full design review.
 - 🧱 **Multi-format layout parsing.** KiCad `.kicad_pcb`, ODB++, Gerber
-  RS-274X, IPC-2581, Altium `.PcbDoc`, 3D STEP — same downstream
+  RS-274X, IPC-2581, Altium `.PcbDoc`, 3D STEP: same downstream
   analyzers regardless of source.
 - 📐 **IPC-grounded impedance.** Microstrip / stripline / differential /
   CPWG via IPC-2141 (Hammerstad-Jensen, Cohn, coupled-line). Plus
@@ -110,7 +110,7 @@ fabrication-grade document.
 ## Tools
 
 131 tools across 14 categories (count is manually maintained, may lag
-by a release). Representative tools by category are below — full
+by a release). Representative tools by category are below: full
 reference with arguments in [`docs/tools.md`](docs/tools.md).
 
 ### Parsers & data extraction (15)
@@ -220,9 +220,9 @@ polyimide (flex). Query via `pcb_get_material_properties`.
 mcp-pcb-emcopilot fits in the following [eng-mcp-suite](https://github.com/RFingAdam/eng-mcp-suite)
 workflow bundles:
 
-- **`pcb-review`** — full layout intake, EMC + SI + PI + thermal +
+- **`pcb-review`**: full layout intake, EMC + SI + PI + thermal +
   DFM analysis, audit-grade DOCX report.
-- **`coexistence-review`** — multi-radio band selection
+- **`coexistence-review`**: multi-radio band selection
   (mcp-ltspice-qucs / mcp-emc-regulations) followed by layout-level
   shielding + return-path check (this server).
 
@@ -233,10 +233,10 @@ for the full list of sibling MCPs and bundle definitions.
 
 ## Documentation
 
-- 📘 **[Quick Start](docs/index.md)** — install through first call.
-- 🛠️ **[Tool reference](docs/tools.md)** — every MCP tool, every argument.
-- 📐 **[Usage examples](docs/usage.md)** — practical end-to-end walkthroughs.
-- 🏗️ **[Architecture](docs/architecture.md)** — how this MCP fits in eng-mcp-suite.
+- 📘 **[Quick Start](docs/index.md)**: install through first call.
+- 🛠️ **[Tool reference](docs/tools.md)**. Every MCP tool, every argument.
+- 📐 **[Usage examples](docs/usage.md)**: practical end-to-end walkthroughs.
+- 🏗️ **[Architecture](docs/architecture.md)**: how this MCP fits in eng-mcp-suite.
 
 ---
 
@@ -244,13 +244,13 @@ for the full list of sibling MCPs and bundle definitions.
 
 | Interface       | Single-ended Z₀ | Differential Z_diff |
 | --------------- | --------------- | ------------------- |
-| General purpose | 50 Ω            | —                   |
-| USB 2.0         | —               | 90 Ω                |
-| USB 3.x         | —               | 85 Ω                |
-| HDMI            | —               | 100 Ω               |
+| General purpose | 50 Ω            | n/a |
+| USB 2.0         | n/a | 90 Ω                |
+| USB 3.x         | n/a | 85 Ω                |
+| HDMI            | n/a | 100 Ω               |
 | DDR4 / LPDDR4   | 40 Ω            | 80 Ω                |
-| PCIe            | —               | 85 Ω                |
-| Ethernet        | —               | 100 Ω               |
+| PCIe            | n/a | 85 Ω                |
+| Ethernet        | n/a | 100 Ω               |
 
 ---
 
@@ -300,14 +300,14 @@ for the toolkit-wide rationale.
 
 ## Acknowledgments
 
-- **The KiCad project**, **ODB++**, **IPC** — the open layout standards
+- **The KiCad project**, **ODB++**, **IPC**. The open layout standards
   this server parses.
-- **IPC-2141A** — controlled-impedance reference behind the trace
+- **IPC-2141A**: controlled-impedance reference behind the trace
   calculators.
-- **The MCP working group** — for the [Model Context Protocol](https://modelcontextprotocol.io) specification.
+- **The MCP working group**: for the [Model Context Protocol](https://modelcontextprotocol.io) specification.
 
 <div align="center">
 
-<sub>Part of <a href="https://github.com/RFingAdam/eng-mcp-suite">eng-mcp-suite</a> — built for PCB designers, EMC labs, and AI agents.</sub>
+<sub>Part of <a href="https://github.com/RFingAdam/eng-mcp-suite">eng-mcp-suite</a>: built for PCB designers, EMC labs, and AI agents.</sub>
 
 </div>

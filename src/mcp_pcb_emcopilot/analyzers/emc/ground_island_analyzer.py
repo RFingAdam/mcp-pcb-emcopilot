@@ -6,7 +6,7 @@ Detects:
 - Ground plane discontinuities
 - Return path issues for high-speed signals
 
-Decoupled from SQLAlchemy — operates on PCBDesignData.
+Decoupled from SQLAlchemy: operates on PCBDesignData.
 """
 
 from __future__ import annotations

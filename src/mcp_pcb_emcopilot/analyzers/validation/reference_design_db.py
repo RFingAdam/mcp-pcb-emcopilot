@@ -83,7 +83,7 @@ class ReferenceDesignComparator:
 
         findings.append({
             "severity": "info", "category": "reference_design",
-            "description": f"Matched SoC: {soc_ref['name']} — comparing against reference guidelines",
+            "description": f"Matched SoC: {soc_ref['name']}: comparing against reference guidelines",
             "recommendation": "", "details": {"soc": soc_key, "reference": soc_ref},
         })
 
@@ -119,7 +119,7 @@ class ReferenceDesignComparator:
                 findings.append({
                     "severity": "info", "category": "ref_stackup",
                     "description": f"Board thickness {total_thick:.2f}mm vs reference {ref_thick:.1f}mm ({dev:.0f}% difference)",
-                    "recommendation": "Large deviation from reference stackup — verify impedance targets are achievable",
+                    "recommendation": "Large deviation from reference stackup: verify impedance targets are achievable",
                     "details": {"actual_mm": round(total_thick, 2), "reference_mm": ref_thick},
                 })
 

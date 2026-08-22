@@ -1,6 +1,6 @@
 # mcp-pcb-emcopilot
 
-**AI-powered PCB design review — EMC, signal integrity, power integrity, thermal, and DFM in one MCP server.**
+**AI-powered PCB design review: EMC, signal integrity, power integrity, thermal, and DFM in one MCP server.**
 **Catch return-path breaks, decoupling gaps, and DDR/PCIe topology errors before fabrication, from your terminal or AI agent.**
 
 ---
@@ -53,13 +53,13 @@ pip install cairosvg python-docx pymupdf
 
 ## Where to next
 
-- [Tool reference](tools.md) — every MCP tool with arguments
-- [Usage examples](usage.md) — full review on a real 4-layer board
-- [Architecture](architecture.md) — how this MCP fits inside eng-mcp-suite
+- [Tool reference](tools.md). Every MCP tool with arguments
+- [Usage examples](usage.md): full review on a real 4-layer board
+- [Architecture](architecture.md): how this MCP fits inside eng-mcp-suite
 
 ---
 
 !!! note "Part of eng-mcp-suite"
-    This MCP server is part of [eng-mcp-suite](https://github.com/RFingAdam/eng-mcp-suite) —
+    This MCP server is part of [eng-mcp-suite](https://github.com/RFingAdam/eng-mcp-suite),
     an umbrella of engineering MCP servers across RF, EMC, PCB, signal
     integrity, EM simulation, and lab test.

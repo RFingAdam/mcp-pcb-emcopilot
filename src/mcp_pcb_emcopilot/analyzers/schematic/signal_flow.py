@@ -2,13 +2,13 @@
 
 Three orthogonal checks:
 
-1. **Clock distribution** — identify clock sources (Y*/X* crystals,
+1. **Clock distribution**: identify clock sources (Y*/X* crystals,
    oscillator-class ICs), trace their fan-out, flag overload (>4
    unbuffered loads) and missing buffers.
-2. **Reset distribution** — locate reset nets (``RESET*`` / ``RST*`` /
+2. **Reset distribution**: locate reset nets (``RESET*`` / ``RST*`` /
    ``nRST``), check for a single driver / pullup, flag multi-driver
    contention.
-3. **Debug-header presence** — verify a JTAG / SWD test connector when
+3. **Debug-header presence**: verify a JTAG / SWD test connector when
    the design has a programmable IC.
 
 Degrades cleanly when pin-net mapping is missing (info-level aggregate
@@ -126,7 +126,7 @@ def analyze_signal_flow(
             src_ref = N.component_refdes(src)
             if not has_pin_net:
                 continue  # need pin-net data to trace fan-out
-            # Identify clock output nets — any net the source touches that
+            # Identify clock output nets. Any net the source touches that
             # is not GND/Vcc/X1/X2.
             d = N.coerce(src)
             output_nets: set[str] = set()
@@ -166,7 +166,7 @@ def analyze_signal_flow(
 
     if reset_nets and not has_supervisor and ics:
         # If we have ICs that need reset but no supervisor, that's a soft
-        # warning — most modern MCUs have internal POR but a watchdog/
+        # warning: most modern MCUs have internal POR but a watchdog/
         # supervisor is best practice.
         findings.append(ReviewFinding(
             domain="schematic_signal_flow",
@@ -201,7 +201,7 @@ def analyze_signal_flow(
                     description=(
                         f"{len(ic_drivers)} ICs drive reset net {name}: "
                         f"{', '.join(N.component_refdes(c) for c in ic_drivers)}. "
-                        f"Wired-OR reset only works if every driver is open-drain — "
+                        f"Wired-OR reset only works if every driver is open-drain: "
                         f"otherwise expect contention."
                     ),
                     recommendation=(

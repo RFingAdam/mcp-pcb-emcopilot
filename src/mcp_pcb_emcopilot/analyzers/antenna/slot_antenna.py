@@ -154,7 +154,7 @@ class SlotAntennaAnalyzer:
             Resonant frequency in MHz
         """
         length_m = length_mm / 1000
-        # Hammerstad εr_eff — use w/h ratio if available, else assume w/h=1
+        # Hammerstad εr_eff. Use w/h ratio if available, else assume w/h=1
         w_over_h = getattr(self, 'w_over_h', 1.0)
         f_wh = (1 + 12 / max(w_over_h, 0.1)) ** (-0.5)
         er_eff = (self.er + 1) / 2 + (self.er - 1) / 2 * f_wh

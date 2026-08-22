@@ -2,17 +2,17 @@
 
 Two flavours of work happen here:
 
-1. *Intent emission* — given a (standard, class, freq) tuple the orchestrator
+1. *Intent emission*: given a (standard, class, freq) tuple the orchestrator
    wants verified against live regulatory data, build an :class:`ExternalAction`
    that Claude will execute. The orchestrator queues these on the session via
    :meth:`DesignSessionManager.enqueue_actions`.
-2. *Result ingestion* — given the raw payload Claude attached with
+2. *Result ingestion*: given the raw payload Claude attached with
    ``pcb_attach_external_result``, parse it into a :class:`LimitPoint` and
    record it in :mod:`analyzers.emc.limits_provider`'s runtime cache so the
    next ``get_limit`` call returns the live value.
 
 The mapping from internal standard ids to ``emc-regulations`` MCP tools lives
-here too — single source of truth.
+here too: single source of truth.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def build_limit_lookup_intent(
 ) -> ExternalAction:
     """Build an ExternalAction that asks Claude to call mcp__emc-regulations__*.
 
-    The resulting action is *not* enqueued — the caller (orchestrator) decides
+    The resulting action is *not* enqueued. The caller (orchestrator) decides
     when to attach it to a session.
     """
     std_upper = standard.upper()
@@ -169,8 +169,8 @@ def apply_limit_result(
 ) -> LimitPoint | None:
     """Parse a sibling-MCP response into a LimitPoint + cache it.
 
-    ``raw_result`` shape is what the user's emc-regulations MCP returns —
-    we tolerate a few common conventions:
+    ``raw_result`` shape is what the user's emc-regulations MCP returns.
+    We tolerate a few common conventions:
 
     - ``{"limit_dbuv_per_m": 32.0, "band_min_mhz": 0.15, "band_max_mhz": 0.3}``
     - ``{"value": 32.0, "unit": "dBuV/m"}``

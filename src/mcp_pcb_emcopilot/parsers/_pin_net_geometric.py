@@ -35,7 +35,7 @@ def resolve_pins_by_geometry(
             unused in the snap-to-label heuristic but reserved so the
             signature is stable as we add wire-walk net merging later.
         labels: list of ``{name, x, y}`` dicts in mm.
-        junctions: list of ``{x, y}`` dicts in mm. Currently unused —
+        junctions: list of ``{x, y}`` dicts in mm. Currently unused:
             reserved for future cross-wire merging.
         nets: optional mapping of ``{net_name -> net_object}`` where
             ``net_object.pins`` is a list to append discovered pin
@@ -51,7 +51,7 @@ def resolve_pins_by_geometry(
           its ``pins`` list.
     """
     if not wires or not labels:
-        # Mark these as deliberately observed — the snap-to-label
+        # Mark these as deliberately observed. The snap-to-label
         # heuristic needs both to work, and the caller should not
         # assume any pins were resolved if either is empty.
         _ = wires, junctions
@@ -80,7 +80,7 @@ def resolve_pins_by_geometry(
 
         for pin in pins:
             # Skip pins that already have an explicit NetIdentifier
-            # — the caller resolved them ahead of the geometric pass.
+            #. The caller resolved them ahead of the geometric pass.
             if pin.get("net"):
                 continue
 

@@ -102,7 +102,7 @@ class PCBZone:
 
 @dataclass
 class PCBDesignData:
-    """Complete PCB design data — the unified in-memory representation.
+    """Complete PCB design data. The unified in-memory representation.
 
     This replaces the Agentarium PostgreSQL database.
     Populated by any parser (KiCad, ODB++, Gerber, Altium, IPC-2581).

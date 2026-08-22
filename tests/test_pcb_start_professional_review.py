@@ -1,4 +1,4 @@
-"""End-to-end test for the pcb_start_professional_review MCP tool — the
+"""End-to-end test for the pcb_start_professional_review MCP tool. The
 entry point of the Claude-driven meticulous review workflow."""
 
 from __future__ import annotations

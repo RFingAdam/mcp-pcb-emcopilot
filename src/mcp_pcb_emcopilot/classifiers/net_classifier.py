@@ -196,7 +196,7 @@ _p(r'^WLAN[_]', 'rf', 'wifi', 0.85)  # WLAN_GRANT, WLAN_PRIORITY, WLAN_REQUEST
 # Bluetooth/BLE
 _p(r'^BT[_]', 'rf', 'bluetooth', 0.85)
 _p(r'^BLE[_]', 'rf', 'bluetooth', 0.85)
-# HaLow (Fix 2.5) — sub-1GHz WiFi (802.11ah)
+# HaLow (Fix 2.5): sub-1GHz WiFi (802.11ah)
 _p(r'HALOW', 'rf', 'halow', 0.90)  # non-anchored: HALOW_3P3V, RF_Halow, RF_HaLow_Mux
 # GNSS (Fix 2.7)
 _p(r'^GPS[_]', 'rf', 'gps', 0.90)
@@ -208,11 +208,11 @@ _p(r'^GSM[_]', 'rf', 'cellular', 0.90)
 _p(r'^LTE[_]', 'rf', 'cellular', 0.90)
 _p(r'LTE[_]SHDN', 'rf', 'cellular', 0.85)  # non-anchored: 8ULP_LTE_SHDN
 _p(r'^NR[_]', 'rf', 'cellular', 0.80)
-# Coexistence (Fix 2.9) — multi-radio antenna sharing control
+# Coexistence (Fix 2.9): multi-radio antenna sharing control
 _p(r'COEX[_]', 'rf', 'coexistence', 0.90)  # non-anchored
 _p(r'[_](GRANT|PRIORITY|REQUEST)$', 'rf', 'coexistence', 0.80)  # BLE_COEX_GRANT, WLAN_GRANT
 
-# --- eMMC (Fix 2.8) — before I2C to prevent SD/SDA collision ---
+# --- eMMC (Fix 2.8). Before I2C to prevent SD/SDA collision ---
 _p(r'^EMMC[_]?CLK', 'emmc', 'clock', 0.95)
 _p(r'^EMMC[_]?CMD', 'emmc', 'command', 0.95)
 _p(r'^EMMC[_]?D\d+', 'emmc', 'data', 0.95)
@@ -222,7 +222,7 @@ _p(r'^EMMC[_]?RST', 'emmc', 'reset', 0.90)
 _p(r'^EMMC[_]', 'emmc', None, 0.95)
 _p(r'^MMC\d?[_]', 'emmc', None, 0.90)
 
-# --- SDIO (Fix 2.8) — before I2C to prevent SD/SDA collision ---
+# --- SDIO (Fix 2.8). Before I2C to prevent SD/SDA collision ---
 _p(r'^SDIO\d?[_]', 'sdio', None, 0.95)
 _p(r'^SD\d?[_]CLK', 'sdio', 'clock', 0.90)
 _p(r'^SD\d?[_]CMD', 'sdio', 'command', 0.90)
@@ -325,7 +325,7 @@ _p(r'^LDO\d+$', 'power', 'ldo', 0.85)  # LDO1, LDO2
 _p(r'^PMIC[_]', 'power', 'pmic', 0.90)  # PMIC_MODE0, PMIC_ON_REQ
 _p(r'PMIC\d*[_]', 'power', 'pmic', 0.80)  # non-anchored: PTB15_PMIC_IRQ
 _p(r'^SIM[_]VCC', 'power', 'sim', 0.85)  # SIM_VCC
-_p(r'^\d+P\d+V\w*$', 'power', None, 0.90)  # 3P3V, 1P8V — voltage nets
+_p(r'^\d+P\d+V\w*$', 'power', None, 0.90)  # 3P3V, 1P8V: voltage nets
 _p(r'^\d+V\d+\w*$', 'power', None, 0.85)  # 3V3, 1V8
 _p(r'^LX\d+$', 'power', 'switching_node', 0.85)  # Buck converter switching nodes
 _p(r'^SW[_]?\d+$', 'power', 'switching_node', 0.70)
@@ -535,7 +535,7 @@ class NetClassifier:
             if pattern.search(name):
                 return (category, subcategory, confidence)
 
-        # Fix 2.11: Second pass — strip SOM port-pin prefix and retry
+        # Fix 2.11: Second pass: strip SOM port-pin prefix and retry
         m = self._SOM_PREFIX_RE.match(name)
         if m:
             stripped = name[m.end():]

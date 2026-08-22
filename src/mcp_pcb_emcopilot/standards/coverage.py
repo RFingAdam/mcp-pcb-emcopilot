@@ -1,13 +1,13 @@
 """Standards → required-analyzer mapping and coverage classification.
 
 For every supported standard we record:
-- ``required_analyzers`` — the analyzer ids that must run to claim compliance
+- ``required_analyzers``. The analyzer ids that must run to claim compliance
   (these are the ``orchestrator._select_analyzers`` keys).
-- ``limit_source`` — ``"local_fallback"`` if the in-process tables in
+- ``limit_source``: ``"local_fallback"`` if the in-process tables in
   ``analyzers.emc.limits_provider`` can fully resolve the standard's limit
   values, ``"emc-regulations"`` if a live sibling-MCP lookup is the
   authoritative source.
-- ``coverage_level`` — ``"full"`` / ``"partial"`` / ``"stub"`` based on
+- ``coverage_level``: ``"full"`` / ``"partial"`` / ``"stub"`` based on
   current analyzer + limit-provider state.
 
 The mirror human-readable matrix lives at
@@ -61,14 +61,14 @@ STANDARD_TO_ANALYZERS: dict[str, dict[str, Any]] = {
         "limit_source": "emc-regulations",
         "coverage_level": "stub",
         "pack": "automotive",
-        "notes": "ISO 7637-2 transient pulses — no analytical model yet, surface to user as human-review.",
+        "notes": "ISO 7637-2 transient pulses. No analytical model yet, surface to user as human-review.",
     },
     "ISO_7637_3": {
         "required_analyzers": [],
         "limit_source": "emc-regulations",
         "coverage_level": "stub",
         "pack": "automotive",
-        "notes": "ISO 7637-3 signal-line transients — stub.",
+        "notes": "ISO 7637-3 signal-line transients: stub.",
     },
     "ISO_16750_2": {
         "required_analyzers": ["immunity_margin"],
@@ -127,7 +127,7 @@ STANDARD_TO_ANALYZERS: dict[str, dict[str, Any]] = {
         "limit_source": "local_fallback",
         "coverage_level": "partial",
         "pack": "commercial",
-        "notes": "Surge immunity — analytical envelope only.",
+        "notes": "Surge immunity: analytical envelope only.",
     },
     "IEC_61000_4_6": {
         "required_analyzers": ["immunity_margin", "cable_coupling"],
@@ -175,7 +175,7 @@ STANDARD_TO_ANALYZERS: dict[str, dict[str, Any]] = {
         "limit_source": "emc-regulations",
         "coverage_level": "partial",
         "pack": "wireless",
-        "notes": "Intentional radiator rules — NEC2 escalation recommended.",
+        "notes": "Intentional radiator rules: NEC2 escalation recommended.",
     },
     "FCC_PART_15_C": {
         "required_analyzers": ["trace_antenna", "slot_antenna", "common_mode", "return_loss"],

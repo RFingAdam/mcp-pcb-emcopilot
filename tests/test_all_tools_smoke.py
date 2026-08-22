@@ -5,22 +5,22 @@ sound. For each registered tool the test:
 
 1. reads the tool's declared ``inputSchema`` from :func:`list_tools`
    (the same schema returned to MCP clients);
-2. synthesises minimal-but-plausible arguments from that schema —
+2. synthesises minimal-but-plausible arguments from that schema:
    numbers default to small positive reals, integers to 1, strings to
    per-field domain-valid defaults (e.g. ``"DDR4"`` for ``ddr_standard``,
    ``"copper"`` for ``material``), arrays to single-element lists, etc.;
 3. invokes the dispatch function and asserts no *structural* exception
    escapes. "Structural" = :class:`AttributeError`, :class:`NameError`,
    :class:`ImportError`, or a :class:`TypeError` from a signature
-   mismatch — these always indicate a broken dispatch branch. Domain
+   mismatch: these always indicate a broken dispatch branch. Domain
    validation errors (``ValueError``, ``KeyError`` on unknown inputs,
    domain-specific ``ValidationError``) are considered *correct* tool
-   behaviour — the tool rejected synthetic input and that's fine.
+   behaviour: the tool rejected synthetic input and that's fine.
 
 The test also verifies registry ↔ dispatch parity: every tool declared
 to clients has a dispatch branch, and vice-versa.
 
-Assertion is aggregate — the test reports every failing tool at once
+Assertion is aggregate. The test reports every failing tool at once
 so a broad regression produces a complete punch-list, not a one-at-a-
 time iteration loop.
 """
@@ -39,7 +39,7 @@ from mcp_pcb_emcopilot.parsers import parse_pcb_file
 FIXTURE = Path(__file__).parent / "fixtures" / "mixed_signal_4layer.kicad_pcb"
 
 # Domain-meaningful defaults keyed by property name substring. Checked in
-# order — first match wins. Keeps the mapping terse while covering the
+# order: first match wins. Keeps the mapping terse while covering the
 # cases where a generic number default (0.1) would fail semantic validation.
 _STRING_DEFAULTS: dict[str, str] = {
     "ddr_standard": "DDR4",
@@ -86,7 +86,7 @@ def _default_for_schema(prop: str, spec: dict[str, Any]) -> Any:
         return [_default_for_schema(prop, item)]
     if t == "object":
         return {}
-    # String — prefer a domain-meaningful default if the property name hints.
+    # String: prefer a domain-meaningful default if the property name hints.
     lower = prop.lower()
     for key, val in _STRING_DEFAULTS.items():
         if key in lower:
@@ -118,7 +118,7 @@ def _build_args(schema: dict[str, Any], session_id: str) -> dict[str, Any]:
 # Classification of dispatch exceptions
 # ---------------------------------------------------------------------------
 
-# Structural: dispatch wiring is broken — always a defect.
+# Structural: dispatch wiring is broken: always a defect.
 _STRUCTURAL_EXC = (AttributeError, NameError)
 
 

@@ -34,7 +34,7 @@ Register the MCP server:
 }
 ```
 
-## Step 1 — Parse the layout
+## Step 1: Parse the layout
 
 Ask the assistant:
 
@@ -50,7 +50,7 @@ It returns a `session_id` plus a summary: 4 layers (signal / GND /
 PWR / signal), 104 nets, 215 components, 1.6 mm thickness. The agent
 caches the session for the rest of the conversation.
 
-## Step 2 — Set the review context
+## Step 2. Set the review context
 
 > *"Target FCC Class B and CISPR 32 Class B. The product is a USB
 > peripheral; rev is v3-prelim."*
@@ -58,7 +58,7 @@ caches the session for the rest of the conversation.
 The agent calls `pcb_set_review_context` so all downstream analyzers
 score against the right standards.
 
-## Step 3 — Run the orchestrated review
+## Step 3. Run the orchestrated review
 
 > *"Run a comprehensive design review across EMC, SI, PI, thermal, and DFM."*
 
@@ -83,20 +83,20 @@ analyzers → orchestrator → findings:
 ```
 
 Two high-severity findings (return-path break under the USB diff pair
-at the GND-island boundary; missing 100 nF decap on a digital rail) —
-both with `pcb_trace_return_path` and `pcb_analyze_decoupling`
+at the GND-island boundary; missing 100 nF decap on a digital rail).
+Both with `pcb_trace_return_path` and `pcb_analyze_decoupling`
 references for the fixer.
 
-## Step 4 — Annotate + render the board
+## Step 4: Annotate + render the board
 
 > *"Render the board with findings annotated, and highlight the USB
 > differential pair net."*
 
 The agent calls `pcb_render_board`, `pcb_annotate_board`,
-`pcb_render_net` — three SVGs that visualize the analyzer output on
+`pcb_render_net`. Three SVGs that visualize the analyzer output on
 top of the actual layout.
 
-## Step 5 — Generate the DOCX
+## Step 5: Generate the DOCX
 
 > *"Generate the DOCX report with executive summary, embedded
 > renders, and per-finding severity table."*

@@ -1,4 +1,4 @@
-"""ReportBuilder — session harvesting and document assembly.
+"""ReportBuilder: session harvesting and document assembly.
 
 Collects analysis results from review_results and analysis_cache,
 constructs TrackedFinding objects with traceability, builds fixed-order

@@ -1,6 +1,6 @@
 """Coverage-aware verdict: a review that didn't run must not read as PASS.
 
-Regression guard for the scariest failure mode of a compliance-adjacent tool —
+Regression guard for the scariest failure mode of a compliance-adjacent tool:
 zero findings from errored or never-run domains being reported as a clean
 "PASS". The distinction that matters: ``error`` is an applicable analyzer that
 threw (a real coverage gap) while ``skipped`` is a benign not-applicable domain

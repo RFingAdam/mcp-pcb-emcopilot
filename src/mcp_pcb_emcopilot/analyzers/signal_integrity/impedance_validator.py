@@ -1,5 +1,5 @@
 """
-Impedance Validator — checks actual trace impedance against interface targets.
+Impedance Validator: checks actual trace impedance against interface targets.
 
 Uses the parsed stackup (layer thickness, Er) and trace widths to calculate
 Z₀ for each high-speed signal, then compares against interface specifications.
@@ -273,7 +273,7 @@ class ImpedanceValidator:
                 if not lm:
                     continue
 
-                # Skip inner layers with minimal routing (< 5mm total) —
+                # Skip inner layers with minimal routing (< 5mm total):
                 # short BGA escape segments don't need impedance control
                 is_inner = layer not in outer_layer_names
                 total_on_layer = layer_total_length.get(layer, 0)
@@ -311,7 +311,7 @@ class ImpedanceValidator:
                         "description": (
                             f"{iface.upper()} trace on {issue['layer']}: Z₀={issue['z0_ohm']}Ω "
                             f"(target {issue['target_ohm']}Ω, {issue['deviation_pct']:.0f}% off) "
-                            f"at w={issue['width_mm']:.4f}mm — {target['description']}"
+                            f"at w={issue['width_mm']:.4f}mm: {target['description']}"
                         ),
                         "recommendation": (
                             f"Adjust trace width on {issue['layer']} to achieve {issue['target_ohm']}Ω. "
@@ -425,7 +425,7 @@ class ImpedanceValidator:
                         "description": (
                             f"{dp.category.upper()} diff pair {dp.pair_name}: "
                             f"Z_diff={z_diff:.0f}Ω (target {z_diff_target:.0f}Ω, "
-                            f"{deviation*100:.0f}% off) — w={width_mm:.4f}mm, "
+                            f"{deviation*100:.0f}% off): w={width_mm:.4f}mm, "
                             f"s={spacing_mm:.3f}mm, Z_SE={z_se:.0f}Ω on {layer} "
                             f"— {target['desc']}"
                         ),

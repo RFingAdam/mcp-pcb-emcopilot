@@ -7,7 +7,7 @@ the earlier Agentarium `pcb_em_copilot` module on 2026-04-21.
 
 - Components and pages (`AIReviewPage`, `AnalysisReportPage`, `FindingsViewerPage`,
   `ViolationsPanel`, `ResultsViewerPage`, `ProjectDetailPage`, `RuleEditorPage`) are present.
-- API client under `src/api/` assumed the Agentarium FastAPI backend shape —
+- API client under `src/api/` assumed the Agentarium FastAPI backend shape:
   retargeting to the Flask app at `src/mcp_pcb_emcopilot/web/app.py` is the
   outstanding integration work.
 - Node dependencies are NOT vendored here; run `npm install` inside this

@@ -1,6 +1,6 @@
 """Integration tests for AltiumSchematicParser._parse_fileheader.
 
-Real .SchDoc files are OLE2 compound binaries — impractical to synthesise.
+Real .SchDoc files are OLE2 compound binaries: impractical to synthesise.
 But the FileHeader stream they wrap is just a sequence of length-prefixed
 pipe-delimited records, which is easy to build. These tests build the
 inner byte stream and call ``_parse_fileheader`` directly, so we exercise
@@ -64,7 +64,7 @@ def _parse(stream: bytes) -> AltiumSchematicData:
 
 
 # ---------------------------------------------------------------------------
-# 1-11 — Parameter-record handling (exercises real _parse_fileheader)
+# 1-11: Parameter-record handling (exercises real _parse_fileheader)
 # ---------------------------------------------------------------------------
 
 
@@ -191,7 +191,7 @@ def test_multiple_params_per_component():
 
 
 # ---------------------------------------------------------------------------
-# 12-15 — New record-type handling
+# 12-15: New record-type handling
 # ---------------------------------------------------------------------------
 
 
@@ -215,7 +215,7 @@ def test_pin_record_attached_to_owner_component():
 
 def test_pin_geometric_resolution_via_wire_and_label():
     """Pins without NetIdentifier match a NET_LABEL by coordinate proximity."""
-    # Component at origin (0, 0). Pin offset at (0, 0) — absolute (0, 0).
+    # Component at origin (0, 0). Pin offset at (0, 0): absolute (0, 0).
     # WIRE from (0, 0) to (100, 0) [mil → 2.54mm]. NET_LABEL "DATA" anchored
     # at (100, 0) [mil → 2.54mm].
     stream = _stream(
@@ -262,7 +262,7 @@ def test_child_sheets_top_level_list_populated():
 
 
 # ---------------------------------------------------------------------------
-# 16-17 — Converter + dispatch integration
+# 16-17: Converter + dispatch integration
 # ---------------------------------------------------------------------------
 
 

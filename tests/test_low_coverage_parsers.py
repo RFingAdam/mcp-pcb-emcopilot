@@ -130,7 +130,7 @@ class TestCrossValidator:
             CrossValidator,
         )
         # Validator with no data loaded should return an empty-but-valid
-        # result, not raise — the entry point shouldn't presume data.
+        # result, not raise. The entry point shouldn't presume data.
         result = CrossValidator().validate()
         assert result is not None
 
@@ -139,7 +139,7 @@ class TestCrossValidator:
             CrossValidator,
         )
         cv = CrossValidator()
-        # A resistor exists in layout but is missing from BOM — that's the
+        # A resistor exists in layout but is missing from BOM. That's the
         # canonical mismatch the validator was built to catch. The ``add_*``
         # methods take keyword args directly (not the ``ComponentData``
         # dataclass, which is built internally).

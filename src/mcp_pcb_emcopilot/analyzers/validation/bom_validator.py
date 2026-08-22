@@ -6,7 +6,7 @@ Validates:
 - Part numbers are present
 - Component values match
 
-Decoupled from SQLAlchemy — operates on PCBDesignData.
+Decoupled from SQLAlchemy: operates on PCBDesignData.
 """
 
 from __future__ import annotations

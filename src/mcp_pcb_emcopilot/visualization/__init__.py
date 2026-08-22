@@ -1,4 +1,4 @@
-"""PCB design visualization — pure-Python SVG rendering.
+"""PCB design visualization: pure-Python SVG rendering.
 
 Provides board layout, stackup cross-section, net highlight, and annotation
 overlays.  Zero external dependencies (SVG is just XML text).

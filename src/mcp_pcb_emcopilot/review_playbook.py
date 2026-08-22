@@ -1,21 +1,21 @@
-"""Claude-driven meticulous review workflow — server-side helpers.
+"""Claude-driven meticulous review workflow: server-side helpers.
 
 This module is the Python side of the *binding* multi-pass review workflow
 documented in ``docs/CLAUDE_REVIEW_PLAYBOOK.md``. It exposes:
 
-- ``SERVER_INSTRUCTIONS`` — short string surfaced on every MCP ``initialize``
+- ``SERVER_INSTRUCTIONS``: short string surfaced on every MCP ``initialize``
   handshake. Tells Claude to call ``pcb_start_professional_review`` first.
-- ``build_input_manifest(file_list)`` — classify a list of file paths by kind
+- ``build_input_manifest(file_list)``: classify a list of file paths by kind
   (layout / schematic / stackup / bom / step / datasheet / other).
-- ``build_interview_pack(manifest, declared_market)`` — merge the core review
+- ``build_interview_pack(manifest, declared_market)``: merge the core review
   questions with the per-market pack from ``market_packs.py``.
-- ``compute_standards_shortlist(declared_market, manifest, hints)`` — union of
+- ``compute_standards_shortlist(declared_market, manifest, hints)``: union of
   market-driven standards.
-- ``start_professional_review(...)`` — main helper invoked by the new MCP tool
+- ``start_professional_review(...)``: main helper invoked by the new MCP tool
   ``pcb_start_professional_review`` to build the response payload.
 
-This module is intentionally pure — no I/O, no globals beyond the imported
-data tables — so it is trivially testable.
+This module is intentionally pure. No I/O, no globals beyond the imported
+data tables, so it is trivially testable.
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ _EXT_TO_KIND: dict[str, tuple[str, str]] = {
     ".csv": ("bom", "csv"),
     ".xlsx": ("bom", "excel"),
     ".xls": ("bom", "excel"),
-    ".json": ("stackup", "json"),  # heuristic — may be stackup OR data file
+    ".json": ("stackup", "json"),  # heuristic: may be stackup OR data file
     ".yaml": ("stackup", "yaml"),
     ".yml": ("stackup", "yaml"),
     ".xml": ("layout", "ipc2581"),  # IPC-2581 is the common .xml in this domain
@@ -154,7 +154,7 @@ def find_input_gaps(manifest: list[dict[str, str]]) -> list[str]:
 
 # Core questions are kept here as the single canonical list. The legacy
 # ``review_context.REVIEW_QUESTIONS`` will be refactored in Phase 4 to read
-# from this same source — for now we duplicate the IDs intentionally so the
+# from this same source: for now we duplicate the IDs intentionally so the
 # playbook module is self-contained.
 
 CORE_QUESTIONS: list[dict[str, Any]] = [
@@ -420,7 +420,7 @@ def start_professional_review(
     """
     declared = (declared_market or "unknown").strip().lower()
     if declared not in {"unknown", *market_packs.KNOWN_MARKETS}:
-        # Unknown market token — keep but note it so the caller can warn
+        # Unknown market token. Keep but note it so the caller can warn
         notes = [f"Declared market '{declared_market}' is not a known preset; using core questions only."]
         declared = "unknown"
     else:
@@ -437,7 +437,7 @@ def start_professional_review(
     # add an advisory note (Phase 4 will auto-infer; for now we just hint).
     if declared == "unknown":
         notes.append(
-            "No market declared — only core questions returned. Call "
+            "No market declared: only core questions returned. Call "
             "pcb_set_market or include declared_market on the next call."
         )
 

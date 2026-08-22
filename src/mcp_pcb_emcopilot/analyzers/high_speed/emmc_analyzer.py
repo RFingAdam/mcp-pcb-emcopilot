@@ -148,7 +148,7 @@ class EMMCAnalyzer:
             elif _match_signal(name, "rst"):
                 rst_nets.append(name)
 
-        # Also check classified_nets if available — use category='emmc'
+        # Also check classified_nets if available. Use category='emmc'
         if classified_nets is not None:
             for nc in getattr(classified_nets, "classified_nets", []):
                 if nc.category == "emmc":

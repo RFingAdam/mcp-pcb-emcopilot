@@ -245,26 +245,26 @@ def analyze_mode_conversion(
     # Risk assessment
     if worst_scd21 > -20:
         risk = "high"
-        emi_comment = "Significant common-mode radiation expected — reduce skew or improve symmetry"
+        emi_comment = "Significant common-mode radiation expected: reduce skew or improve symmetry"
     elif worst_scd21 > -30:
         risk = "medium"
-        emi_comment = "Moderate mode conversion — may cause EMI issues in sensitive designs"
+        emi_comment = "Moderate mode conversion: may cause EMI issues in sensitive designs"
     elif worst_scd21 > -40:
         risk = "low"
         emi_comment = "Acceptable mode conversion for most applications"
     else:
         risk = "negligible"
-        emi_comment = "Excellent differential symmetry — minimal mode conversion"
+        emi_comment = "Excellent differential symmetry: minimal mode conversion"
 
     notes = []
     if length_asymmetry_mm > 0.5:
-        notes.append(f"Length mismatch {length_asymmetry_mm:.2f} mm — consider length tuning serpentine")
+        notes.append(f"Length mismatch {length_asymmetry_mm:.2f} mm: consider length tuning serpentine")
     if skew_percent > 10:
-        notes.append(f"Skew {skew_ps:.1f} ps is {skew_percent:.1f}% of UI — may degrade eye opening")
+        notes.append(f"Skew {skew_ps:.1f} ps is {skew_percent:.1f}% of UI: may degrade eye opening")
     if coupling_k < 0.1:
-        notes.append("Weak coupling — traces may be too far apart for good differential signaling")
+        notes.append("Weak coupling: traces may be too far apart for good differential signaling")
     elif coupling_k > 0.5:
-        notes.append("Very tight coupling — check manufacturing feasibility")
+        notes.append("Very tight coupling. Check manufacturing feasibility")
 
     return {
         "z_odd_ohm": round(z_odd, 2),

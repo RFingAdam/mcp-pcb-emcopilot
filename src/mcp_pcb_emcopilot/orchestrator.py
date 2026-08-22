@@ -25,7 +25,7 @@ from .models.pcb_data import PCBDesignData
 SEVERITY_ORDER = {"critical": 0, "high": 1, "warning": 2, "medium": 2, "low": 3, "info": 4}
 
 # =============================================================================
-# Phase 3 escalation policy — applied by `_emit_next_actions` below.
+# Phase 3 escalation policy: applied by `_emit_next_actions` below.
 # A finding triggers escalation to a sibling MCP (openEMS / NEC2 / live regs)
 # when EITHER its severity rank is <= ESCALATE_SEVERITY_MAX OR its analyzer
 # confidence is below ESCALATE_CONFIDENCE_BELOW. Domains outside the
@@ -410,7 +410,7 @@ def _select_analyzers(
     if hasattr(design, 'schematic_data') and design.schematic_data:
         analyzers.append("bom_cross_ref")
 
-    # Phase 4b schematic-aware analyzers — enabled when the session has
+    # Phase 4b schematic-aware analyzers: enabled when the session has
     # any schematic content attached (PDF text, KiCad native, or Altium).
     if getattr(design, "schematic_components", None):
         analyzers.append("sch_power_topology")
@@ -548,7 +548,7 @@ def _run_grounding_analysis(design: PCBDesignData) -> DomainResult:
         board_area_cm2 = (board_w * board_h) / 100
 
         # Count GND stitching vias (exclude BGA escape vias by checking
-        # if they're near a component center — crude but better than raw count)
+        # if they're near a component center: crude but better than raw count)
         gnd_vias = [v for v in design.vias
                     if v.net_name and v.net_name.upper() in ('GND', 'GND_IN', 'DGND', 'AGND', 'PGND')]
 
@@ -1542,7 +1542,7 @@ def _build_executive_summary(
 
     # Coverage gate on the verdict. A pure critical/warning count would let a
     # review that never actually ran ("we didn't check") masquerade as "PASS"
-    # ("we checked and it's fine") — the one failure mode a compliance-adjacent
+    # ("we checked and it's fine"). The one failure mode a compliance-adjacent
     # tool must never have. An "error" domain is an *applicable* analyzer that
     # threw (a genuine gap); "skipped" means not-applicable (no DDR interface,
     # no power nets, no schematic) and is benign on its own. So a zero-finding
@@ -1597,13 +1597,13 @@ def _build_human_review(
     reasons: list[str] = []
     if exec_summary.get("parse_partial"):
         reasons.append(
-            "The design file did not fully parse (partial ingest) — findings ran on "
+            "The design file did not fully parse (partial ingest): findings ran on "
             "incomplete data. Re-export/verify the source file and re-run."
         )
     n_err = int(exec_summary.get("domains_errored", 0) or 0)
     if n_err:
         reasons.append(
-            f"{n_err} analysis domain(s) errored and were not assessed — coverage is "
+            f"{n_err} analysis domain(s) errored and were not assessed: coverage is "
             "incomplete."
         )
     if exec_summary.get("overall_status") == "INCONCLUSIVE":
@@ -1642,7 +1642,7 @@ def _build_human_review(
     if has_emc_or_pdn:
         reasons.append(
             "EMC emission/immunity and power-integrity (PDN) results are screening "
-            "indicators, not compliance verdicts — confirm marginal results with field "
+            "indicators, not compliance verdicts: confirm marginal results with field "
             "simulation (openEMS) or accredited lab measurement before release."
         )
 
@@ -1711,7 +1711,7 @@ def _build_recommendations(
 
 
 # =============================================================================
-# Cross-MCP escalation — Phase 3 sibling-MCP intent queue
+# Cross-MCP escalation: Phase 3 sibling-MCP intent queue
 # =============================================================================
 
 def _needs_em_verification(f: ReviewFinding) -> bool:
@@ -1736,13 +1736,13 @@ def _emit_next_actions(
 
     Emits four flavours of intent:
 
-    1. openEMS — one per HIGH/CRITICAL or low-confidence finding in an
+    1. openEMS. One per HIGH/CRITICAL or low-confidence finding in an
        EM-addressable domain.
-    2. NEC2 antenna — one per finding tagged as intentional/unintentional
+    2. NEC2 antenna. One per finding tagged as intentional/unintentional
        antenna at ≥ NEC2_MIN_FREQ_MHZ.
-    3. emc-regulations — one per standard in the review_context's
+    3. emc-regulations. One per standard in the review_context's
        ``target_standards`` that does not yet have a cached lookup.
-    4. drawio diagrams — stackup (always), RF chain (if RF interfaces
+    4. drawio diagrams: stackup (always), RF chain (if RF interfaces
        detected), one EMC test setup per market, schematic markup (if a
        schematic was parsed).
 
@@ -1775,7 +1775,7 @@ def _emit_next_actions(
     ctx = design.review_context or {}
 
     # ------------------------------------------------------------------
-    # 1. openEMS — drive off finding severity / confidence
+    # 1. openEMS: drive off finding severity / confidence
     # ------------------------------------------------------------------
     escalation_targets: list[ReviewFinding] = []
     for dr in review_result.domain_results:
@@ -1788,7 +1788,7 @@ def _emit_next_actions(
         candidates: list[SimulationCandidate] = RFSimulationExtractor().to_candidates(
             design, net_cls, max_candidates=20
         )
-    except Exception:  # pragma: no cover — extractor may fail on stub data
+    except Exception:  # pragma: no cover: extractor may fail on stub data
         candidates = []
     candidates_by_net: dict[str, SimulationCandidate] = {}
     for source_cand in candidates:
@@ -1979,7 +1979,7 @@ def _openems_call_for_candidate(cand) -> tuple[str, dict]:
             "pad_mm": cand.via_pad_mm or 0.6,
             "board_thickness_mm": cand.dielectric_height_mm,
         }
-    # Fallback — at least carry the metadata over so Claude can inspect.
+    # Fallback: at least carry the metadata over so Claude can inspect.
     return "openems_list_antenna_types", {
         **base,
         "structure_type": st,
@@ -2022,7 +2022,7 @@ def run_design_review(
     design_classifier = DesignClassifier()
     classification = design_classifier.classify(design, net_cls, interfaces)
 
-    # Phase 1b: Review context — identify unanswered questions, build typed accessor
+    # Phase 1b: Review context: identify unanswered questions, build typed accessor
     from .review_context import ReviewContext, get_review_questions
 
     ctx_answers = ctx.get("interactive_answers", {})

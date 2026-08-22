@@ -28,7 +28,7 @@ The matrix maps every supported regulatory standard to the analyzers required to
 | ISO_11452_2 | immunity_margin, cable_coupling | local_fallback | full |
 | ISO_11452_4 | immunity_margin, cable_coupling | local_fallback | full |
 | ISO_11452_5 | immunity_margin | local_fallback | partial |
-| ISO_7637_2 | (none — transient model deferred) | emc-regulations | stub |
+| ISO_7637_2 | (none: transient model deferred) | emc-regulations | stub |
 | ISO_7637_3 | (none) | emc-regulations | stub |
 | ISO_16750_2 | immunity_margin | local_fallback | partial |
 
@@ -80,10 +80,10 @@ The matrix maps every supported regulatory standard to the analyzers required to
 
 | Standard | Required analyzers | Limit source | Coverage |
 |---|---|---|---|
-| MIL_STD_461G | — | emc-regulations | unimplemented |
+| MIL_STD_461G | n/a | emc-regulations | unimplemented |
 
 ## How callers use this
 
 - `pcb_get_standards_coverage(session_id)` returns one `StandardCoverage` per active standard, surfacing which required analyzers ran and which are missing.
-- The preflight gate (`standards/preflight.py::validate_review_complete`) refuses to advance to report generation when any `stub` or `unimplemented` standard is in the active set — unless `force_run=True`, which stamps the report **PRELIMINARY**.
+- The preflight gate (`standards/preflight.py::validate_review_complete`) refuses to advance to report generation when any `stub` or `unimplemented` standard is in the active set, unless `force_run=True`, which stamps the report **PRELIMINARY**.
 - A coverage entry with non-empty `missing_analyzers` does not by itself block report generation; the analyzers ran for that interface may not have been triggered (e.g., no USB nets in the design). Use the coverage summary alongside the orchestrator's `domain_results` to judge.

@@ -1,4 +1,4 @@
-"""Tests for standards/coverage — STANDARD_TO_ANALYZERS map + helpers."""
+"""Tests for standards/coverage: STANDARD_TO_ANALYZERS map + helpers."""
 
 from __future__ import annotations
 

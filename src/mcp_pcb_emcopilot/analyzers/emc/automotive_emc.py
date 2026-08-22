@@ -1,4 +1,4 @@
-"""Automotive EMC standards analysis — CISPR 25 and ISO 11452."""
+"""Automotive EMC standards analysis: CISPR 25 and ISO 11452."""
 from __future__ import annotations
 
 import math

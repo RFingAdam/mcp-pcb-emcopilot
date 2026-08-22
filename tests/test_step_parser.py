@@ -21,7 +21,7 @@ from mcp_pcb_emcopilot.parsers.step_parser import (
 )
 
 # =============================================================================
-# Mock STEP content — minimal but realistic EDA export structure
+# Mock STEP content: minimal but realistic EDA export structure
 # =============================================================================
 
 MOCK_STEP_CONTENT = """\
@@ -46,7 +46,7 @@ DATA;
 #21 = SHAPE_DEFINITION_REPRESENTATION(#20,#22);
 #22 = ADVANCED_BREP_SHAPE_REPRESENTATION('PCB_Shape',(#30),#100);
 
-/* Board body — CLOSED_SHELL with 6 faces for 100x80x1.6mm board */
+/* Board body: CLOSED_SHELL with 6 faces for 100x80x1.6mm board */
 #30 = CLOSED_SHELL('Board_Body',(#31,#32,#33,#34,#35,#36));
 #31 = ADVANCED_FACE('',(#60),.F.);
 #32 = ADVANCED_FACE('',(#61),.F.);
@@ -97,7 +97,7 @@ DATA;
 #103 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
 #104 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
 
-/* Component 1: R1 — Resistor at (10, 15, 1.6) with small body */
+/* Component 1: R1: Resistor at (10, 15, 1.6) with small body */
 #200 = PRODUCT('R1','Resistor 0402','',($));
 #201 = PRODUCT_DEFINITION_FORMATION('','',#200);
 #202 = PRODUCT_DEFINITION('design','',#201,#13);
@@ -107,7 +107,7 @@ DATA;
 #210 = CLOSED_SHELL('R1_Body',(#211));
 #211 = ADVANCED_FACE('',(),.F.);
 
-/* R1 body points — 1.0mm x 0.5mm x 0.35mm */
+/* R1 body points: 1.0mm x 0.5mm x 0.35mm */
 #220 = CARTESIAN_POINT('',(9.5, 14.75, 1.6));
 #221 = CARTESIAN_POINT('',(10.5, 14.75, 1.6));
 #222 = CARTESIAN_POINT('',(10.5, 15.25, 1.6));
@@ -117,7 +117,7 @@ DATA;
 #226 = CARTESIAN_POINT('',(10.5, 15.25, 1.95));
 #227 = CARTESIAN_POINT('',(9.5, 15.25, 1.95));
 
-/* Component 2: U1 — IC at (50, 40, 1.6) with taller body */
+/* Component 2: U1: IC at (50, 40, 1.6) with taller body */
 #300 = PRODUCT('U1','Microcontroller QFP48','',($));
 #301 = PRODUCT_DEFINITION_FORMATION('','',#300);
 #302 = PRODUCT_DEFINITION('design','',#301,#13);
@@ -127,7 +127,7 @@ DATA;
 #310 = CLOSED_SHELL('U1_Body',(#311));
 #311 = ADVANCED_FACE('',(),.F.);
 
-/* U1 body points — 7.0mm x 7.0mm x 1.4mm */
+/* U1 body points: 7.0mm x 7.0mm x 1.4mm */
 #320 = CARTESIAN_POINT('',(46.5, 36.5, 1.6));
 #321 = CARTESIAN_POINT('',(53.5, 36.5, 1.6));
 #322 = CARTESIAN_POINT('',(53.5, 43.5, 1.6));
@@ -137,7 +137,7 @@ DATA;
 #326 = CARTESIAN_POINT('',(53.5, 43.5, 3.0));
 #327 = CARTESIAN_POINT('',(46.5, 43.5, 3.0));
 
-/* Component 3: J1 — Connector at (95, 40, 1.6) protruding above board */
+/* Component 3: J1: Connector at (95, 40, 1.6) protruding above board */
 #400 = PRODUCT('J1','USB-C Connector','',($));
 #401 = PRODUCT_DEFINITION_FORMATION('','',#400);
 #402 = PRODUCT_DEFINITION('design','',#401,#13);
@@ -147,7 +147,7 @@ DATA;
 #410 = CLOSED_SHELL('J1_Body',(#411));
 #411 = ADVANCED_FACE('',(),.F.);
 
-/* J1 body points — 9.0mm x 7.5mm x 3.2mm (tall connector) */
+/* J1 body points: 9.0mm x 7.5mm x 3.2mm (tall connector) */
 #420 = CARTESIAN_POINT('',(90.5, 36.25, 1.6));
 #421 = CARTESIAN_POINT('',(99.5, 36.25, 1.6));
 #422 = CARTESIAN_POINT('',(99.5, 43.75, 1.6));
@@ -157,7 +157,7 @@ DATA;
 #426 = CARTESIAN_POINT('',(99.5, 43.75, 4.8));
 #427 = CARTESIAN_POINT('',(90.5, 43.75, 4.8));
 
-/* Component 4: C1 — Capacitor near edge */
+/* Component 4: C1: Capacitor near edge */
 #500 = PRODUCT('C1','Cap 100nF 0603','',($));
 #501 = PRODUCT_DEFINITION_FORMATION('','',#500);
 #502 = PRODUCT_DEFINITION('design','',#501,#13);
@@ -167,7 +167,7 @@ DATA;
 #510 = CLOSED_SHELL('C1_Body',(#511));
 #511 = ADVANCED_FACE('',(),.F.);
 
-/* C1 body points — 1.6mm x 0.8mm x 0.45mm, near left edge */
+/* C1 body points: 1.6mm x 0.8mm x 0.45mm, near left edge */
 #520 = CARTESIAN_POINT('',(0.5, 40.0, 1.6));
 #521 = CARTESIAN_POINT('',(2.1, 40.0, 1.6));
 #522 = CARTESIAN_POINT('',(2.1, 40.8, 1.6));
@@ -278,7 +278,7 @@ def test_component_extraction():
     result = parser.parse_content(MOCK_STEP_CONTENT)
     components = result["step_components"]
 
-    # Should find R1, U1, J1, C1 (not PCB — that's the board)
+    # Should find R1, U1, J1, C1 (not PCB. That's the board)
     refs = {c["reference"] for c in components}
     assert "R1" in refs, f"R1 not found in components: {refs}"
     assert "U1" in refs, f"U1 not found in components: {refs}"
@@ -420,7 +420,7 @@ def test_clearance_tight_spacing():
 # =============================================================================
 
 def test_enclosure_fit_passes():
-    """Test enclosure fit check — board fits in large enclosure."""
+    """Test enclosure fit check: board fits in large enclosure."""
     board_3d = {
         "width": 100.0, "depth": 80.0, "thickness": 1.6,
         "bounding_box": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 100, "max_y": 80, "max_z": 1.6},
@@ -451,7 +451,7 @@ def test_enclosure_fit_passes():
 
 
 def test_enclosure_fit_fails_width():
-    """Test enclosure fit check — board too wide."""
+    """Test enclosure fit check: board too wide."""
     board_3d = {
         "width": 100.0, "depth": 80.0, "thickness": 1.6,
         "bounding_box": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 100, "max_y": 80, "max_z": 1.6},
@@ -475,7 +475,7 @@ def test_enclosure_fit_fails_width():
 
 
 def test_enclosure_fit_fails_height():
-    """Test enclosure fit check — assembly too tall."""
+    """Test enclosure fit check: assembly too tall."""
     board_3d = {
         "width": 100.0, "depth": 80.0, "thickness": 1.6,
         "bounding_box": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 100, "max_y": 80, "max_z": 1.6},

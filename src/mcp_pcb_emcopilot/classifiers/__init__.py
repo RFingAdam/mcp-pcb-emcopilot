@@ -1,4 +1,4 @@
-"""PCB design classifiers — net classification, interface detection, and design type analysis."""
+"""PCB design classifiers: net classification, interface detection, and design type analysis."""
 
 from .design_classifier import DesignClassificationResult, DesignClassifier
 from .interface_detector import DetectedInterface, InterfaceDetectionResult, InterfaceDetector

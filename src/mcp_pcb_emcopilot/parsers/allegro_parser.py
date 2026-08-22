@@ -446,7 +446,7 @@ class AllegroParser:
             # or:     NET_NAME
             #           PIN1 PIN2 PIN3 ...
             if not stripped.startswith(" ") and not stripped.startswith("\t"):
-                # New net line — may have pins on the same line
+                # New net line: may have pins on the same line
                 if ";" in stripped:
                     net_name, _, pin_str = stripped.partition(";")
                     net_name = net_name.strip()

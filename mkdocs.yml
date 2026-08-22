@@ -1,5 +1,5 @@
 site_name: mcp-pcb-emcopilot
-site_description: PCB EMC + SI analysis — return paths, decoupling, DDR/PCIe/USB integrity
+site_description: PCB EMC + SI analysis: return paths, decoupling, DDR/PCIe/USB integrity
 site_url: https://rfingadam.github.io/mcp-pcb-emcopilot/
 repo_url: https://github.com/RFingAdam/mcp-pcb-emcopilot
 repo_name: RFingAdam/mcp-pcb-emcopilot

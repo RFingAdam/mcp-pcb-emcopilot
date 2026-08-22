@@ -14,7 +14,7 @@ class TestReviewContextAccessors:
 
         ctx = ReviewContext(answers={})
         # Each accessor should return a reasonable default when no answers are
-        # provided — never raise on the empty case.
+        # provided: never raise on the empty case.
         assert ctx.get_impedance_target("single_ended") == 50.0
         assert ctx.get_impedance_target("differential") == 100.0
         assert ctx.has("nonexistent_key") is False
@@ -91,7 +91,7 @@ class TestPowerPlaneAnalyzer:
         from mcp_pcb_emcopilot.analyzers.power_integrity.power_plane_analyzer import (
             PowerPlaneAnalyzer,
         )
-        # 10x10 square — area 100.
+        # 10x10 square: area 100.
         points = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
         area = PowerPlaneAnalyzer().calculate_polygon_area(points)
         assert area == pytest.approx(100.0, rel=0.01)
@@ -100,7 +100,7 @@ class TestPowerPlaneAnalyzer:
         from mcp_pcb_emcopilot.analyzers.power_integrity.power_plane_analyzer import (
             PowerPlaneAnalyzer,
         )
-        # Right triangle with legs 10, 6 — area 30.
+        # Right triangle with legs 10, 6: area 30.
         points = [(0.0, 0.0), (10.0, 0.0), (0.0, 6.0)]
         area = PowerPlaneAnalyzer().calculate_polygon_area(points)
         assert area == pytest.approx(30.0, rel=0.01)
@@ -161,7 +161,7 @@ class TestDDRAnalyzer:
         analyzer = DDRAnalyzer()
         result = analyzer.check_zq_resistor(
             controller_position=(10.0, 10.0),
-            zq_resistor_position=(50.0, 50.0),  # far away — should flag
+            zq_resistor_position=(50.0, 50.0),  # far away: should flag
             zq_resistance_ohm=100.0,            # wrong value
             zq_tolerance_percent=1.0,
         )
@@ -187,7 +187,7 @@ class TestCrossValidatorFullFlow:
             CrossValidator,
         )
         cv = CrossValidator()
-        # Add identical data to BOM/schematic/layout — validator should find no issues.
+        # Add identical data to BOM/schematic/layout: validator should find no issues.
         for ref in ("R1", "R2", "C1", "U1"):
             cv.add_bom_item(reference=ref, part_number=f"PN-{ref}", manufacturer="Vendor")
             cv.add_layout_component(reference=ref, value="10k", footprint="R_0603")
@@ -207,7 +207,7 @@ class TestCrossValidatorFullFlow:
 
 
 class TestFindingIdPrefix:
-    """Regression tests for ``_prefix_for`` — the helper used to fail on
+    """Regression tests for ``_prefix_for``. The helper used to fail on
     domains with underscores in the first 3 chars (e.g. ``"em_risk"``)
     because it sliced the raw string, producing ``"EM_"`` which failed
     ``TrackedFinding``'s ``^[A-Z]+-\\d{3}$`` validator and broke report

@@ -1,5 +1,5 @@
 """
-Finding Annotator — renders SVG board view with review findings overlaid.
+Finding Annotator: renders SVG board view with review findings overlaid.
 
 Draws the board outline, all traces as thin gray lines, then overlays
 flagged traces in colour by severity with marker circles at finding

@@ -296,7 +296,7 @@ class HaLowAnalyzer:
                 "severity": "warning",
                 "category": "halow_filter",
                 "description": (
-                    "No SAW/BAW/BPF filter detected in HaLow RF path — "
+                    "No SAW/BAW/BPF filter detected in HaLow RF path: "
                     "both TX and RX paths require filtering"
                 ),
                 "recommendation": (
@@ -308,7 +308,7 @@ class HaLowAnalyzer:
                 "details": {"filters_detected": {}},
             })
         else:
-            # Filters found — check if TX path is covered
+            # Filters found. Check if TX path is covered
             has_900mhz_filters = any(
                 '900' in k or 'saw' in k.lower()
                 for k in filters_found

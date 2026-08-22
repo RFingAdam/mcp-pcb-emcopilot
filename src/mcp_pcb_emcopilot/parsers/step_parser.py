@@ -3,7 +3,7 @@
 Extracts board outline, component bounding boxes, heights, and reference
 designators from STEP files exported by EDA tools (KiCad, Altium, Fusion360).
 
-This is a text-only parser — NO heavy 3D dependencies (cadquery, OCP, trimesh).
+This is a text-only parser. NO heavy 3D dependencies (cadquery, OCP, trimesh).
 STEP files are ASCII text with a well-defined entity structure.
 """
 
@@ -30,7 +30,7 @@ class STEPEntity:
 class STEPParser:
     """Parse STEP files to extract 3D geometry for PCB mechanical review.
 
-    Handles typical EDA-exported STEP files. Best-effort parsing — does not
+    Handles typical EDA-exported STEP files. Best-effort parsing. Does not
     attempt to implement a full ISO 10303 reader.
     """
 
@@ -122,7 +122,7 @@ class STEPParser:
 
         data_section = content[data_start + 5:data_end]
 
-        # Normalize whitespace — collapse multi-line entities into single lines
+        # Normalize whitespace: collapse multi-line entities into single lines
         # But preserve string contents
         data_section = self._normalize_whitespace(data_section)
 
@@ -202,7 +202,7 @@ class STEPParser:
                 params.append(int(raw[i + 1:j]))  # type: ignore[arg-type]
                 i = j
             elif ch == '(':
-                # Tuple/list — find matching close paren
+                # Tuple/list: find matching close paren
                 depth = 1
                 j = i + 1
                 while j < len(raw) and depth > 0:
@@ -225,7 +225,7 @@ class STEPParser:
                 try:
                     end = raw.index('.', i + 1)
                 except ValueError:
-                    # Unterminated enum token — take rest of string
+                    # Unterminated enum token: take rest of string
                     end = len(raw)
                 params.append(raw[i + 1:end])
                 i = end + 1 if end < len(raw) else end
@@ -276,7 +276,7 @@ class STEPParser:
                             pass
 
     def _extract_products(self) -> None:
-        """Extract PRODUCT entities — these represent components in EDA exports."""
+        """Extract PRODUCT entities. These represent components in EDA exports."""
         for eid, entity in self.entities.items():
             if entity.type_name == "PRODUCT":
                 params = self._parse_param_list(entity.raw_params)
@@ -614,7 +614,7 @@ class STEPParser:
 
         Strategy:
         1. Look for CLOSED_SHELL or MANIFOLD_SOLID_BREP with the largest
-           footprint (area in XY) and smallest Z extent — that's likely the board.
+           footprint (area in XY) and smallest Z extent. That's likely the board.
         2. Fall back to computing bounding box from all non-component geometry.
         3. Fall back to bounding box from all cartesian points.
         """
@@ -671,7 +671,7 @@ class STEPParser:
         return board_3d
 
     def _find_board_body(self) -> Optional[dict]:
-        """Find the board body — the CLOSED_SHELL or MANIFOLD_SOLID_BREP
+        """Find the board body. The CLOSED_SHELL or MANIFOLD_SOLID_BREP
         with the largest XY footprint and typical PCB thickness (0.4-3.2mm).
 
         The board body is typically the entity with the largest area in XY

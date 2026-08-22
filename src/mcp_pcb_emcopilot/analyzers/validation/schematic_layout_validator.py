@@ -6,7 +6,7 @@ Validates:
 - Footprint assignments match
 - Missing/extra components
 
-Decoupled from SQLAlchemy — operates on PCBDesignData.
+Decoupled from SQLAlchemy: operates on PCBDesignData.
 """
 
 from __future__ import annotations

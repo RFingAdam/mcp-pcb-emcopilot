@@ -179,7 +179,7 @@ addopts = "-v --tb=short"
 
 ```
 # src/mcp_pcb_emcopilot/py.typed
-# PEP 561 marker — this package supports type checking
+# PEP 561 marker. This package supports type checking
 ```
 
 - [ ] **Step 3: Verify build**

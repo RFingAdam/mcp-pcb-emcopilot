@@ -488,7 +488,7 @@ def generate_docx_report(
     for key in ("board_annotated", "board_full"):
         if key in img:
             add_image_with_caption(doc, img[key],
-                f"Board layout — {board_w:.0f} x {board_h:.0f} mm, {layers} layers, "
+                f"Board layout: {board_w:.0f} x {board_h:.0f} mm, {layers} layers, "
                 f"{len(design.components)} components, {len(design.traces)} traces.",
                 width_inches=6.2)
             break
@@ -604,7 +604,7 @@ def generate_docx_report(
             if img_key in img:
                 figure_num += 1
                 add_image_with_caption(doc, img[img_key],
-                    f"Figure {figure_num}: {domain} — highlighted traces and components.",
+                    f"Figure {figure_num}: {domain}: highlighted traces and components.",
                     width_inches=5.5)
                 break
 
@@ -622,7 +622,7 @@ def generate_docx_report(
             net_name = label.replace("net_", "").replace("_", " ").upper()
             figure_num += 1
             add_image_with_caption(doc, path,
-                f"Figure {figure_num}: Net '{net_name}' — traces and vias highlighted.",
+                f"Figure {figure_num}: Net '{net_name}': traces and vias highlighted.",
                 width_inches=5.0)
 
     # ---- Drill table ----

@@ -5,14 +5,14 @@ function backs every analyzer + report that needs a CISPR / FCC / ISO /
 IEC limit value. It returns a :class:`LimitPoint` whose ``source`` field
 records whether the value came from:
 
-- ``"local_fallback"`` — the in-process tables copied here from the
+- ``"local_fallback"``. The in-process tables copied here from the
   per-analyzer dicts. Stable, vendor-neutral, always available.
-- ``"live_regs"`` — a value pushed in at runtime by the regulations
+- ``"live_regs"``. A value pushed in at runtime by the regulations
   bridge after Claude executed an ``mcp__emc-regulations__*`` lookup.
 
 Analyzers stay backwards-compatible: the legacy ``CISPR25_RADIATED_LIMITS``
 / ``FCC_PART15_CONDUCTED_LIMITS`` / ``_FCC_CLASS_B_LIMITS`` constants in
-the original files keep working — they are now thin wrappers that read
+the original files keep working. They are now thin wrappers that read
 the same data through this provider.
 
 This module is intentionally thread-unsafe (single-process MCP server).
@@ -222,7 +222,7 @@ def _lookup_fallback(
     """Resolve a limit from the local fallback tables.
 
     Returns ``None`` when the (standard, class, freq) tuple is outside the
-    coverage of every table — the caller can then surface that gap.
+    coverage of every table. The caller can then surface that gap.
     """
     std = standard.upper()
     klass = str(class_or_level).upper()
@@ -269,7 +269,7 @@ def _lookup_fallback(
                     source="local_fallback",
                     notes="CISPR 25 conducted (voltage method)",
                 )
-        # Conducted-preferred path didn't match — fall back to radiated.
+        # Conducted-preferred path didn't match: fall back to radiated.
         if prefer_conducted:
             for band in _CISPR25_RADIATED:
                 if band["f_min"] <= freq_mhz <= band["f_max"] and kint in band["lim"]:
@@ -399,7 +399,7 @@ def get_limit(
     Lookup order:
     1. Runtime live-regs cache (populated by ``cache_live_result``).
     2. Local fallback tables in this module.
-    3. ``None`` if neither path resolves — callers must surface the gap.
+    3. ``None`` if neither path resolves: callers must surface the gap.
     """
     key = _cache_key(standard, class_or_level, frequency_mhz, detector)
     cached = _LIVE_CACHE.get(key)

@@ -18,12 +18,12 @@ from ..models.pcb_data import PCBDesignData, PCBLayer
 # ---------------------------------------------------------------------------
 
 _COLOURS = {
-    "signal": "#D4A017",      # copper — gold
-    "plane": "#CC8400",       # copper plane — darker gold
-    "mixed": "#DAA520",       # mixed — goldenrod
-    "dielectric": "#2E7D32",  # prepreg / core — green
-    "solder_mask": "#1B5E20", # solder mask — dark green
-    "silk": "#FAFAFA",        # silkscreen — white
+    "signal": "#D4A017",      # copper: gold
+    "plane": "#CC8400",       # copper plane: darker gold
+    "mixed": "#DAA520",       # mixed: goldenrod
+    "dielectric": "#2E7D32",  # prepreg / core: green
+    "solder_mask": "#1B5E20", # solder mask: dark green
+    "silk": "#FAFAFA",        # silkscreen: white
 }
 
 _BG = "#F5F5F0"

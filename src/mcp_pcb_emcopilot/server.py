@@ -16,7 +16,7 @@ Provides ~57 tools for PCB engineers covering:
 - 3D / mechanical (STEP parsing, clearances, enclosure fit)
 - Session management
 
-Claude Code acts as the AI orchestrator — this server provides the computational tools.
+Claude Code acts as the AI orchestrator. This server provides the computational tools.
 """
 
 from __future__ import annotations
@@ -386,11 +386,11 @@ def calc_dielectric_loss(frequency_mhz: float, dielectric_constant: float, loss_
 
     notes = []
     if total_loss_db > 3:
-        notes.append(f"CRITICAL: {total_loss_db:.1f} dB loss — consider lower-loss laminate")
+        notes.append(f"CRITICAL: {total_loss_db:.1f} dB loss: consider lower-loss laminate")
     elif total_loss_db > 1:
-        notes.append(f"Significant dielectric loss ({total_loss_db:.1f} dB) — verify link budget")
+        notes.append(f"Significant dielectric loss ({total_loss_db:.1f} dB): verify link budget")
     if loss_tangent > 0.02:
-        notes.append(f"High loss tangent ({loss_tangent}) — FR4 typical; use Rogers/Megtron for >5 GHz")
+        notes.append(f"High loss tangent ({loss_tangent}): FR4 typical; use Rogers/Megtron for >5 GHz")
 
     return {
         "dielectric_loss_db_per_inch": round(loss_db_per_inch, 4),
@@ -437,7 +437,7 @@ def calc_plane_resonance(plane_width_mm: float, plane_length_mm: float, dielectr
         notes.append(f"First resonance at {f1:.0f} MHz (mode {resonances[0]['mode']})")
         notes.append(f"Place decoupling vias at < {max_via_spacing:.1f} mm spacing to suppress")
         if f1 < 500:
-            notes.append("WARNING: Low-frequency resonance — add distributed decoupling capacitors")
+            notes.append("WARNING: Low-frequency resonance: add distributed decoupling capacitors")
 
     return {
         "resonances": resonances[:10],
@@ -464,11 +464,11 @@ def calc_via_stitching_requirements(max_frequency_mhz: float, dielectric_constan
 
     notes = []
     if max_spacing_mm < 1.0:
-        notes.append(f"Very tight spacing ({max_spacing_mm:.2f} mm) — may require HDI process")
+        notes.append(f"Very tight spacing ({max_spacing_mm:.2f} mm): may require HDI process")
     elif max_spacing_mm < 2.5:
-        notes.append(f"Moderate spacing ({max_spacing_mm:.2f} mm) — standard PCB feasible")
+        notes.append(f"Moderate spacing ({max_spacing_mm:.2f} mm): standard PCB feasible")
     else:
-        notes.append(f"Relaxed spacing ({max_spacing_mm:.1f} mm) — easy to implement")
+        notes.append(f"Relaxed spacing ({max_spacing_mm:.1f} mm): easy to implement")
 
     # Also calculate lambda/10 for critical areas
     critical_spacing = wavelength_mm / 10
@@ -616,7 +616,7 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
 
         # =====================================================================
-        # IMPEDANCE CALCULATORS (4 tools — original)
+        # IMPEDANCE CALCULATORS (4 tools: original)
         # =====================================================================
         _make_tool("pcb_calc_microstrip_impedance", "Calculate microstrip trace impedance using IPC-2141 formulas.", {
             "trace_width_mm": {"type": "number", "description": "Trace width in mm"},
@@ -681,7 +681,7 @@ async def list_tools() -> list[Tool]:
         }, ["plane_width_mm", "plane_height_mm", "dielectric_height_mm", "dielectric_constant"]),
 
         # =====================================================================
-        # S-PARAMETER / MODE CONVERSION (3 tools — Issues #8 & #12)
+        # S-PARAMETER / MODE CONVERSION (3 tools: Issues #8 & #12)
         # =====================================================================
         _make_tool("pcb_calc_insertion_loss", "Calculate frequency-swept insertion loss (S21) and return loss (S11) for a PCB trace. Models conductor loss (skin effect + Hammerstad roughness), dielectric loss, and mismatch loss.", {
             "trace_length_mm": {"type": "number", "description": "Trace length in mm"},
@@ -992,7 +992,7 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
 
         # =====================================================================
-        # REFERENCE DATA (2 tools — original)
+        # REFERENCE DATA (2 tools: original)
         # =====================================================================
         _make_tool("pcb_get_stackup_templates", "Get common PCB stackup templates with typical impedances.", {}, None),
         _make_tool("pcb_get_material_properties", "Get dielectric properties for common PCB materials.", {}, None),
@@ -1178,7 +1178,7 @@ async def list_tools() -> list[Tool]:
         }, ["session_id"]),
 
         # =====================================================================
-        # CROSS-MCP COORDINATION (Phase 3 — sibling-MCP intent queue)
+        # CROSS-MCP COORDINATION (Phase 3: sibling-MCP intent queue)
         # =====================================================================
         _make_tool("pcb_suggest_next_actions", "Return the prioritised list of sibling-MCP calls (openEMS / NEC2 / emc-regulations / drawio) Claude should execute to verify or enrich the current findings. Populated by pcb_run_design_review. Drained as Claude calls each suggested tool then feeds the result back via pcb_attach_external_result.", {
             "session_id": {"type": "string", "description": "Session id."},
@@ -1319,7 +1319,7 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         # AUTOMOTIVE EMC (4 tools)
         # =====================================================================
-        _make_tool("pcb_analyze_automotive_emc", "Automotive EMC compliance analysis — predicts CISPR 25 radiated emission compliance for clock harmonics and generates ISO 11452 immunity recommendations.", {
+        _make_tool("pcb_analyze_automotive_emc", "Automotive EMC compliance analysis: predicts CISPR 25 radiated emission compliance for clock harmonics and generates ISO 11452 immunity recommendations.", {
             "clock_frequencies_mhz": {"type": "array", "items": {"type": "number"}, "description": "List of clock frequencies in MHz to analyze"},
             "cispr_class": {"type": "integer", "description": "CISPR 25 class (1-5, default 3). Class 5 is strictest."},
             "iso_level": {"type": "integer", "description": "ISO 11452 immunity test level (1-5, default 3)"},
@@ -1349,7 +1349,7 @@ async def list_tools() -> list[Tool]:
         # =====================================================================
         # NEAR-FIELD EMI (1 tool)
         # =====================================================================
-        _make_tool("pcb_analyze_near_field", "Near-field probe and current loop EMI modeling — computes H-field (magnetic dipole) and E-field (electric dipole) at various distances from PCB sources. Identifies dominant emitters and near-field/far-field transition.", {
+        _make_tool("pcb_analyze_near_field", "Near-field probe and current loop EMI modeling: computes H-field (magnetic dipole) and E-field (electric dipole) at various distances from PCB sources. Identifies dominant emitters and near-field/far-field transition.", {
             "sources": {"type": "array", "items": {"type": "object", "properties": {
                 "name": {"type": "string", "description": "Descriptive name for this source"},
                 "type": {"type": "string", "description": "Source type: current_loop, smps_inductor, motor_driver, power_trace, transformer, clock_trace, high_impedance_trace, crystal_oscillator, reset_line, unshielded_cable"},
@@ -2567,7 +2567,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         file_path = args["file_path"]
         forced_format = args.get("format", "auto")
         if forced_format != "auto":
-            # Caller wants a specific parser — emulate detect_format and run.
+            # Caller wants a specific parser: emulate detect_format and run.
             pass
         else:
             forced_format = detect_format(file_path)
@@ -2826,7 +2826,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         sid = args["session_id"]
         data = _get_session(sid)
         # Derive the set of analyzers that ran from the orchestrator's stored
-        # review_results — domain names there map 1:1 to the analyzer ids in
+        # review_results: domain names there map 1:1 to the analyzer ids in
         # standards/coverage.py.
         ran_coverage: list[str] = []
         if data.review_results:
@@ -2925,7 +2925,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             actions = _emit_next_actions(data, result)
             if actions:
                 sessions.enqueue_actions(args["session_id"], actions)
-        except Exception:  # pragma: no cover — escalation never blocks the review
+        except Exception:  # pragma: no cover: escalation never blocks the review
             actions = []
         out = result.to_dict()
         out["next_actions"] = [a.to_dict() for a in actions]
@@ -2946,7 +2946,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
         domain_filter = args.get("domains") or []
         if domain_filter:
             wanted = {str(d).lower() for d in domain_filter}
-            # Domain isn't on ExternalAction directly — it's on the linked
+            # Domain isn't on ExternalAction directly. It's on the linked
             # findings. Use the finding-id prefix as a coarse proxy.
             def _matches(a: Any) -> bool:
                 for fid in a.linked_finding_ids:
@@ -2996,7 +2996,7 @@ def _dispatch(name: str, args: dict[str, Any]) -> Any:  # noqa: C901
             try:
                 from .integrations.regulations_bridge import apply_limit_result
                 live_limit_cached = apply_limit_result(action, ext_result.result) is not None
-            except Exception:  # pragma: no cover — never block on bridge errors
+            except Exception:  # pragma: no cover: never block on bridge errors
                 live_limit_cached = False
 
         # (b) openEMS → run compare_results against the linked finding's
@@ -3696,7 +3696,7 @@ def _get_session(session_id: str) -> PCBDesignData:
 def main() -> None:
     """Run the MCP server, or the headless ``review`` subcommand.
 
-    With no arguments — how MCP clients launch it — this starts the stdio MCP
+    With no arguments: how MCP clients launch it. This starts the stdio MCP
     server. ``mcp-pcb-emcopilot review <board> ...`` instead runs a one-shot
     headless design review and exits, so the engine is usable as a plain CLI
     without an LLM host.

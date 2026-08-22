@@ -4,7 +4,7 @@ For every IC (refdes U*) in the schematic, count how many capacitors sit
 on a Vdd-class net the IC also touches. The rule of thumb is one bypass
 capacitor per Vdd pin plus at least one bulk cap on the rail.
 
-The analyzer degrades cleanly when pin-net information is missing — it
+The analyzer degrades cleanly when pin-net information is missing. It
 falls back to counting all caps vs all ICs and reports the ratio. That
 output is INFO-level so it never blocks review generation.
 """
@@ -116,12 +116,12 @@ def analyze_decoupling_per_ic(
             ))
         return findings
 
-    # Pin-net mapping available — do the per-IC analysis.
+    # Pin-net mapping available. Do the per-IC analysis.
     for ic in ics:
         refdes = N.component_refdes(ic)
         vdd_pin_count = _ic_vdd_pin_count(ic)
         if vdd_pin_count == 0:
-            # No Vdd pins detected — could be a passive-like part or pinout
+            # No Vdd pins detected: could be a passive-like part or pinout
             # uses non-standard net names. Skip silently.
             continue
         power_nets = _ic_power_nets(ic)

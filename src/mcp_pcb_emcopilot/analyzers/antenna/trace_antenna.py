@@ -143,7 +143,7 @@ class TraceAntennaAnalyzer:
 
         # Hammerstad εr_eff using actual w/h ratio when available.
         # Both attributes are optional context the caller may have set
-        # before invoking this method — use getattr with a default of
+        # before invoking this method. Use getattr with a default of
         # None so missing attributes simply collapse to w/h=1.
         trace_width_mm = getattr(self, "trace_width_mm", None)
         height_mm = getattr(self, "height_mm", None)

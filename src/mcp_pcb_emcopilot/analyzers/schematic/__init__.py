@@ -1,6 +1,6 @@
 """Schematic-aware analyzers (Phase 4b).
 
-Operate on the schematic side of a design — components and nets either as
+Operate on the schematic side of a design: components and nets either as
 dicts (from PDF/heuristic parsers) or :class:`ParsedComponent` /
 :class:`ParsedNet` dataclasses (from native KiCad/Altium parsers). Each
 analyzer is robust to either input shape via the helpers in :mod:`._normalise`.

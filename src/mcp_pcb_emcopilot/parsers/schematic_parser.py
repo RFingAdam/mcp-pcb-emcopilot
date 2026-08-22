@@ -74,7 +74,7 @@ def _to_float(value: Any) -> float:
 
 
 def _to_yes(value: Any) -> bool:
-    """KiCad uses (in_bom yes) / (on_board no) — Symbol "yes" / "no"."""
+    """KiCad uses (in_bom yes) / (on_board no): Symbol "yes" / "no"."""
     return _to_str(value).lower() == "yes"
 
 
@@ -306,7 +306,7 @@ class KiCadSchematicParser:
         properties["lib_id"] = lib_id
         properties["dnp_in_bom"] = in_bom
         properties["dnp_on_board"] = on_board
-        # Composite DNP flag — either toggle off means "don't populate".
+        # Composite DNP flag: either toggle off means "don't populate".
         properties["dnp"] = not (in_bom and on_board)
 
         return ParsedComponent(

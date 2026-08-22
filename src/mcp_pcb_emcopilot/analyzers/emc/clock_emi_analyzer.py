@@ -5,7 +5,7 @@ Models the harmonic envelope of digital clock signals (trapezoidal waveform)
 and SMPS switching waveforms, predicts emission levels, and compares against
 FCC/CISPR limits.  Includes spread-spectrum clocking (SSC) dithering reduction.
 
-All calculations are pure Python — no external dependencies.
+All calculations are pure Python. No external dependencies.
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def calculate_clock_emi(
     ssc_deviation_percent : float
         SSC frequency deviation (typically 0.25-0.5%).
     trace_length_mm : float
-        Trace length — used for antenna efficiency estimate.
+        Trace length. Used for antenna efficiency estimate.
     limit_standard : str
         Emission limit: "fcc_classb", "fcc_classa", "cispr32_classb", "cispr32_classa".
 
@@ -118,7 +118,7 @@ def calculate_clock_emi(
     f_knee_mhz = 1000.0 / (math.pi * rise_time_ns)  # 1/(pi*tr) in MHz
 
     # Emission limits (simplified, at 3m distance, dBuV/m)
-    # These are approximate — real limits vary with frequency
+    # These are approximate: real limits vary with frequency
     _limits = {
         "fcc_classb": {
             "30-88_mhz": 40.0,
@@ -235,9 +235,9 @@ def calculate_clock_emi(
     notes.append(f"Knee frequency: {f_knee_mhz:.0f} MHz (1/(pi*{rise_time_ns} ns))")
     notes.append("Harmonics above knee frequency roll off at -40 dB/decade")
     if ssc_enabled:
-        notes.append(f"SSC enabled: {ssc_deviation_percent}% deviation — reduces peak emissions")
+        notes.append(f"SSC enabled: {ssc_deviation_percent}% deviation: reduces peak emissions")
     if rise_time_ns < 0.5:
-        notes.append("Very fast rise time — broadband emissions will be significant")
+        notes.append("Very fast rise time: broadband emissions will be significant")
     if worst_margin_db < 0:
         notes.append(
             f"Harmonic {worst_harmonic} ({clock_frequency_mhz*worst_harmonic:.0f} MHz) "
@@ -252,7 +252,7 @@ def calculate_clock_emi(
         recommendations.append("Add series resistance (22-33 ohm) near clock driver")
         recommendations.append("Shorten clock trace or use differential signaling")
     elif worst_margin_db < 6:
-        recommendations.append(f"Only {worst_margin_db:.1f} dB margin — borderline. Consider SSC or slower edges.")
+        recommendations.append(f"Only {worst_margin_db:.1f} dB margin: borderline. Consider SSC or slower edges.")
 
     return {
         "harmonics": harmonics,
@@ -301,7 +301,7 @@ def calculate_smps_emi(
     num_harmonics : int
         Number of harmonics to analyze.
     pcb_loop_area_cm2 : float
-        Hot loop area on PCB (cm^2) — critical for emissions.
+        Hot loop area on PCB (cm^2): critical for emissions.
     limit_standard : str
         Emission limit standard.
 
@@ -403,7 +403,7 @@ def calculate_smps_emi(
     notes.append(f"Hot loop area: {pcb_loop_area_cm2} cm^2")
 
     if pcb_loop_area_cm2 > 2.0:
-        notes.append("WARNING: Hot loop area > 2 cm^2 — minimize immediately")
+        notes.append("WARNING: Hot loop area > 2 cm^2: minimize immediately")
 
     recommendations = []
     if worst_margin_db < 0:
@@ -453,7 +453,7 @@ def calculate_smps_emi(
 # Speed of light (m/s)
 _C0 = 299792458.0
 
-# FCC Part 15 Class B limits at 3m (dBuV/m). Retained for compatibility —
+# FCC Part 15 Class B limits at 3m (dBuV/m). Retained for compatibility:
 # legacy callers may still iterate this tuple list. The authoritative source
 # is now ``analyzers.emc.limits_provider``.
 _FCC_CLASS_B_LIMITS = [
@@ -492,7 +492,7 @@ def _get_regulatory_limit(frequency_mhz: float, standard: str = "fcc_b") -> floa
     if point is not None:
         return float(point.limit_value)
 
-    # Provider miss — fall back to the legacy in-file table so old behaviour
+    # Provider miss: fall back to the legacy in-file table so old behaviour
     # never regresses on edge cases not yet modelled in the provider.
     limits = _CISPR_CLASS_B_LIMITS if is_cispr else _FCC_CLASS_B_LIMITS
     for f_low, f_high, limit in limits:

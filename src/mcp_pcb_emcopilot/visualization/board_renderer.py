@@ -1,6 +1,6 @@
 """SVG board renderer for PCB design visualization.
 
-Generates SVG from PCBDesignData — board outline, component placement,
+Generates SVG from PCBDesignData: board outline, component placement,
 net/trace highlighting, via positions, copper zones, and layer views.
 
 Pure Python, no external dependencies (SVG is XML text).
@@ -20,22 +20,22 @@ from ..models.pcb_data import PCBDesignData
 
 # Component type heuristic colour map (prefix -> fill colour)
 _COMP_COLOURS = {
-    "U": "#4A90D9",      # ICs — blue
+    "U": "#4A90D9",      # ICs: blue
     "IC": "#4A90D9",
-    "J": "#E88D3F",      # connectors — orange
+    "J": "#E88D3F",      # connectors: orange
     "P": "#E88D3F",
     "CON": "#E88D3F",
-    "R": "#5CB85C",      # passives — green
+    "R": "#5CB85C",      # passives: green
     "C": "#5CB85C",
     "L": "#5CB85C",
-    "D": "#D94A7A",      # diodes/LEDs — pink
+    "D": "#D94A7A",      # diodes/LEDs: pink
     "LED": "#D94A7A",
-    "Q": "#9B59B6",      # transistors — purple
+    "Q": "#9B59B6",      # transistors: purple
     "T": "#9B59B6",
-    "F": "#F5A623",      # fuses — amber
-    "SW": "#8E8E93",     # switches — grey
-    "TP": "#AAAAAA",     # test points — light grey
-    "Y": "#C0392B",      # crystals — red
+    "F": "#F5A623",      # fuses: amber
+    "SW": "#8E8E93",     # switches: grey
+    "TP": "#AAAAAA",     # test points: light grey
+    "Y": "#C0392B",      # crystals: red
     "X": "#C0392B",
 }
 

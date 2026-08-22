@@ -17,7 +17,7 @@ def coerce(obj: Any) -> dict[str, Any]:
     # only accepts instances. Narrow to "instance, not class" before calling.
     if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
-    # Fallback — read public attributes.
+    # Fallback: read public attributes.
     return {
         k: getattr(obj, k)
         for k in dir(obj)

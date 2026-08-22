@@ -149,7 +149,7 @@ class TestAltiumInternalHelpers:
 
         data = AltiumBoardData(source_file="/tmp/x.PcbDoc")
         AltiumPcbParser()._calculate_board_dimensions(data)
-        # No components or traces — both dimensions should stay at their
+        # No components or traces. Both dimensions should stay at their
         # default values (0 or inf-sentinel) without raising.
 
     def test_calculate_trace_statistics_empty(self):

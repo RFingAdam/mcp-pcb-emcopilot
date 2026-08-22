@@ -753,7 +753,7 @@ def _build_human_review_html(hr: dict) -> str:
     """Render the 'Items Requiring Human Review / Lab Verification' callout.
 
     Returns "" when the block is absent or not required, so clean reviews are
-    not cluttered. When present it renders as a prominent amber panel — this is
+    not cluttered. When present it renders as a prominent amber panel. This is
     the report's honesty backstop against an over-confident automated verdict.
     """
     if not hr or not hr.get("required"):

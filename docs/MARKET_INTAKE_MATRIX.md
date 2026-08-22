@@ -129,8 +129,8 @@ For the runtime mirror, see `src/mcp_pcb_emcopilot/standards/coverage.py::STANDA
 |---|---|---|---|---|
 | CISPR_25_CLASS_1..5 | automotive | automotive_emc, return_paths, smps_emi, clock_emi | emc-regulations + local fallback | full |
 | ISO_11452_2/4/5 | automotive | immunity_margin, cable_coupling | emc-regulations | full |
-| ISO_7637_2 | automotive | (transient) — Phase 4 stub | local | stub |
-| ISO_16750_2 | automotive | (env) — local heuristics | local | partial |
+| ISO_7637_2 | automotive | (transient): Phase 4 stub | local | stub |
+| ISO_16750_2 | automotive | (env): local heuristics | local | partial |
 | FCC_PART_15_B | commercial / wireless | conducted_emissions, near_field, emi_risk | emc-regulations + local fallback | full |
 | CISPR_32_CLASS_A/B | commercial | conducted_emissions, near_field, clock_emi | emc-regulations | full |
 | IEC_60601_1_2_ED_4_1 | medical | esd, immunity_margin, cable_coupling | emc-regulations | full |
@@ -138,13 +138,13 @@ For the runtime mirror, see `src/mcp_pcb_emcopilot/standards/coverage.py::STANDA
 | EN_300_328 | wireless | trace_antenna, return_loss, NEC2-escalate | emc-regulations + nec2 | full |
 | EN_301_893 | wireless | trace_antenna, return_loss | emc-regulations | full |
 | EN_61326_industrial | industrial | conducted_emissions, immunity_margin, esd | emc-regulations | full |
-| MIL_STD_461G | (military, out-of-scope today) | — | — | unimplemented |
+| MIL_STD_461G | (military, out-of-scope today) | n/a |: | unimplemented |
 
 ---
 
 ## Pre-flight gate behaviour
 
-`pcb_validate_review_complete(session_id)` (Phase 4 — new) returns:
+`pcb_validate_review_complete(session_id)` (Phase 4: new) returns:
 
 ```jsonc
 {

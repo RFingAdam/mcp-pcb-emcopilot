@@ -4,10 +4,10 @@ Triggered when an intentional radiator (or unintentional antenna with strong
 resonance evidence) is detected at frequency ≥ NEC2_MIN_FREQ_MHZ. The bridge
 emits an ExternalAction pair Claude executes:
 
-1. ``mcp__nec2-antenna__nec2_create_<type>`` — build the wire model from
+1. ``mcp__nec2-antenna__nec2_create_<type>``: build the wire model from
    the geometry the bridge inferred (trace length, frequency, ground-plane
    extent).
-2. ``mcp__nec2-antenna__nec2_simulate`` — run the model and return VSWR,
+2. ``mcp__nec2-antenna__nec2_simulate``. Run the model and return VSWR,
    gain, pattern data.
 
 Result ingestion lives in ``server.pcb_attach_external_result``; this
@@ -39,7 +39,7 @@ _ANTENNA_TYPE_RULES: list[tuple[str, str]] = [
     ("loop",        "nec2_create_loop"),
     ("ifa",         "nec2_create_dipole"),   # closest NEC2 primitive
     ("pifa",        "nec2_create_dipole"),
-    ("chip_antenna", "nec2_create_dipole"),  # placeholder — usually pre-validated
+    ("chip_antenna", "nec2_create_dipole"),  # placeholder: usually pre-validated
 ]
 
 
@@ -48,7 +48,7 @@ def infer_antenna_type(title: str, description: str, structure_hint: str | None 
 
     Returns the matched substring (e.g. ``"dipole"``) for use with
     :func:`build_antenna_intent`. Defaults to ``"dipole"`` when nothing
-    matches — that's NEC2's most general primitive.
+    matches: that's NEC2's most general primitive.
     """
     haystack = " ".join([title, description, structure_hint or ""]).lower()
     for needle, _tool in _ANTENNA_TYPE_RULES:

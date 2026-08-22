@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320"
-     role="img" aria-label="mcp-pcb-emcopilot — PCB EMC + signal-integrity analysis (return paths, decoupling, DDR/PCIe/USB)">
-  <title>mcp-pcb-emcopilot — PCB EMC + signal-integrity analysis</title>
+     role="img" aria-label="mcp-pcb-emcopilot: PCB EMC + signal-integrity analysis (return paths, decoupling, DDR/PCIe/USB)">
+  <title>mcp-pcb-emcopilot: PCB EMC + signal-integrity analysis</title>
 
   <defs>
     <linearGradient id="t-bg" x1="0" y1="0" x2="1" y2="0">
@@ -46,7 +46,7 @@
       lineforge cross-section: (a) horizontal layer stack from above
       (not a single-trace cross-section), (b) plated through via from
       top to bottom, (c) an EMC return-current arc looping back through
-      the inner plane — this is the "EMC + SI analysis" identity.
+      the inner plane. This is the "EMC + SI analysis" identity.
     -->
     <g transform="translate(40, 40)" filter="url(#t-glow)">
       <g fill="none" class="accent-stroke" stroke-width="2"
@@ -72,7 +72,7 @@
         <path d="M 32 79 L 38 74 L 36 84 Z" fill="#F59E0B" stroke="none"/>
       </g>
       <!-- Small E-field marks above top copper to read as "near-field
-           coupling" — keeps the EMC identity unambiguous. -->
+           coupling": keeps the EMC identity unambiguous. -->
       <g class="accent-2" stroke-width="1.5" stroke-opacity="0.6"
          stroke-linecap="round" fill="none">
         <path d="M 60 36 Q 60 26, 70 26"/>

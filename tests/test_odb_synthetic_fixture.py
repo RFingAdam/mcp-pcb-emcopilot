@@ -6,9 +6,9 @@ impractical. Instead, this test synthesises a small but structurally
 valid ODB++ directory tree inside a temp dir, tars it, hands it to the
 parser, and asserts the parser extracts the expected entities.
 
-The goal isn't parser thoroughness — that's covered by the env-gated
+The goal isn't parser thoroughness. That's covered by the env-gated
 ``TestRealODBParsing`` class in ``test_integration_odb.py`` running
-against a real design — but to guarantee the parser handles the format
+against a real design, but to guarantee the parser handles the format
 envelope (matrix, stephdr, profile, eda/data, layer features) without
 depending on an external file.
 """
@@ -100,7 +100,7 @@ def _synth_odb_tree(base: Path) -> Path:
         "OE\n"
     ))
 
-    # ---------- netlists/cadnet — net names ----------
+    # ---------- netlists/cadnet: net names ----------
     # ODB++ cadnet format: lines starting with ``$`` declare a net; the
     # parser picks up ``$<num> <name>`` and creates ODBNet entries.
     _write(root, "steps/pcb/netlists/cadnet/netlist", (
@@ -152,7 +152,7 @@ def test_synthetic_archive_yields_nets(synthetic_odb_archive):
     parser = ODBParser()
     data = parser.parse(str(synthetic_odb_archive))
     names = {n.name for n in data.nets}
-    # Synthetic netlist declared GND / VCC_3V3 / SIG1 — parser should pick at least one.
+    # Synthetic netlist declared GND / VCC_3V3 / SIG1: parser should pick at least one.
     assert names & {"GND", "VCC_3V3", "SIG1"}
 
 

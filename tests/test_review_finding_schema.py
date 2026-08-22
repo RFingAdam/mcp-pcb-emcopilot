@@ -1,4 +1,4 @@
-"""Tests for the Phase 3 ReviewFinding schema upgrade — confidence,
+"""Tests for the Phase 3 ReviewFinding schema upgrade: confidence,
 verified, source, finding_id, linked_actions."""
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def test_finding_defaults_for_new_fields():
 
 def test_finding_id_auto_generated():
     f = ReviewFinding(domain="emc", severity="high", title="t", description="d")
-    # EMC is in _DOMAIN_PREFIXES — yields "EMC"
+    # EMC is in _DOMAIN_PREFIXES: yields "EMC"
     assert f.finding_id == "EMC-001"
 
 

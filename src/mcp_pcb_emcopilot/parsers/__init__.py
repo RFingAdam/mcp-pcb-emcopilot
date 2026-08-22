@@ -47,7 +47,7 @@ def detect_format(file_path: str) -> str:
     elif ext == ".brd":
         return "allegro"
     elif ext in (".exp",):
-        # Allegro extraction file — verify content if possible
+        # Allegro extraction file: verify content if possible
         try:
             with open(file_path, encoding="utf-8", errors="ignore") as f:
                 header = f.read(2000)
@@ -59,7 +59,7 @@ def detect_format(file_path: str) -> str:
             pass
         return "allegro"
     elif ext in (".xml", ".cvg"):
-        # Could be IPC-2581 or other XML — check content
+        # Could be IPC-2581 or other XML. Check content
         try:
             with open(file_path, encoding="utf-8", errors="ignore") as f:
                 header = f.read(1000)
@@ -164,9 +164,9 @@ def _completeness_warnings(data: PCBDesignData, fmt: str) -> list[str]:
 
     A partial parse that silently reports success is the core ingest risk: a
     downstream review then runs on incomplete data and can print a confident,
-    wrong verdict. These gates catch the common "looked fine, wasn't" cases —
-    nothing extracted, components with no connectivity, no routing, or no board
-    outline — so the parse can be flagged partial and human review required.
+    wrong verdict. These gates catch the common "looked fine, wasn't" cases.
+    Nothing extracted, components with no connectivity, no routing, or no board
+    outline: so the parse can be flagged partial and human review required.
     """
     warns: list[str] = []
     n_comp = len(data.components)
@@ -177,29 +177,29 @@ def _completeness_warnings(data: PCBDesignData, fmt: str) -> list[str]:
     if fmt in _CONNECTIVITY_FORMATS:
         if n_comp == 0 and n_net == 0 and n_trace == 0:
             warns.append(
-                "Parse produced no components, nets, or traces — the file may be "
+                "Parse produced no components, nets, or traces. The file may be "
                 "unsupported, an unexpected version, or corrupt."
             )
         else:
             if n_comp > 0 and n_net == 0:
                 warns.append(
-                    f"{n_comp} component(s) parsed but 0 nets — connectivity was not "
+                    f"{n_comp} component(s) parsed but 0 nets: connectivity was not "
                     "extracted; net/return-path analysis will be unreliable."
                 )
             if n_comp > 0 and n_trace == 0:
                 warns.append(
-                    f"{n_comp} component(s) parsed but 0 traces — routing/copper was "
+                    f"{n_comp} component(s) parsed but 0 traces: routing/copper was "
                     "not extracted; layout-dependent analysis will be unreliable."
                 )
             if area <= 0:
                 warns.append(
-                    "Board outline/dimensions not determined (0 area) — per-area and "
+                    "Board outline/dimensions not determined (0 area): per-area and "
                     "enclosure/cavity analysis will be unreliable."
                 )
     elif fmt == "step":
         if not data.step_components and not data.board_3d:
             warns.append(
-                "STEP parse produced no 3D components or board body — the model may "
+                "STEP parse produced no 3D components or board body. The model may "
                 "be unsupported or empty."
             )
     return warns
@@ -219,7 +219,7 @@ def _parse_format(fmt: str, file_path: str, parser_fn) -> PCBDesignData:
         ) from e
 
     # Completeness gate: flag suspicious/partial parses instead of reporting
-    # silent success. Never raises — a partial parse still returns usable data,
+    # silent success. Never raises. A partial parse still returns usable data,
     # but marked so the review degrades its verdict and requires human review.
     gate_warnings = _completeness_warnings(data, fmt)
     if gate_warnings:

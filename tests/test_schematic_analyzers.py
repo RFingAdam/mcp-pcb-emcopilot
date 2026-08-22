@@ -242,7 +242,7 @@ class _LayoutComp:
 def test_xref_critical_missing_from_layout():
     sch = [_comp("R1", "10k", footprint="0402"), _comp("R2", "4.7k", footprint="0402")]
     bom = [_bom("R1", value="10k"), _bom("R2", value="4.7k")]
-    # Layout has R2 but is missing R1 — schematic + BOM both confirm R1 should exist.
+    # Layout has R2 but is missing R1: schematic + BOM both confirm R1 should exist.
     layout = [_LayoutComp("R2", "4.7k", footprint="0402")]
     findings = analyze_three_way_xref(sch, bom, layout)
     assert any(f.severity == "critical" and "missing from layout" in f.title for f in findings)
@@ -291,5 +291,5 @@ def test_xref_value_normalisation_handles_unit_variants():
     bom = [_bom("R1", value="10K")]
     layout = [_LayoutComp("R1", "10K")]
     findings = analyze_three_way_xref(sch, bom, layout)
-    # Should be clean — no value mismatch
+    # Should be clean. No value mismatch
     assert not any("value mismatch" in f.title.lower() for f in findings)

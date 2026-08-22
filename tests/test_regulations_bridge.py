@@ -1,4 +1,4 @@
-"""Tests for integrations/regulations_bridge — intent emission + result ingest."""
+"""Tests for integrations/regulations_bridge: intent emission + result ingest."""
 
 from __future__ import annotations
 

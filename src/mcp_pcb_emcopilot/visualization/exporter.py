@@ -96,7 +96,7 @@ def batch_export(
     Args:
         renders: Mapping of label -> SVG content string.
         output_dir: Directory for output files.
-        fmt: Output format — 'png' or 'svg'.
+        fmt: Output format: 'png' or 'svg'.
         width: PNG width in pixels (ignored for SVG).
 
     Returns:

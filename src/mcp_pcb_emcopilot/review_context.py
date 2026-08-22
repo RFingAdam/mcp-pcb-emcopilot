@@ -1,4 +1,4 @@
-"""Review context — identifies missing information and stores user answers.
+"""Review context: identifies missing information and stores user answers.
 
 When the MCP tool runs a design review and encounters ambiguity or missing
 information, this module determines what questions need answering and provides
@@ -124,7 +124,7 @@ _QUESTIONS_BY_ID: dict[str, dict[str, Any]] = {q["id"]: q for q in REVIEW_QUESTI
 
 
 # =============================================================================
-# Condition functions — determine when each question is applicable
+# Condition functions: determine when each question is applicable
 # =============================================================================
 
 def _has_ddr(design: PCBDesignData, classification: DesignClassificationResult,
@@ -196,7 +196,7 @@ def get_active_markets(
     """Return the list of markets that apply to this session.
 
     Sources, in order of authority:
-    1. Explicit ``markets`` list on ``review_context`` (Phase 4 — set via
+    1. Explicit ``markets`` list on ``review_context`` (Phase 4. Set via
        ``pcb_set_market``).
     2. The playbook's ``declared_market`` (from Phase 2 ``pcb_start_professional_review``).
     3. Heuristic auto-inference: RF nets → ``wireless``, automotive bus tags →
@@ -234,7 +234,7 @@ def get_review_questions(
     """Return the list of applicable review questions for this design.
 
     Merges:
-    1. The CORE legacy pack (``REVIEW_QUESTIONS``) — filtered by per-question
+    1. The CORE legacy pack (``REVIEW_QUESTIONS``): filtered by per-question
        conditional predicates against the parsed design.
     2. Per-market packs from :mod:`market_packs` for every market in
        :func:`get_active_markets`.
@@ -245,7 +245,7 @@ def get_review_questions(
     applicable: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    # CORE pack (legacy) — gated by per-question conditional predicates.
+    # CORE pack (legacy): gated by per-question conditional predicates.
     for q in REVIEW_QUESTIONS:
         cond = _CONDITIONS.get(q["id"], _always)
         try:
@@ -541,7 +541,7 @@ class ReviewContext:
             return str(val)
         return None
 
-    def get_surge_target_kV(self) -> Optional[float]:  # noqa: N802 — match kV spelling
+    def get_surge_target_kV(self) -> Optional[float]:  # noqa: N802: match kV spelling
         """Industrial IEC 61000-4-5 surge target in kV or None."""
         val = self._answers.get("surge_target_kV") or self._answers.get("surge_target_kv")
         try:

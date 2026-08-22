@@ -6,7 +6,7 @@ Validates:
 - SAW/LC filter presence in RF paths
 - Ground plane isolation between TX and RX sections
 
-Decoupled from SQLAlchemy — operates on PCBDesignData.
+Decoupled from SQLAlchemy: operates on PCBDesignData.
 """
 
 from __future__ import annotations

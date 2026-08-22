@@ -162,7 +162,7 @@ class Annotator:
         return "".join(parts)
 
     def _render_highlight(self, ann: dict) -> str:
-        """Highlight region — rectangle or circle."""
+        """Highlight region: rectangle or circle."""
         x_mm = ann["x"]
         y_mm = ann["y"]
         colour = ann.get("color", ann.get("colour", _DEFAULT_COLOUR))

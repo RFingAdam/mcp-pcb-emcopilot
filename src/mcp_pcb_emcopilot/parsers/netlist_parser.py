@@ -2,7 +2,7 @@
 
 Replaces the regex stub in :mod:`schematic_dispatch._parse_simple_netlist`
 with real section-aware readers that recover per-net pin lists. These two
-formats are the long-tail of EDA schematic export — Altium and KiCad have
+formats are the long-tail of EDA schematic export: Altium and KiCad have
 native parsers, but ORCAD/Allegro/Pads workflows export to one of these
 plain-text formats.
 
@@ -33,7 +33,7 @@ _SECTION_RE = re.compile(r"^\s*\*(PART|NET|VIA|MISC|REMARK|CONNECTION|PIN)\*\s*$
 _NET_NAME_RE = re.compile(r"^\s*NET_NAME\s*[:=]\s*['\"]?([\w\+\-\.]+)['\"]?\s*$", re.IGNORECASE)
 # `REFDES.PIN` references (e.g. `R1.1`, `U1.50`).
 _PIN_REF_RE = re.compile(r"\b([A-Z]+\d+[A-Z]?)\.([\w\-]+)\b")
-# A part line is typically "REFDES VALUE PART_NUMBER MANUFACTURER" — whitespace separated.
+# A part line is typically "REFDES VALUE PART_NUMBER MANUFACTURER": whitespace separated.
 _PART_LINE_RE = re.compile(r"^\s*([A-Z]+\d+[A-Z]?)\s+(.+)$")
 
 
@@ -133,7 +133,7 @@ def parse_orcad_netlist(file_path: str) -> ParsedSchematicData:
 
     if not components and not nets:
         warnings.append(
-            "PSTXNET parser found neither *PART* nor *NET* sections — "
+            "PSTXNET parser found neither *PART* nor *NET* sections: "
             "file may use a non-standard dialect."
         )
 
@@ -150,7 +150,7 @@ def parse_pads_netlist(file_path: str) -> ParsedSchematicData:
     The Pads dialect is structurally identical to PSTXNET for the parts
     we care about (sections, pin lists), so we delegate. The distinction
     matters when handling Pads-specific records like ``*VIA*`` (drill
-    table) and ``*MISC*`` (board outline) — neither contributes to the
+    table) and ``*MISC*`` (board outline): neither contributes to the
     schematic-side data this module produces.
     """
     return parse_orcad_netlist(file_path)

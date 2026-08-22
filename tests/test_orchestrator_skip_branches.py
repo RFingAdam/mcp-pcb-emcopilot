@@ -2,12 +2,12 @@
 in :mod:`mcp_pcb_emcopilot.orchestrator`.
 
 Each analyzer domain (PDN, DDR, USB, PCIe, Ethernet) emits ``skipped``
-only when the input truly lacks applicable data — never to paper over a
+only when the input truly lacks applicable data: never to paper over a
 bug. These tests pin that contract: they build the minimal design state
 that should drive each branch to ``skipped``, and assert the orchestrator
 returns that status cleanly.
 
-If any of these start failing, the skip logic has drifted — either a
+If any of these start failing, the skip logic has drifted: either a
 classifier changed its output format, or a genuine defect is hiding
 behind a silent bypass.
 """
@@ -116,7 +116,7 @@ def test_ethernet_substring_match_catches_future_variants():
     """
     design = _empty_design()
     interfaces = _FakeInterfaceResult(interfaces=[_FakeInterface(interface_type="1000BASE-T")])
-    # The call must not return ``skipped`` — the interface should be picked up.
+    # The call must not return ``skipped``. The interface should be picked up.
     # It may legitimately fail with another status once the analyzer runs on
     # the stub interface; what matters is that skip-on-absence is gone.
     result = _run_ethernet_analysis(design, interfaces, _empty_nets())  # type: ignore[arg-type]

@@ -205,7 +205,7 @@ class SimulationPlotter:
         ax.set_ylim(-voltage_swing_mv * 0.7, voltage_swing_mv * 0.7)
         ax.set_xlabel("Time (UI)")
         ax.set_ylabel("Voltage (mV)")
-        ax.set_title(f"{spec_name} Eye Diagram — {data_rate_gbps:.1f} Gbps")
+        ax.set_title(f"{spec_name} Eye Diagram: {data_rate_gbps:.1f} Gbps")
         ax.legend(loc="upper left", fontsize=8,
                   facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"])
 
@@ -272,7 +272,7 @@ class SimulationPlotter:
         ax2.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"])
         ax2.set_ylim(min(s11) * 1.2, 0)
 
-        fig.suptitle(f"S-Parameter Analysis — {channel_name}", color=t["fg"],
+        fig.suptitle(f"S-Parameter Analysis: {channel_name}", color=t["fg"],
                      fontsize=13, fontweight="bold")
         fig.tight_layout(rect=[0, 0, 1, 0.93])
 
@@ -332,7 +332,7 @@ class SimulationPlotter:
 
         ax.set_xlabel("Frequency (MHz)")
         ax.set_ylabel("Impedance (Ω)")
-        ax.set_title(f"PDN Impedance Profile — {rail_voltage}V Rail")
+        ax.set_title(f"PDN Impedance Profile: {rail_voltage}V Rail")
         ax.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"],
                   loc="upper left")
 
@@ -445,7 +445,7 @@ class SimulationPlotter:
         ax.set_xticklabels([f"{f:.0f}" for f in freqs_mhz], rotation=45, fontsize=7)
         ax.set_xlabel("Frequency (MHz)")
         ax.set_ylabel("Level (dBµV/m)")
-        ax.set_title(f"Clock EMI Spectrum — {clock_mhz:.0f} MHz, {rise_time_ns} ns rise")
+        ax.set_title(f"Clock EMI Spectrum: {clock_mhz:.0f} MHz, {rise_time_ns} ns rise")
         ax.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"])
 
         _add_status_badge(ax, status, t)
@@ -545,7 +545,7 @@ class SimulationPlotter:
         ax.set_xscale("log")
         ax.set_xlabel("Frequency (MHz)")
         ax.set_ylabel("Level (dBµV/m)")
-        ax.set_title(f"CISPR 25 Class {cispr_class} Compliance — {clock_mhz:.0f} MHz Clock")
+        ax.set_title(f"CISPR 25 Class {cispr_class} Compliance: {clock_mhz:.0f} MHz Clock")
         ax.set_xlim(0.1, 3000)
 
         _add_status_badge(ax, status, t)
@@ -626,7 +626,7 @@ class SimulationPlotter:
         ax.set_xlabel("Frequency (MHz)")
         ax.set_yticks([])
         ax.set_title(
-            f"Power Plane Cavity Resonance — "
+            f"Power Plane Cavity Resonance: "
             f"{board_width_mm:.0f} × {board_height_mm:.0f} mm, εr={er}"
         )
         ax.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"],
@@ -701,7 +701,7 @@ class SimulationPlotter:
         ax.set_yticks(x)
         ax.set_yticklabels(names, fontsize=9)
         ax.set_xlabel("Temperature (°C)")
-        ax.set_title(f"Thermal Budget — {ambient_c}°C Ambient")
+        ax.set_title(f"Thermal Budget: {ambient_c}°C Ambient")
         ax.legend(fontsize=7, facecolor=t["bg"], edgecolor=t["grid"], labelcolor=t["fg"],
                   loc="lower right")
         ax.invert_yaxis()
@@ -847,7 +847,7 @@ class SimulationPlotter:
             ax2.text(0.5, 0.5, "No changes", transform=ax2.transAxes,
                      ha="center", va="center", fontsize=14, color=t["secondary"])
 
-        fig.suptitle(f"Design Revision Comparison — {design_a} vs {design_b}",
+        fig.suptitle(f"Design Revision Comparison: {design_a} vs {design_b}",
                      color=t["fg"], fontsize=13, fontweight="bold")
         fig.tight_layout(rect=[0, 0, 1, 0.93])
 
@@ -970,7 +970,7 @@ class SimulationPlotter:
         ax.set_ylabel("Level (dBµV)")
         ax.set_xlim(0.1, 120)
         ax.set_title(
-            f"Conducted Emissions — {switching_freq_khz:.0f} kHz SMPS, "
+            f"Conducted Emissions: {switching_freq_khz:.0f} kHz SMPS, "
             f"V_in={input_voltage}V"
         )
 

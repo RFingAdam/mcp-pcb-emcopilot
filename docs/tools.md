@@ -102,7 +102,7 @@ is the tool registration in
 
 ## ESD
 
-`pcb_analyze_esd` — ESD protection assessment (TVS placement, clamping
+`pcb_analyze_esd`: ESD protection assessment (TVS placement, clamping
 voltage, IEC 61000-4-2 levels).
 
 ## Classification
@@ -141,10 +141,10 @@ voltage, IEC 61000-4-2 levels).
 
 ## Supported standards
 
-- **IPC-2221** — Generic PCB design (current capacity)
-- **IPC-2141** — Controlled impedance
-- **FCC Part 15** — Radiated + conducted emission limits
-- **CISPR 22 / 32** — Information-technology / multimedia equipment emissions
-- **IEC 61000-4** — ESD, surge, immunity
-- **JEDEC** — DDR timing + topology
-- **PCIe CEM** — Lane routing + loss budget
+- **IPC-2221**: Generic PCB design (current capacity)
+- **IPC-2141**: Controlled impedance
+- **FCC Part 15**: Radiated + conducted emission limits
+- **CISPR 22 / 32**: Information-technology / multimedia equipment emissions
+- **IEC 61000-4**: ESD, surge, immunity
+- **JEDEC**: DDR timing + topology
+- **PCIe CEM**: Lane routing + loss budget

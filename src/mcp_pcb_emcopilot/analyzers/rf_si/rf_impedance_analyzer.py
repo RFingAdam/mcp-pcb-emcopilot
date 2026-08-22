@@ -6,7 +6,7 @@ Validates:
 - Ground coplanar waveguide (GCPW) detection
 - RF component connectivity
 
-Decoupled from SQLAlchemy — operates on PCBDesignData.
+Decoupled from SQLAlchemy: operates on PCBDesignData.
 """
 
 from __future__ import annotations
@@ -124,7 +124,7 @@ class RFImpedanceAnalyzer:
         # Get stackup info for impedance calculations
         copper_layers = [l for l in design_data.layers if l.layer_type in ("signal", "plane", "mixed")]
         if not copper_layers:
-            result.stackup_notes.append("No stackup data — cannot calculate impedance")
+            result.stackup_notes.append("No stackup data: cannot calculate impedance")
             return result
 
         # Check impedance for each RF net

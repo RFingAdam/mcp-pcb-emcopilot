@@ -1,4 +1,4 @@
-"""Tests for integrations/nec2_bridge — antenna intent emission."""
+"""Tests for integrations/nec2_bridge: antenna intent emission."""
 
 from __future__ import annotations
 

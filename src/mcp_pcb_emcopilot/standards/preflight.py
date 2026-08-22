@@ -1,4 +1,4 @@
-"""Preflight gate — refuses to advance past run_design_review or
+"""Preflight gate: refuses to advance past run_design_review or
 generate_design_review_report when intake state is incomplete.
 
 The gate is intentionally generous: any single critical defect causes
@@ -76,7 +76,7 @@ def validate_review_complete(
     The gate combines:
     - Required-question completion (core + market-specific).
     - Standard selection (at least one active standard must be in scope).
-    - Standards coverage state — ``stub`` or ``unimplemented`` standards
+    - Standards coverage state: ``stub`` or ``unimplemented`` standards
       surface as ``incomplete_standards`` but do not block on their own;
       they become blocking only if no other standard fully covers the same
       hazard domain (judgement deferred to the caller via notes).
@@ -85,7 +85,7 @@ def validate_review_complete(
     answers = ctx.get("interactive_answers", {}) or {}
 
     # Resolve active markets. The ``markets`` key may be absent, the wrong
-    # type, or a list — coerce to a flat list[str] before further use.
+    # type, or a list: coerce to a flat list[str] before further use.
     raw_markets = ctx.get("markets")
     explicit_markets: list[str] = (
         [str(m).lower() for m in raw_markets] if isinstance(raw_markets, list) else []
@@ -117,7 +117,7 @@ def validate_review_complete(
     if markets:
         notes.append(f"Active markets: {', '.join(markets)}.")
     else:
-        notes.append("No active market declared — call pcb_set_market or include declared_market.")
+        notes.append("No active market declared: call pcb_set_market or include declared_market.")
     if incomplete:
         notes.append(
             "Standards with stub or unimplemented coverage: "

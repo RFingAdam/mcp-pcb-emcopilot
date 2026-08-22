@@ -8,7 +8,7 @@ This is the single test that proves the whole flagship pipeline works:
 4. verify the outputs are structurally valid (non-empty, readable as
    their respective formats, contain expected section anchors).
 
-It does NOT hash-check artifact contents — DOCX output embeds a
+It does NOT hash-check artifact contents: DOCX output embeds a
 creation timestamp that makes byte-identical reproduction impossible
 without monkey-patching the whole toolchain. Structural validation is
 the right level for a regression gate: if the review silently produces
@@ -49,7 +49,7 @@ def test_review_covers_multiple_domains(reviewed_design):
     # produce results for a meaningful cross-section of them.
     assert len(review.domain_results) >= 10
     statuses = {dr.status for dr in review.domain_results}
-    # At least one domain must have actually run — not all skipped/errored.
+    # At least one domain must have actually run. Not all skipped/errored.
     assert statuses & {"pass", "warning", "fail"}, (
         f"no domains actually ran; statuses were {statuses}"
     )
@@ -59,7 +59,7 @@ def test_executive_summary_is_nontrivial(reviewed_design):
     _, review = reviewed_design
     summary = review.executive_summary
     assert summary is not None
-    # Either a non-empty string or a dict with fields — reject both None
+    # Either a non-empty string or a dict with fields: reject both None
     # and empty stringy/empty-dict cases that indicate the summariser bailed.
     assert (isinstance(summary, str) and len(summary) > 50) or (
         isinstance(summary, dict) and summary
@@ -78,7 +78,7 @@ def test_docx_report_is_valid_zip(reviewed_design, tmp_path):
 
     assert Path(path).exists()
     assert Path(path).stat().st_size > 1024, "DOCX report is suspiciously small"
-    # DOCX is a ZIP — if the archive is malformed the report is broken.
+    # DOCX is a ZIP. If the archive is malformed the report is broken.
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
     assert "word/document.xml" in names, "DOCX missing core document.xml"

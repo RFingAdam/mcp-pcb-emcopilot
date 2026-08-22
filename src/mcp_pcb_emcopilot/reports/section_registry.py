@@ -1,4 +1,4 @@
-"""Report section registry — defines the fixed ordering and metadata for report sections."""
+"""Report section registry: defines the fixed ordering and metadata for report sections."""
 
 from __future__ import annotations
 

@@ -488,7 +488,7 @@ class ODBParser:
                     except ValueError:
                         continue
 
-                    # Copper weight (parse early — used by layer_dielectric logic)
+                    # Copper weight (parse early. Used by layer_dielectric logic)
                     if attr_name == 'copper_weight' and num_val > 0:
                         layer_info.copper_weight_oz = num_val
                         # Also set copper thickness from weight
@@ -498,7 +498,7 @@ class ODBParser:
                             layer_info.thickness_mm = num_val * 0.035  # 1oz = 35μm
                         continue
 
-                    # Layer dielectric thickness — for dielectric layers this IS
+                    # Layer dielectric thickness: for dielectric layers this IS
                     # the layer thickness; for copper layers this is the adjacent
                     # dielectric thickness (NOT the copper thickness)
                     if attr_name == 'layer_dielectric' and num_val > 0:
@@ -1248,7 +1248,7 @@ class ODBParser:
                     ))
                     feature_idx += 1
 
-            # Pad record — also a feature, increment index
+            # Pad record: also a feature, increment index
             elif line.startswith('P '):
                 feature_idx += 1
 
@@ -1437,7 +1437,7 @@ class ODBParser:
                         sym_idx = parts[3] if len(parts) >= 4 else None
                         drill_size = symbol_sizes.get(sym_idx, default_drill) if sym_idx else default_drill
 
-                        # Net number (Fix 1.2) — find last numeric field after polarity
+                        # Net number (Fix 1.2): find last numeric field after polarity
                         net_name: Optional[str] = None
                         net_num: Optional[int] = None
                         # Format: P x y sym P net_num mirror
@@ -1804,7 +1804,7 @@ class ODBParser:
             if match_rate < 0.3:
                 data.parse_warnings.append(
                     f"EDA net mapping validation: only {match_rate*100:.0f}% of GND vias "
-                    f"are within 2mm of GND traces — feature index alignment may be off"
+                    f"are within 2mm of GND traces: feature index alignment may be off"
                 )
 
         # Count net assignment statistics

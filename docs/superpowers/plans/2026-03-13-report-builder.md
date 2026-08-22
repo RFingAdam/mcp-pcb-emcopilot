@@ -18,7 +18,7 @@
 |------|--------|---------------|
 | `src/mcp_pcb_emcopilot/reports/tracked_finding.py` | Create | `TrackedFinding` dataclass with traceability fields |
 | `src/mcp_pcb_emcopilot/reports/section_registry.py` | Create | `SectionDef` dataclass and `REPORT_SECTIONS` ordered list |
-| `src/mcp_pcb_emcopilot/reports/report_builder.py` | Create | `ReportBuilder` class — session harvesting, section builders, document assembly |
+| `src/mcp_pcb_emcopilot/reports/report_builder.py` | Create | `ReportBuilder` class: session harvesting, section builders, document assembly |
 | `src/mcp_pcb_emcopilot/reports/__init__.py` | Modify | Export `ReportBuilder`, `TrackedFinding` |
 | `src/mcp_pcb_emcopilot/reports/docx_report.py` | Modify | Make helper functions public (remove `_` prefix) |
 | `src/mcp_pcb_emcopilot/models/pcb_data.py` | Modify | Add `analysis_cache` field to `PCBDesignData` |
@@ -242,7 +242,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'mcp_pcb_emcopilot.rep
 - [ ] **Step 3: Implement TrackedFinding**
 
 ```python
-"""TrackedFinding dataclass — traceable design review finding."""
+"""TrackedFinding dataclass: traceable design review finding."""
 
 from __future__ import annotations
 
@@ -283,7 +283,7 @@ class TrackedFinding:
     recommendation: str
     reference_standard: str
 
-    # Traceability (optional — not all findings map to a specific net)
+    # Traceability (optional. Not all findings map to a specific net)
     nets: list[str] = field(default_factory=list)
     layers: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)
@@ -422,7 +422,7 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Implement section registry**
 
 ```python
-"""Report section registry — defines the fixed ordering and metadata for report sections."""
+"""Report section registry: defines the fixed ordering and metadata for report sections."""
 
 from __future__ import annotations
 
@@ -652,7 +652,7 @@ git commit -m "refactor: make docx_report helpers public, update reports exports
 
 ## Chunk 4: ReportBuilder Core
 
-### Task 5: ReportBuilder — session harvesting and skeleton
+### Task 5: ReportBuilder: session harvesting and skeleton
 
 **Files:**
 - Create: `src/mcp_pcb_emcopilot/reports/report_builder.py`
@@ -880,11 +880,11 @@ Expected: FAIL with `ModuleNotFoundError`
 Create `src/mcp_pcb_emcopilot/reports/report_builder.py` with:
 
 1. `ReportBuilder.__init__(self, design, title=None, confidentiality="CONFIDENTIAL", output_dir="/tmp/pcb_reports", auto_render=True)`
-2. `ReportBuilder.generate(self, format="both") -> dict` — main entry point
-3. `ReportBuilder._harvest_session(self) -> dict` — collects review_results + analysis_cache
-4. `ReportBuilder._determine_verdict(self, all_findings) -> str` — verdict logic from spec 2.2
-5. `ReportBuilder._build_docx(self, results, all_findings, verdict) -> str` — assembles DOCX using docx_report.py helpers
-6. `ReportBuilder._build_html(self, results, all_findings, verdict) -> str` — assembles HTML using html_report.py
+2. `ReportBuilder.generate(self, format="both") -> dict`: main entry point
+3. `ReportBuilder._harvest_session(self) -> dict`: collects review_results + analysis_cache
+4. `ReportBuilder._determine_verdict(self, all_findings) -> str`: verdict logic from spec 2.2
+5. `ReportBuilder._build_docx(self, results, all_findings, verdict) -> str`: assembles DOCX using docx_report.py helpers
+6. `ReportBuilder._build_html(self, results, all_findings, verdict) -> str`: assembles HTML using html_report.py
 7. Required section stubs: `_build_executive_summary`, `_build_board_overview`, `_build_action_items`, `_build_tool_coverage`, `_build_glossary`, `_build_references`, `_build_appendices`
 8. Domain section stubs (one per skippable section) that check for data and skip if empty
 

@@ -1,23 +1,23 @@
-# Claude Review Playbook — Meticulous Professional PCB / EMC Design Review
+# Claude Review Playbook: Meticulous Professional PCB / EMC Design Review
 
 This document is the **binding workflow** Claude follows when conducting a design review through the `mcp-pcb-emcopilot` MCP server. Every pass is mandatory. Skipping a pass invalidates the review.
 
-The playbook is referenced from the MCP server's `instructions=` field, so Claude receives a pointer to it on every `initialize` handshake. The single entry tool is **`pcb_start_professional_review`** — it returns this playbook inline together with an input manifest, an interview pack, a standards shortlist, and a pass checklist.
+The playbook is referenced from the MCP server's `instructions=` field, so Claude receives a pointer to it on every `initialize` handshake. The single entry tool is **`pcb_start_professional_review`**. It returns this playbook inline together with an input manifest, an interview pack, a standards shortlist, and a pass checklist.
 
 ---
 
 ## Operating principles
 
-1. **Evidence-based** — every finding cites a tool call (session_id + tool_name + timestamp) and a measurement or limit. No claims without backing.
-2. **Multi-pass** — passes run in order. Earlier passes write into session state; later passes read it. Pre-flight gates refuse forward progress on incomplete state.
-3. **Assumptions are logged, not hidden** — anything Claude infers (a defaulted standard, an implied class, a missing answer) is captured in the session's `assumption_ledger` and surfaced in the final report's "Reviewer's Notes" appendix.
-4. **Confidence is a first-class field** — every finding carries a `confidence ∈ [0,1]`. Findings with `confidence < 0.7` or severity ≥ HIGH escalate to full-wave simulation (Pass 5).
-5. **Self-critical** — Pass 8 forces Claude to attack its own findings looking for blind spots, before the report is finalised.
-6. **Halt on incompleteness** — if a critical input is missing, Claude refuses to run further analyses and asks the user. Producing a review on incomplete data is a worse failure than asking a question.
+1. **Evidence-based**. Every finding cites a tool call (session_id + tool_name + timestamp) and a measurement or limit. No claims without backing.
+2. **Multi-pass**: passes run in order. Earlier passes write into session state; later passes read it. Pre-flight gates refuse forward progress on incomplete state.
+3. **Assumptions are logged, not hidden**. Anything Claude infers (a defaulted standard, an implied class, a missing answer) is captured in the session's `assumption_ledger` and surfaced in the final report's "Reviewer's Notes" appendix.
+4. **Confidence is a first-class field**. Every finding carries a `confidence ∈ [0,1]`. Findings with `confidence < 0.7` or severity ≥ HIGH escalate to full-wave simulation (Pass 5).
+5. **Self-critical**: Pass 8 forces Claude to attack its own findings looking for blind spots, before the report is finalised.
+6. **Halt on incompleteness**. If a critical input is missing, Claude refuses to run further analyses and asks the user. Producing a review on incomplete data is a worse failure than asking a question.
 
 ---
 
-## Pass 0 — Intake & file triage
+## Pass 0: Intake & file triage
 
 **Goal.** Establish what the user has given us, classify each file, and identify gaps before parsing.
 
@@ -50,52 +50,52 @@ The playbook is referenced from the MCP server's `instructions=` field, so Claud
 
 ---
 
-## Pass 1 — Scoping interview
+## Pass 1: Scoping interview
 
 **Goal.** Lock down the regulatory and operational scope of the review *before* any analyser fires. A senior consulting engineer always asks before reviewing.
 
 **Tools.**
-1. `pcb_get_review_questions(session_id)` — returns the merged `core + market` question pack. Includes the conditional questions (DDR / USB / RF / battery) and the market-specific ones from `MARKET_INTAKE_MATRIX.md`.
-2. `pcb_answer_review_questions(session_id, answers)` — store the user's answers.
-3. `pcb_set_review_context(session_id, ...)` — applies the answers, computes the active standards set.
-4. `pcb_set_market(session_id, market_id, sub_options)` *(new in Phase 4)* — if multiple markets apply (e.g. wireless medical), call once per market.
+1. `pcb_get_review_questions(session_id)`: returns the merged `core + market` question pack. Includes the conditional questions (DDR / USB / RF / battery) and the market-specific ones from `MARKET_INTAKE_MATRIX.md`.
+2. `pcb_answer_review_questions(session_id, answers)`: store the user's answers.
+3. `pcb_set_review_context(session_id, ...)`: applies the answers, computes the active standards set.
+4. `pcb_set_market(session_id, market_id, sub_options)` *(new in Phase 4)*. If multiple markets apply (e.g. wireless medical), call once per market.
 
 **Rules.**
 - Answer everything you can infer from the manifest (e.g. if the layout shows automotive bus pins, pre-fill `vehicle_class`). Mark inferred answers in the assumption ledger.
-- Ask the user for everything else *in a single batched question* — do not interrogate them one question at a time.
+- Ask the user for everything else *in a single batched question*. Do not interrogate them one question at a time.
 - Refuse to advance past P1 with unanswered required questions.
 
 **Exit condition.** All required questions answered or explicitly defaulted. `playbook_pass_state["P1"]` recorded.
 
 ---
 
-## Pass 2 — Parse & cross-reference
+## Pass 2: Parse & cross-reference
 
 **Goal.** Turn files into structured data and verify they agree.
 
 **Tool sequence.**
 1. `pcb_parse_layout(file_path, session_id)`
-2. `pcb_parse_schematic(file_path, session_id, format)` *(Phase 4 — falls back to `pcb_parse_schematic_pdf` if schematic-native parser unavailable)*
-3. `pcb_parse_step(file_path, session_id)` — only if STEP provided
+2. `pcb_parse_schematic(file_path, session_id, format)` *(Phase 4: falls back to `pcb_parse_schematic_pdf` if schematic-native parser unavailable)*
+3. `pcb_parse_step(file_path, session_id)`: only if STEP provided
 4. `pcb_parse_bom(file_path, session_id)` *(Phase 4)*
-5. `pcb_three_way_cross_reference(session_id)` *(Phase 4 — falls back to `pcb_cross_reference_schematic` today)*
-6. `pcb_get_stackup(session_id)`, `pcb_get_components(session_id)`, `pcb_get_nets(session_id)` — confirm extracted state.
+5. `pcb_three_way_cross_reference(session_id)` *(Phase 4: falls back to `pcb_cross_reference_schematic` today)*
+6. `pcb_get_stackup(session_id)`, `pcb_get_components(session_id)`, `pcb_get_nets(session_id)`: confirm extracted state.
 
 **Rules.**
-- HALT if the schematic ↔ layout net-count mismatch exceeds 5% — likely the user gave inconsistent files.
+- HALT if the schematic ↔ layout net-count mismatch exceeds 5%: likely the user gave inconsistent files.
 - Promote any CRITICAL cross-reference mismatch directly into the findings table (DNP differs, footprint differs, value differs).
 
 **Exit condition.** All available files parsed; cross-reference findings logged.
 
 ---
 
-## Pass 3 — Domain analysis
+## Pass 3: Domain analysis
 
 **Goal.** Run the full analyser surface with context-aware selection.
 
 **Tool sequence.**
-1. `pcb_classify_design(session_id)`, `pcb_classify_nets(session_id)`, `pcb_detect_interfaces(session_id)` — populate detection state.
-2. `pcb_run_design_review(session_id)` — fires the orchestrator's 5-phase pipeline (classify → detect → select → execute → correlate).
+1. `pcb_classify_design(session_id)`, `pcb_classify_nets(session_id)`, `pcb_detect_interfaces(session_id)`: populate detection state.
+2. `pcb_run_design_review(session_id)`: fires the orchestrator's 5-phase pipeline (classify → detect → select → execute → correlate).
 3. **Per detected interface**, run the deep validators:
    - DDR: `pcb_validate_ddr_topology`, `pcb_analyze_ddr_timing_budget`, `pcb_analyze_ddr`
    - PCIe: `pcb_validate_pcie_lanes`, `pcb_calc_pcie_link_budget`, `pcb_analyze_pcie`
@@ -110,18 +110,18 @@ The playbook is referenced from the MCP server's `instructions=` field, so Claud
 5. Read `pcb_get_emi_hotspots(session_id)` to surface high-risk regions for the report.
 
 **Rules.**
-- A failure to run an analyser (exception) is itself a finding — confidence drops to 0.3 and the missing area is flagged for human review.
+- A failure to run an analyser (exception) is itself a finding: confidence drops to 0.3 and the missing area is flagged for human review.
 
 **Exit condition.** `playbook_pass_state["P3"]` records every analyser called and its finding count.
 
 ---
 
-## Pass 4 — Standards verification
+## Pass 4: Standards verification
 
 **Goal.** Compare predictions to the limits for *every* selected standard, using live data when available.
 
 **Tool sequence per standard.**
-1. Live limit lookup (Phase 3 — new):
+1. Live limit lookup (Phase 3: new):
    - `mcp__emc-regulations__cispr25_limit(class_n, freq_mhz, detector)` *(automotive)*
    - `mcp__emc-regulations__fcc_part15_limit(class, freq_mhz, detector)` *(commercial / wireless)*
    - `mcp__emc-regulations__iso11452_levels(test_method, level)` *(automotive immunity)*
@@ -130,9 +130,9 @@ The playbook is referenced from the MCP server's `instructions=` field, so Claud
    - `mcp__emc-regulations__fcc_part_lookup(part_number)` *(intentional radiator)*
    - `mcp__emc-regulations__protocol_limits(protocol, band)` *(wireless protocols)*
 2. Predictions:
-   - `pcb_predict_emissions(session_id, standard)` — radiated emissions vs limit line
-   - `pcb_predict_compliance(session_id, standard_set)` — go/no-go per standard
-   - `pcb_analyze_conducted_emissions(session_id)` — vs LISN-based limits
+   - `pcb_predict_emissions(session_id, standard)`: radiated emissions vs limit line
+   - `pcb_predict_compliance(session_id, standard_set)`: go/no-go per standard
+   - `pcb_analyze_conducted_emissions(session_id)`: vs LISN-based limits
 
 **Rules.**
 - Log compliance margin in dB for every standard. A negative margin is automatically severity ≥ HIGH.
@@ -142,7 +142,7 @@ The playbook is referenced from the MCP server's `instructions=` field, so Claud
 
 ---
 
-## Pass 5 — Simulation escalation
+## Pass 5: Simulation escalation
 
 **Goal.** Verify analytical findings that matter with full-wave EM (openEMS) or NEC2 antenna simulation. Cheap analytical heuristics are insufficient for a meticulous review when severity is high or confidence is low.
 
@@ -154,16 +154,16 @@ escalate = (severity in {CRITICAL, HIGH} OR confidence < 0.7)
 ```
 
 **Tool sequence.**
-1. `pcb_extract_simulation_candidates(session_id)` — orchestrator's candidate list.
-2. `pcb_suggest_next_actions(session_id, domains=["si","emc","antenna","pi"])` *(Phase 3 — new)* — returns a prioritised list of `ExternalAction` objects (openEMS / NEC2 / live regs).
+1. `pcb_extract_simulation_candidates(session_id)`: orchestrator's candidate list.
+2. `pcb_suggest_next_actions(session_id, domains=["si","emc","antenna","pi"])` *(Phase 3: new)*: returns a prioritised list of `ExternalAction` objects (openEMS / NEC2 / live regs).
 3. For each action with `mcp_server="openems"`:
    - Call the matching `mcp__openems__*` tool (`openems_create_microstrip`, `_stripline`, `_via`, `_coupled_lines`, `_patch`, `_dipole`, `_horn`, `_helix`, `_monopole`) with the supplied params.
    - Run `mcp__openems__openems_generate_script` → user executes the simulation (or it runs in CI for synthetic boards).
-   - Feed result back via `pcb_attach_external_result(session_id, action_id, result)` — orchestrator re-correlates the finding (`verified=True`, severity may shift up or down within tolerance).
+   - Feed result back via `pcb_attach_external_result(session_id, action_id, result)`: orchestrator re-correlates the finding (`verified=True`, severity may shift up or down within tolerance).
 4. For each action with `mcp_server="nec2-antenna"` (triggered when an intentional radiator ≥ 30 MHz is detected):
    - `mcp__nec2-antenna__nec2_create_<type>` then `mcp__nec2-antenna__nec2_simulate`.
    - Attach result; finding gains `simulated_vswr`, `simulated_gain_dbi`, `pattern_null_directions`.
-5. `pcb_validate_with_openems(session_id, finding_id)` — closes the loop, sets `verified=True/False` based on tolerance (`SIM_TOLERANCE_PCT=5%`).
+5. `pcb_validate_with_openems(session_id, finding_id)`: closes the loop, sets `verified=True/False` based on tolerance (`SIM_TOLERANCE_PCT=5%`).
 
 **Rules.**
 - A simulation `pass` → `verified=True, confidence=0.95, source="openems"`.
@@ -175,43 +175,43 @@ escalate = (severity in {CRITICAL, HIGH} OR confidence < 0.7)
 
 ---
 
-## Pass 6 — Cross-domain correlation
+## Pass 6: Cross-domain correlation
 
 **Goal.** Find compound failure modes that single-domain analysers miss.
 
 **Correlations to check.**
-- **Thermal × SI** — elevated junction temp shrinks timing margin. Re-check DDR/PCIe eyes if any `thermal` finding ≥ MEDIUM.
-- **PDN × EMI** — PDN anti-resonance near a clock harmonic? Re-rate clock_emi findings.
-- **EMC × Routing** — return-path break + high di/dt source nearby → escalate to CRITICAL.
-- **Mechanical × ESD** — STEP shows accessible mechanical surfaces within 10 mm of a sensitive net without ESD protection → flag.
-- **DFM × Grounding** — via pitch < 250 µm near power-return → thermal-relief adequacy.
-- **Protection circuit × Interface** *(Phase 4)* — external-facing pin (USB/Ethernet PHY/antenna port) without TVS in schematic.
+- **Thermal × SI**: elevated junction temp shrinks timing margin. Re-check DDR/PCIe eyes if any `thermal` finding ≥ MEDIUM.
+- **PDN × EMI**: PDN anti-resonance near a clock harmonic? Re-rate clock_emi findings.
+- **EMC × Routing**: return-path break + high di/dt source nearby → escalate to CRITICAL.
+- **Mechanical × ESD**: STEP shows accessible mechanical surfaces within 10 mm of a sensitive net without ESD protection → flag.
+- **DFM × Grounding**: via pitch < 250 µm near power-return → thermal-relief adequacy.
+- **Protection circuit × Interface** *(Phase 4)*: external-facing pin (USB/Ethernet PHY/antenna port) without TVS in schematic.
 
 **Tool sequence.**
-- `pcb_analyze_emi_risk(session_id)`, `pcb_analyze_immunity_margin(session_id)` — re-run with full findings as context.
-- `pcb_compare_simulation(session_id)` — closes analytical-vs-simulated loop.
+- `pcb_analyze_emi_risk(session_id)`, `pcb_analyze_immunity_margin(session_id)`: re-run with full findings as context.
+- `pcb_compare_simulation(session_id)`: closes analytical-vs-simulated loop.
 
 **Exit condition.** Risk matrix populated. `playbook_pass_state["P6"]` updated.
 
 ---
 
-## Pass 7 — Reporting
+## Pass 7: Reporting
 
 **Goal.** Produce the audit-grade deliverable.
 
 **Tool sequence.**
 1. Renders:
    - `pcb_render_board(session_id)`, `pcb_export_all_renders(session_id)`
-   - `pcb_annotate_board(session_id, findings)` — overlays severity markers at coordinates.
+   - `pcb_annotate_board(session_id, findings)`: overlays severity markers at coordinates.
    - `pcb_render_stackup(session_id)`, `pcb_render_net(session_id, net_name)` for high-risk nets.
-2. Diagrams *(Phase 3 — drawio_bridge emits the intents)*:
-   - `mcp__drawio-engineering__create_pcb_stackup` — always.
-   - `mcp__drawio-engineering__create_rf_block_diagram` — if RF detected.
-   - `mcp__drawio-engineering__create_emc_test_setup` — one per market.
-   - `mcp__drawio-engineering__markup_schematic` — if schematic parsed.
+2. Diagrams *(Phase 3: drawio_bridge emits the intents)*:
+   - `mcp__drawio-engineering__create_pcb_stackup`: always.
+   - `mcp__drawio-engineering__create_rf_block_diagram`. If RF detected.
+   - `mcp__drawio-engineering__create_emc_test_setup`. One per market.
+   - `mcp__drawio-engineering__markup_schematic`. If schematic parsed.
    - Each result attached via `pcb_attach_external_result`; report builder embeds them.
-3. `pcb_generate_test_plan(session_id)` — recommended test set per market.
-4. `pcb_generate_design_review_report(session_id, formats=["html","docx"])` — refuses to run unless P0–P6 logged; emits PRELIMINARY-stamped output if `force=True`.
+3. `pcb_generate_test_plan(session_id)`: recommended test set per market.
+4. `pcb_generate_design_review_report(session_id, formats=["html","docx"])`: refuses to run unless P0–P6 logged; emits PRELIMINARY-stamped output if `force=True`.
 
 **Output sections** (existing template, augmented):
 - Executive summary with go/no-go
@@ -229,20 +229,20 @@ escalate = (severity in {CRITICAL, HIGH} OR confidence < 0.7)
 
 ---
 
-## Pass 8 — Self-critique
+## Pass 8: Self-critique
 
 **Goal.** Attack the review for blind spots before delivering.
 
 **Use** `docs/SELF_CRITIQUE_CHECKLIST.md`. At minimum:
 
-1. **Coverage** — every detected interface has its deep validator entry in `P3`? Every standard in shortlist has a limit lookup in `P4`?
-2. **Confidence audit** — list every finding with `confidence < 0.8`; justify why it wasn't escalated.
-3. **Assumption ledger** — every inferred answer, defaulted standard, missing input — captured.
-4. **Counter-evidence** — for each HIGH/CRITICAL finding, what would falsify it? Did we check?
-5. **Simulation gap** — any HIGH finding lacking openEMS / NEC2 corroboration → explain.
-6. **Standards traceability** — every cited limit links to an `mcp__emc-regulations__*` action_id or `analytical-fallback` flag.
-7. **Human review flags** — list items a registered PE should personally verify before signing the report.
-8. **Known blind spots** — thermal transients, ESD soft-fail, long-term drift, EOL stackup tolerance, ageing capacitors, supply-chain MPN substitutions.
+1. **Coverage**. Every detected interface has its deep validator entry in `P3`? Every standard in shortlist has a limit lookup in `P4`?
+2. **Confidence audit**: list every finding with `confidence < 0.8`; justify why it wasn't escalated.
+3. **Assumption ledger**. Every inferred answer, defaulted standard, missing input: captured.
+4. **Counter-evidence**: for each HIGH/CRITICAL finding, what would falsify it? Did we check?
+5. **Simulation gap**. Any HIGH finding lacking openEMS / NEC2 corroboration → explain.
+6. **Standards traceability**. Every cited limit links to an `mcp__emc-regulations__*` action_id or `analytical-fallback` flag.
+7. **Human review flags**: list items a registered PE should personally verify before signing the report.
+8. **Known blind spots**: thermal transients, ESD soft-fail, long-term drift, EOL stackup tolerance, ageing capacitors, supply-chain MPN substitutions.
 
 **Tool.** Append the critique as the "Reviewer's Notes" appendix of the existing report. Re-run `pcb_generate_design_review_report(session_id, regenerate_appendix_only=True)`.
 
@@ -250,7 +250,7 @@ escalate = (severity in {CRITICAL, HIGH} OR confidence < 0.7)
 
 ---
 
-## State logging — what every pass writes
+## State logging: what every pass writes
 
 Each pass appends to `session.playbook_pass_state[pass_id]`:
 
@@ -278,7 +278,7 @@ Each pass appends to `session.playbook_pass_state[pass_id]`:
 
 - **Missing layout file** → P0 halts. Refuse to continue.
 - **Schematic ↔ layout net-count mismatch > 5%** → P2 halts. Surface the discrepancy to the user.
-- **All sibling MCPs unavailable** → P4 and P5 use fallbacks; report is stamped "PRELIMINARY — external verification unavailable". Not invalid, just downgraded.
+- **All sibling MCPs unavailable** → P4 and P5 use fallbacks; report is stamped "PRELIMINARY: external verification unavailable". Not invalid, just downgraded.
 - **A required interview question unanswered** → P1 will not advance. Re-ask the user.
 - **Critical finding without simulation verification when sim was available** → P8 catches it and forces re-run of P5.
 
@@ -288,14 +288,14 @@ Each pass appends to `session.playbook_pass_state[pass_id]`:
 
 User: *"Review the attached automotive accessory board for CISPR-25 Class 3 + ISO 7637-2 + ISO 11452-4. Files: dashboard.kicad_pcb, dashboard_sch.pdf, dashboard_stackup.json, dashboard_bom.csv, dashboard.step. Product: 12 V dashboard accessory, key-on/off, no engine-bay placement."*
 
-1. **P0** — `pcb_start_professional_review` returns manifest (5 files, no gaps), market=automotive, standards_shortlist=`[CISPR_25_CLASS_3, ISO_11452_4, ISO_7637_2, ISO_16750_2]`.
-2. **P1** — Interview pack adds `vehicle_class`, `bus_voltage`, `iso7637_pulses`, `oem_spec`. User answers in one batch. `pcb_set_review_context` applies.
-3. **P2** — Parse all five files; 3-way cross-ref flags a footprint mismatch on R47 (HIGH).
-4. **P3** — Orchestrator runs 8 analysers; `pcb_analyze_automotive_emc` flags two return-path breaks; `pcb_analyze_smps_emi` flags a 2 MHz SMPS harmonic near the AM-band limit.
-5. **P4** — `mcp__emc-regulations__cispr25_limit` returns Class 3 AM-band radiated limit; predicted emission exceeds it by 4 dB (CRITICAL).
-6. **P5** — `pcb_suggest_next_actions` returns 3 openEMS escalations. `mcp__openems__*` simulations confirm the AM-band exceedance (verified=True) and one return-path finding is downgraded to MEDIUM after simulation.
-7. **P6** — Cross-correlation links the verified AM-band exceedance to the unstitched SMPS return path → recommendation chain.
-8. **P7** — Reports generated; drawio creates stackup + RF chain + CISPR-25 test setup diagrams.
-9. **P8** — Self-critique flags that the ISO 7637-2 Pulse 5b transient was not simulated (no analyser for transient response yet) → appended to "Reviewer's Notes" as a human-review flag.
+1. **P0**: `pcb_start_professional_review` returns manifest (5 files, no gaps), market=automotive, standards_shortlist=`[CISPR_25_CLASS_3, ISO_11452_4, ISO_7637_2, ISO_16750_2]`.
+2. **P1**: Interview pack adds `vehicle_class`, `bus_voltage`, `iso7637_pulses`, `oem_spec`. User answers in one batch. `pcb_set_review_context` applies.
+3. **P2**: Parse all five files; 3-way cross-ref flags a footprint mismatch on R47 (HIGH).
+4. **P3**: Orchestrator runs 8 analysers; `pcb_analyze_automotive_emc` flags two return-path breaks; `pcb_analyze_smps_emi` flags a 2 MHz SMPS harmonic near the AM-band limit.
+5. **P4**: `mcp__emc-regulations__cispr25_limit` returns Class 3 AM-band radiated limit; predicted emission exceeds it by 4 dB (CRITICAL).
+6. **P5**: `pcb_suggest_next_actions` returns 3 openEMS escalations. `mcp__openems__*` simulations confirm the AM-band exceedance (verified=True) and one return-path finding is downgraded to MEDIUM after simulation.
+7. **P6**: Cross-correlation links the verified AM-band exceedance to the unstitched SMPS return path → recommendation chain.
+8. **P7**: Reports generated; drawio creates stackup + RF chain + CISPR-25 test setup diagrams.
+9. **P8**: Self-critique flags that the ISO 7637-2 Pulse 5b transient was not simulated (no analyser for transient response yet) → appended to "Reviewer's Notes" as a human-review flag.
 
 Final output: DOCX + HTML report, ~18 pages, 14 findings, 3 verified by simulation, 1 human-review flag, "Go with conditions" verdict. Total agent time: ~6 min, ~28 tool calls.

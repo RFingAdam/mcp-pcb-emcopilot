@@ -32,7 +32,7 @@ def test_in_bom_on_board_become_dnp_flag(sample_kicad_sch):
     c1 = next(c for c in result.components if c.reference == "C1")
     c2 = next(c for c in result.components if c.reference == "C2")
     assert c1.properties["dnp"] is False  # in_bom=yes + on_board=yes
-    assert c2.properties["dnp"] is True   # in_bom=no — DNP
+    assert c2.properties["dnp"] is True   # in_bom=no: DNP
 
 
 def test_dnp_in_bom_and_on_board_recorded_separately(sample_kicad_sch):

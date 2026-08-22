@@ -1,5 +1,5 @@
-"""End-to-end test for the Phase 4 MCP tools — pcb_set_market,
-pcb_get_standards_coverage, pcb_validate_review_complete — plus the
+"""End-to-end test for the Phase 4 MCP tools: pcb_set_market,
+pcb_get_standards_coverage, pcb_validate_review_complete: plus the
 preflight gate wired into pcb_generate_design_review_report.
 """
 
@@ -177,7 +177,7 @@ def test_report_force_true_emits_preliminary_when_preflight_fails(fresh_session)
         {"session_id": fresh_session, "format": "html", "force": True},
     )
     # Either the builder produced a report (with preliminary=True) or it
-    # itself returned a structured response — in either case the gate did
+    # itself returned a structured response: in either case the gate did
     # not stop us.
     assert out.get("status") != "deferred"
     if "preliminary" in out:

@@ -92,7 +92,7 @@ def _pi_filter_transfer(
     a21 = y_c1
     a22 = y_c1 * z_l + 1
 
-    # (M_c1 * M_l) * M_c2 — right multiply by [[1,0],[y_c2,1]]
+    # (M_c1 * M_l) * M_c2: right multiply by [[1,0],[y_c2,1]]
     A_final = a11 + a12 * y_c2
     B_final = a12
     C_final = a21 + a22 * y_c2

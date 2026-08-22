@@ -40,7 +40,7 @@ def _hammerstad_roughness_factor(skin_depth_m: float, surface_roughness_m: float
 def _effective_er_microstrip(w: float, h: float, er: float) -> float:
     """Hammerstad-Jensen effective dielectric constant for microstrip.
 
-    Parameters are in consistent units (both mm or both m — ratio only).
+    Parameters are in consistent units (both mm or both m: ratio only).
     """
     wh = w / h
     if wh <= 1:
@@ -121,9 +121,9 @@ def calculate_insertion_loss(
     """Calculate frequency-swept insertion loss (S21) and return loss (S11).
 
     Models included:
-    * Conductor loss — skin-effect + Hammerstad surface roughness
-    * Dielectric loss — alpha_d formula
-    * Mismatch loss — from impedance deviation vs 50 ohm reference
+    * Conductor loss: skin-effect + Hammerstad surface roughness
+    * Dielectric loss: alpha_d formula
+    * Mismatch loss: from impedance deviation vs 50 ohm reference
 
     Returns dict with arrays ``frequency_mhz``, ``s21_db``, ``s11_db``,
     plus scalar summaries and notes.
@@ -145,7 +145,7 @@ def calculate_insertion_loss(
                                  trace_thickness_mm, dielectric_constant)
 
     # Mismatch: S11 from impedance discontinuity (constant with frequency for a simple
-    # model — no length-dependent resonance in this simplified extractor).
+    # model: no length-dependent resonance in this simplified extractor).
     if z0 + z0_ref > 0:
         gamma_mismatch = abs(z0 - z0_ref) / (z0 + z0_ref)
     else:
@@ -202,13 +202,13 @@ def calculate_insertion_loss(
                      f"(conductor {cond*0.0254:.3f} + dielectric {diel*0.0254:.3f})")
 
     if loss_tangent > 0.015:
-        notes.append(f"High loss tangent ({loss_tangent}) — consider low-loss laminate for >5 GHz")
+        notes.append(f"High loss tangent ({loss_tangent}): consider low-loss laminate for >5 GHz")
     if surface_roughness_um > 1.0:
         notes.append(f"Rough copper ({surface_roughness_um} um) adds significant conductor loss at high frequency")
 
     z_deviation_pct = abs(z0 - z0_ref) / z0_ref * 100
     if z_deviation_pct > 10:
-        notes.append(f"Trace impedance {z0:.1f} ohm deviates {z_deviation_pct:.1f}% from 50 ohm — adjust width")
+        notes.append(f"Trace impedance {z0:.1f} ohm deviates {z_deviation_pct:.1f}% from 50 ohm: adjust width")
 
     return {
         "frequency_mhz": frequencies_mhz,
@@ -272,11 +272,11 @@ def calculate_return_loss(
 
     notes = []
     if vswr > 2.0:
-        notes.append(f"VSWR {vswr:.2f} — significant mismatch, consider impedance matching")
+        notes.append(f"VSWR {vswr:.2f}: significant mismatch, consider impedance matching")
     elif vswr > 1.5:
-        notes.append(f"VSWR {vswr:.2f} — moderate mismatch")
+        notes.append(f"VSWR {vswr:.2f}: moderate mismatch")
     else:
-        notes.append(f"VSWR {vswr:.3f} — good match")
+        notes.append(f"VSWR {vswr:.3f}: good match")
 
     return {
         "s11_db": round(s11_db, 3),

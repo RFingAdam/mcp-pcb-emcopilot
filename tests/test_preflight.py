@@ -1,4 +1,4 @@
-"""Tests for standards/preflight — validate_review_complete gate."""
+"""Tests for standards/preflight: validate_review_complete gate."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from mcp_pcb_emcopilot.standards.preflight import (
 
 
 class _Design:
-    """Stub PCBDesignData — only review_context / review_results used."""
+    """Stub PCBDesignData: only review_context / review_results used."""
     def __init__(self, review_context: dict | None = None,
                  review_results: dict | None = None) -> None:
         self.review_context = review_context or {}

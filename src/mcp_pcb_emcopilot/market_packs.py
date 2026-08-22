@@ -1,9 +1,9 @@
 """Market-specific question packs and standards bundles.
 
 Data-only module. Consumed by:
-- ``review_playbook.build_interview_pack`` — to compose the per-session interview.
-- ``review_context.get_review_questions`` — to merge the core + market packs.
-- ``standards.coverage`` (Phase 4) — to map markets to required analyzers.
+- ``review_playbook.build_interview_pack``: to compose the per-session interview.
+- ``review_context.get_review_questions``: to merge the core + market packs.
+- ``standards.coverage`` (Phase 4): to map markets to required analyzers.
 
 Adding a new market = adding a single dict entry to ``QUESTION_BANK`` plus an
 entry in ``MARKET_STANDARDS`` and ``MARKET_ANALYZERS``. No new code paths.
@@ -47,7 +47,7 @@ QUESTION_BANK: dict[str, list[dict[str, Any]]] = {
             "type": "choice",
             "choices": ["QM", "A", "B", "C", "D"],
             "default": "QM",
-            "why": "Functional-safety classification — affects diagnostic-coverage and redundancy review.",
+            "why": "Functional-safety classification: affects diagnostic-coverage and redundancy review.",
         },
         {
             "id": "cispr25_class",
@@ -73,7 +73,7 @@ QUESTION_BANK: dict[str, list[dict[str, Any]]] = {
             "type": "multi",
             "choices": ["off", "accessory", "on", "cranking"],
             "default": ["on"],
-            "why": "Defines which power modes must comply — cranking includes low-voltage operation per ISO 16750.",
+            "why": "Defines which power modes must comply: cranking includes low-voltage operation per ISO 16750.",
         },
         {
             "id": "iso7637_pulses",

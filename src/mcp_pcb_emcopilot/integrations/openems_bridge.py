@@ -245,7 +245,7 @@ Trace: w={geom["trace_width_mm"]}mm, h={geom["dielectric_height_mm"]}mm, er={geo
 import os
 import numpy as np
 
-# Try importing openEMS — graceful fallback if not installed
+# Try importing openEMS: graceful fallback if not installed
 try:
     from CSXCAD import ContinuousStructure
     from openEMS import openEMS

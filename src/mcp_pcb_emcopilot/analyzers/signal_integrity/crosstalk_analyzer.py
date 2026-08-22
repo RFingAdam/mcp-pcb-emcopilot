@@ -1,5 +1,5 @@
 """
-Crosstalk Analyzer — detects parallel trace coupling on high-speed nets.
+Crosstalk Analyzer: detects parallel trace coupling on high-speed nets.
 
 Finds parallel trace segments on the same layer within coupling distance,
 estimates NEXT/FEXT using simplified models, and flags critical pairs based
@@ -162,7 +162,7 @@ class CrosstalkAnalyzer:
         flagged_pairs: set[tuple[str, str, str]] = set()
 
         for layer, layer_trs in layer_traces.items():
-            # Sort by segment length descending — longest segments have most coupling risk
+            # Sort by segment length descending: longest segments have most coupling risk
             layer_trs.sort(
                 key=lambda t: _segment_length(t.x1_mm, t.y1_mm, t.x2_mm, t.y2_mm),
                 reverse=True,

@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # ISO 11452 field strength and BCI levels (duplicated from automotive_emc
-# for self-contained use — values are identical)
+# for self-contained use: values are identical)
 # ---------------------------------------------------------------------------
 ISO11452_FIELD_LEVELS: dict[int, float] = {
     1: 1.0,
@@ -200,7 +200,7 @@ def get_ic_threshold(ic_type: str) -> dict[str, float | str]:
     return {
         "upset_v": 0.3,
         "damage_v": 2.0,
-        "description": f"Unknown IC type '{ic_type}' — using conservative CMOS defaults",
+        "description": f"Unknown IC type '{ic_type}': using conservative CMOS defaults",
     }
 
 
@@ -267,11 +267,11 @@ class ImmunityAnalyzer:
         ----------
         interfaces : list[dict]
             Each dict must contain:
-              - name : str              — interface label
-              - cable_length_mm : float — cable / trace run length
-              - shielding : str         — "none", "unshielded", "shielded"
-              - ic_type : str           — key into IC_THRESHOLDS
-              - trace_length_mm : float — on-board trace to IC pin
+              - name : str             : interface label
+              - cable_length_mm : float: cable / trace run length
+              - shielding : str        : "none", "unshielded", "shielded"
+              - ic_type : str          : key into IC_THRESHOLDS
+              - trace_length_mm : float: on-board trace to IC pin
             Optional keys:
               - coupling_factor : float (default 1.0)
               - shield_thickness_mm : float (default 0.1)

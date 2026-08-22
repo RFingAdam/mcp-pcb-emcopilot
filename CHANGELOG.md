@@ -5,10 +5,10 @@ All notable changes to **mcp-pcb-emcopilot** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.2] — 2026-05-27
+## [0.4.2]: 2026-05-27
 
 ### Fixed
-- **CI typecheck** — `altium_to_parsed_schematic` was annotated
+- **CI typecheck**: `altium_to_parsed_schematic` was annotated
   `-> Any` to dodge a circular import with `schematic_parser`. mypy
   in CI (run with `--ignore-missing-imports` against the whole tree)
   flagged the downstream `SchematicParserFactory.parse` as
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with this typecheck failure on its tag commit; v0.4.2 is the same
   release content with CI green.
 
-## [0.4.1] — 2026-05-27
+## [0.4.1]: 2026-05-27
 
 ### Added
 - **AltiumSchematicParser**: PIN (#2), SHEET_SYMBOL (#15), SHEET_ENTRY
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter on a pin record wins; pins without one fall back to the
   shared geometric resolver (label-anchor snap, same algorithm as
   KiCad).
-- **Sheet-symbol hierarchy** — `AltiumSchematicData.sheet_symbols` and
+- **Sheet-symbol hierarchy**: `AltiumSchematicData.sheet_symbols` and
   `child_sheets` populated from SHEET_SYMBOL + FILE_NAME owner-index
   linkage. Hierarchy now surfaces in `ParsedSchematicData.sheet_count`
   and `properties['child_sheets']`.
@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maps `AltiumSchematicData` to the canonical `ParsedSchematicData`
   shape downstream analyzers expect. `SchematicParserFactory.parse()`
   wires the converter in so `.SchDoc` input flows through the same
-  analyzer surface as `.kicad_sch` — schematic-aware analyzers
+  analyzer surface as `.kicad_sch`: schematic-aware analyzers
   (3-way cross-reference, signal-flow, schematic-layout validator)
   stop running in degraded mode against Altium files.
 - **17 integration tests** in `test_altium_parameter_records.py` that
@@ -51,40 +51,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parsers share one implementation.
 
 ### Closes
-- [#121](https://github.com/RFingAdam/mcp-pcb-emcopilot/issues/121) —
+- [#121](https://github.com/RFingAdam/mcp-pcb-emcopilot/issues/121):
   Extend AltiumSchematicParser for DNP / MPN / pin-net mapping.
 
-## [0.4.0] — 2026-05-27
+## [0.4.0]: 2026-05-27
 
 ### Added
-- **Phase 2** — Claude-driven meticulous-review workflow.
-- **Phase 3 / 3a** — cross-MCP intent queue + four orchestration tools
+- **Phase 2**: Claude-driven meticulous-review workflow.
+- **Phase 3 / 3a**: cross-MCP intent queue + four orchestration tools
   (`pcb_request_simulation`, `pcb_request_limit_lookup`,
   `pcb_request_antenna_check`, `pcb_request_filter_design`).
-- **Phase 3b** — limits provider with sibling-MCP bridges into
+- **Phase 3b**: limits provider with sibling-MCP bridges into
   `mcp-emc-regulations`, `mcp-openems`, `mcp-nec2-antenna`, and
   `mcp-ltspice-qucs`.
-- **Phase 4** — multi-market intake (FCC Part 15 / CISPR / automotive
+- **Phase 4**: multi-market intake (FCC Part 15 / CISPR / automotive
   CISPR-25 / medical IEC-60601), standards-coverage report, and a
   pre-flight gate that refuses analysis when required market context
   is missing.
-- **Phase 4b** — schematic-aware analyzers and 3-way schematic /
+- **Phase 4b**: schematic-aware analyzers and 3-way schematic /
   layout / BOM cross-reference, plus the
   `pcb_three_way_cross_reference` tool.
-- **Phase 4c** — KiCad `sexpdata` parser for `.kicad_sch` and
+- **Phase 4c**: KiCad `sexpdata` parser for `.kicad_sch` and
   `.kicad_pcb`, netlist extractor, and `pcb_analyze_signal_flow`
   tool. CI pinned for reproducibility.
-- **web-ui scaffold** — React + Vite + Tailwind frontend salvaged
+- **web-ui scaffold**: React + Vite + Tailwind frontend salvaged
   from the earlier Agentarium `pcb_em_copilot` module (2026-04-21).
   Ships under `web-ui/` with its own README documenting the
   remaining Flask-backend retargeting work. Not built or served by
-  the Python package yet — included as the integration starting
+  the Python package yet: included as the integration starting
   point for the next iteration.
 
 ### Changed
-- **CI** — bumped GitHub Actions to Node 24 (`checkout@v5`,
+- **CI**: bumped GitHub Actions to Node 24 (`checkout@v5`,
   `setup-python@v6`).
-- **Type checking** — mypy typecheck is now a required CI step;
+- **Type checking**: mypy typecheck is now a required CI step;
   `continue-on-error` moved from job- to step-level so individual
   step failures still surface.
 
@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   args and from `test_integration_odb` imports so tests resolve
   against the installed package, not the working tree.
 
-## [0.3.0] — 2026-05-13
+## [0.3.0]: 2026-05-13
 
 ### Changed
 - **License: Apache-2.0 → AGPL-3.0-or-later.** Aligns with the
@@ -106,17 +106,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [LICENSE_SUMMARY](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md)
   in eng-mcp-suite for the toolkit-wide rationale.
 
-## [0.2.0] — 2026-05-13
+## [0.2.0]: 2026-05-13
 
 ### Added
 - Tiers 2–3 design-review features: BOM cross-reference, revision diff,
   AI-driven recommendations, reference-design lookup, ECO generation.
 - Executive dashboard with SVG gauges and domain-risk bars.
-- PCB-to-OpenEMS bridge — RF simulation extractor + coupled-line models.
+- PCB-to-OpenEMS bridge: RF simulation extractor + coupled-line models.
 - Crosstalk analyzer, finding annotator, false-positive suppression.
 - 65 integration tests + EDA net-mapping validation.
 - BOM-driven current profiling and battery-life analysis.
-- Interactive review context — MCP asks the user for missing info.
+- Interactive review context: MCP asks the user for missing info.
 - Differential-pair impedance calculation from real trace spacing.
 - Per-IC decoupling adequacy checker.
 - Impedance validation using real stackup data.

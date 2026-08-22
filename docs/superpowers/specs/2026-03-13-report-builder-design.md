@@ -1,4 +1,4 @@
-# Generalized PCB Design Review Report Builder — Design Spec
+# Generalized PCB Design Review Report Builder: Design Spec
 
 **Goal:** Replace the one-off `generate_docx_report.py` script with a reusable, project-agnostic MCP tool that generates professional DOCX and HTML design review reports from any PCB design session.
 
@@ -12,11 +12,11 @@
 
 The current report generation is a hardcoded script (`generate_docx_report.py`) specific to one example design. It has several shortcomings:
 
-- **Not reusable** — every new project requires rewriting the script
-- **Not traceable** — findings say "a 31 mm trace" without specifying which net, layer, or components
-- **Not explanatory** — reports show numbers without explaining what they mean, how they were calculated, or the physical mechanism
-- **Not integrated** — exists outside the MCP server as a standalone script
-- **Not automated** — requires manual assembly of analysis results
+- **Not reusable**. Every new project requires rewriting the script
+- **Not traceable**: findings say "a 31 mm trace" without specifying which net, layer, or components
+- **Not explanatory**: reports show numbers without explaining what they mean, how they were calculated, or the physical mechanism
+- **Not integrated**: exists outside the MCP server as a standalone script
+- **Not automated**: requires manual assembly of analysis results
 
 ## 2. Design Decisions
 
@@ -48,10 +48,10 @@ The overall verdict is determined by the highest-severity finding:
 
 | Condition | Verdict |
 |-----------|---------|
-| Any CRITICAL finding | `"CRITICAL — Remediation Required Before Prototype"` |
-| Any HIGH finding (no CRITICAL) | `"CONDITIONAL — Proceed with Caution, Address HIGH Items"` |
-| Any WARNING finding (no HIGH/CRITICAL) | `"PASS WITH WARNINGS — Review Recommended Items"` |
-| Only INFO/PASS findings | `"PASS — Ready for Prototype"` |
+| Any CRITICAL finding | `"CRITICAL: Remediation Required Before Prototype"` |
+| Any HIGH finding (no CRITICAL) | `"CONDITIONAL: Proceed with Caution, Address HIGH Items"` |
+| Any WARNING finding (no HIGH/CRITICAL) | `"PASS WITH WARNINGS: Review Recommended Items"` |
+| Only INFO/PASS findings | `"PASS: Ready for Prototype"` |
 
 ## 3. Finding Traceability Model
 
@@ -92,7 +92,7 @@ class TrackedFinding:
     render_path: str | None      # Board/net render PNG
 ```
 
-### Example — Trace Antenna Finding
+### Example: Trace Antenna Finding
 
 ```
 finding_id: "ANT-001"
@@ -161,7 +161,7 @@ Pattern:
 ```python
 def _build_section_name(self, doc, results):
     """Section N: Title."""
-    # 1. Guard — skip if no data
+    # 1. Guard: skip if no data
     data = self._get_domain_results("domain_key", results)
     if not data:
         return
@@ -245,7 +245,7 @@ def _build_section_name(self, doc, results):
     "findings_count": {"critical": 3, "high": 5, "warning": 8, "info": 4, "pass": 12},
     "plots_generated": 14,
     "renders_generated": 6,
-    "overall_verdict": "CRITICAL — Remediation Required Before Prototype"
+    "overall_verdict": "CRITICAL: Remediation Required Before Prototype"
 }
 ```
 
@@ -254,15 +254,15 @@ def _build_section_name(self, doc, results):
 ```
 src/mcp_pcb_emcopilot/
   reports/
-    __init__.py              # existing — add ReportBuilder export
-    report_builder.py        # NEW — ReportBuilder class (~800 lines)
-    tracked_finding.py        # NEW — TrackedFinding dataclass (~60 lines)
-    section_registry.py      # NEW — section ordering & metadata (~100 lines)
-    docx_report.py           # existing — reuse helpers as-is
-    html_report.py           # existing — reuse as-is
-    simulation_plots.py      # existing — reuse as-is
-    test_plan.py             # existing — reuse as-is
-  server.py                  # existing — add 1 new tool handler
+    __init__.py              # existing: add ReportBuilder export
+    report_builder.py        # NEW: ReportBuilder class (~800 lines)
+    tracked_finding.py        # NEW: TrackedFinding dataclass (~60 lines)
+    section_registry.py      # NEW: section ordering & metadata (~100 lines)
+    docx_report.py           # existing: reuse helpers as-is
+    html_report.py           # existing: reuse as-is
+    simulation_plots.py      # existing: reuse as-is
+    test_plan.py             # existing: reuse as-is
+  server.py                  # existing: add 1 new tool handler
 
 tests/
   test_report_builder.py     # NEW
@@ -302,9 +302,9 @@ Real DOCX/HTML files generated to `/tmp/`, validated well-formed. Synthetic anal
 
 ## 9. Key Design Principles
 
-1. **Every finding must be traceable** — net name, layer, component ref des, coordinates. No anonymous "a trace" or "a slot."
-2. **Every finding must be explanatory** — `what_it_means`, `how_calculated`, `physical_mechanism` fields are not optional in spirit. The report should teach the reader.
-3. **Reuse existing infrastructure** — `docx_report.py` helpers, `SimulationPlotter`, `html_report.py` are already well-factored. Don't rewrite them.
-4. **Session-first** — the primary path is harvesting results the AI already generated during the review conversation.
-5. **Graceful degradation** — missing data means skip the section, not crash the report.
-6. **Professional output** — color-coded severity badges, alternating row stripes, sequential figure numbering, headers/footers, TOC field codes. The output should look like it came from a $50k/year EDA tool, not a script.
+1. **Every finding must be traceable**: net name, layer, component ref des, coordinates. No anonymous "a trace" or "a slot."
+2. **Every finding must be explanatory**: `what_it_means`, `how_calculated`, `physical_mechanism` fields are not optional in spirit. The report should teach the reader.
+3. **Reuse existing infrastructure**: `docx_report.py` helpers, `SimulationPlotter`, `html_report.py` are already well-factored. Don't rewrite them.
+4. **Session-first**. The primary path is harvesting results the AI already generated during the review conversation.
+5. **Graceful degradation**: missing data means skip the section, not crash the report.
+6. **Professional output**: color-coded severity badges, alternating row stripes, sequential figure numbering, headers/footers, TOC field codes. The output should look like it came from a $50k/year EDA tool, not a script.

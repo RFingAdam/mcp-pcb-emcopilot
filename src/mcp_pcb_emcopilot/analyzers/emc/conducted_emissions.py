@@ -1,10 +1,10 @@
-"""Conducted emissions analysis — LISN model, CISPR 25 & FCC Part 15 Subpart B.
+"""Conducted emissions analysis: LISN model, CISPR 25 & FCC Part 15 Subpart B.
 
 Predicts conducted emissions from SMPS switching waveforms through a standard
 50µH/50Ω LISN (Line Impedance Stabilisation Network) model and compares against
 CISPR 25 conducted limits and FCC Part 15 Subpart B conducted limits.
 
-All calculations are pure Python — no external dependencies.
+All calculations are pure Python. No external dependencies.
 """
 
 from __future__ import annotations

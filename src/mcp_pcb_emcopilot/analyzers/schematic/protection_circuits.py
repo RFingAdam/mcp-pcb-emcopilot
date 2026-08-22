@@ -14,7 +14,7 @@ External-facing nets are identified by:
 2. Net names that imply a port: ``USB_DP``, ``USB_DM``, ``ETH_TX``,
    ``ANT_OUT``, ``GPIO_EXT``.
 3. Cable-driven nets that the design's net classifier already flagged
-   (deferred — Phase 4b doesn't have the cable classifier).
+   (deferred: Phase 4b doesn't have the cable classifier).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ _EXT_NET_KEYWORDS: tuple[str, ...] = (
     "USB", "ETH", "RJ45", "ANT", "RF_OUT", "RF_IN", "GPIO_EXT", "EXT_",
     "HEADER", "CONN", "I2C_EXT", "SPI_EXT", "UART_EXT", "CAN_H", "CAN_L",
     "LIN", "JTAG_EXT", "SWD_EXT",
-    # External power inputs — fuse / TVS coverage applies here too.
+    # External power inputs: fuse / TVS coverage applies here too.
     "VIN", "VBUS", "VBAT", "DCIN",
 )
 
@@ -91,7 +91,7 @@ def analyze_protection_circuits(
 
     ext_nets = [n for n in schematic_nets if _is_external_net(N.net_name(n))]
     if not ext_nets:
-        # Not an error — the design may not expose any external ports — but
+        # Not an error. The design may not expose any external ports, but
         # log as informational so the reviewer sees it.
         findings.append(ReviewFinding(
             domain="schematic_protection",
@@ -109,7 +109,7 @@ def analyze_protection_circuits(
 
     # Map TVS components to candidate protected nets (heuristic when pin-net
     # mapping is absent: any external net is "potentially" covered by the
-    # design's TVS components — surface counts to the user).
+    # design's TVS components: surface counts to the user).
     tvs_count = len(tvs_components)
     cmc_count = len(cmc_components)
     fuse_count = len(fuse_components)
@@ -145,7 +145,7 @@ def analyze_protection_circuits(
             pass
 
     if not has_pin_net:
-        # Aggregate finding — surface the gap so the reviewer knows manual
+        # Aggregate finding: surface the gap so the reviewer knows manual
         # verification is needed.
         ratio = tvs_count / max(len(ext_net_names), 1)
         severity = "high" if ratio < 0.5 else "medium" if ratio < 1.0 else "info"

@@ -20,15 +20,15 @@ _CAP_PATTERNS = [
     r'(?i)^C\d+',  # C1, C2, C100
 ]
 
-# Power net patterns — nets that need decoupling
+# Power net patterns: nets that need decoupling
 _POWER_NET_KEYWORDS = {
     'VCC', 'VDD', 'AVDD', 'DVDD', 'PVDD', 'VCCO', 'VDDI', 'NVCC',
     'BUCK', 'LDO', '3P3V', '1P8V', '1V8', '3V3', '5V', '1V0', '1V1',
 }
 
 # Proximity thresholds (mm)
-MAX_DECAP_DISTANCE_BGA = 2.0   # BGA packages — tight routing
-MAX_DECAP_DISTANCE_QFP = 3.0   # QFP/SOIC — more relaxed
+MAX_DECAP_DISTANCE_BGA = 2.0   # BGA packages: tight routing
+MAX_DECAP_DISTANCE_QFP = 3.0   # QFP/SOIC: more relaxed
 MAX_DECAP_DISTANCE_DEFAULT = 2.5
 
 

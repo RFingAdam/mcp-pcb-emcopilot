@@ -245,7 +245,7 @@ class AltiumSheetSymbol:
     record (linked by owner_idx) and exposes one or more sheet-entries
     (#16) that match port labels on the child sheet.
     """
-    name: str  # DESIGNATOR field — the sheet block label
+    name: str  # DESIGNATOR field. The sheet block label
     filename: Optional[str] = None  # linked FILE_NAME record's TEXT
     owner_idx: int = -1
     entries: List[Dict[str, Any]] = field(default_factory=list)
@@ -1504,7 +1504,7 @@ class AltiumSchematicParser:
             raise ValueError(f"SchDoc parse error: {str(e)}")
 
     # Coordinate tolerance for the geometric pin → net fallback (mm).
-    # Matches KiCadSchematicParser._LABEL_SNAP_MM — both tools snap to
+    # Matches KiCadSchematicParser._LABEL_SNAP_MM. Both tools snap to
     # the same nominal grid resolution at the mil level.
     _LABEL_SNAP_MM = 0.51
 
@@ -1893,7 +1893,7 @@ def altium_to_parsed_schematic(data: AltiumSchematicData) -> ParsedSchematicData
     flow into ``ParsedComponent.properties`` / ``ParsedSchematicData.properties``
     so no information is lost.
     """
-    # Local import to avoid circular dependency at module load time —
+    # Local import to avoid circular dependency at module load time:
     # schematic_parser imports altium_parser inside its factory branch.
     from dataclasses import asdict
 
