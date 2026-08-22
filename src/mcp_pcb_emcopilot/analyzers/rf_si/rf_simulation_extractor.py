@@ -264,7 +264,7 @@ class RFSimulationExtractor:
                 f"{c.structure_type} on {c.layer_name}",
                 f"net {nets_str}",
                 f"({c.interface} interface)",
-                f"— w={c.trace_width_mm:.3f}mm, L={c.trace_length_mm:.1f}mm",
+                f"- w={c.trace_width_mm:.3f}mm, L={c.trace_length_mm:.1f}mm",
             ]
             if c.z_diff_analytical:
                 desc_parts.append(

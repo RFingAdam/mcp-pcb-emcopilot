@@ -644,7 +644,7 @@ def generate_docx_report(
     doc.add_paragraph()
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("— End of Report —")
+    run = p.add_run("End of Report")
     run.font.size = Pt(10)
     run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
     run.italic = True

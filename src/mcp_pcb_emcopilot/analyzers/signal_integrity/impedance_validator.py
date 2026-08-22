@@ -427,7 +427,7 @@ class ImpedanceValidator:
                             f"Z_diff={z_diff:.0f}Ω (target {z_diff_target:.0f}Ω, "
                             f"{deviation*100:.0f}% off): w={width_mm:.4f}mm, "
                             f"s={spacing_mm:.3f}mm, Z_SE={z_se:.0f}Ω on {layer} "
-                            f"— {target['desc']}"
+                            f"; {target['desc']}"
                         ),
                         "recommendation": (
                             f"Adjust {dp.pair_name} trace width or spacing to achieve "
@@ -452,7 +452,7 @@ class ImpedanceValidator:
                         "description": (
                             f"{dp.category.upper()} diff pair {dp.pair_name}: "
                             f"Z_diff={z_diff:.0f}Ω ✓ (target {z_diff_target:.0f}Ω) "
-                            f"— w={width_mm:.4f}mm, s={spacing_mm:.3f}mm on {layer}"
+                            f"- w={width_mm:.4f}mm, s={spacing_mm:.3f}mm on {layer}"
                         ),
                         "recommendation": "",
                         "details": {

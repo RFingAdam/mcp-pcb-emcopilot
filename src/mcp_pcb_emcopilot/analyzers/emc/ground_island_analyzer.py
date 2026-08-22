@@ -95,7 +95,7 @@ class GroundIslandAnalyzer:
 
     def __init__(self):
         if not HAS_NETWORKX:
-            logger.warning("networkx not installed — ground island analysis unavailable")
+            logger.warning("networkx not installed; ground island analysis unavailable")
 
     def _get_via_stitch_spacing_for_freq(self, freq_mhz: float) -> float:
         for freq_threshold, spacing in sorted(self.VIA_STITCH_SPACING_BY_FREQ.items()):
